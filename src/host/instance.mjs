@@ -350,7 +350,7 @@ export function createInstance(pi, deps = {}) {
       heartbeatOnce();
       // R3 / LT-3: the same 5 s tick promotes a late-ready viewer (T13) without a second
       // `/dashboard`. Only a pending role needs it, so an idle dashboard makes no Herdr call.
-      tickPendingPass();
+      tickPendingPass().catch(error => record(error, 'heartbeat-tick'));
     }, heartbeatMs);
     heartbeatTimer?.unref?.();
   }
