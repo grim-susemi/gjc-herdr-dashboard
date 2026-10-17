@@ -105,7 +105,7 @@ The earlier LV-3 PASS used a wrapper `delay-run-25s` flag that the plan deleted 
 
 ## L2 (Workers pane and the two-role band)
 
-Unit: `node scripts/test.mjs` 521 tests, 0 fail (report `.evidence/L2/test-report.txt`). New modules: `src/host/sources/workers.mjs`, `src/core/layout.mjs`, `src/viewers/workers/{render,viewer}.mjs`; changed: `launch.mjs` (anchor, direction, ratio), `reconciler.mjs` (two-role loop, planner, shape check), `instance.mjs` (ROLES, bus wiring, per-role tick). L1 tests changed because the band opens two panes: AC1.4 (2 splits then 0), AC1.2 (two projections per publish), LT-5 (foreign sibling now `partial:shape`, was `opened`).
+Unit: `node scripts/test.mjs` 527 tests, 0 fail (report `.evidence/L2/test-report.txt`). New modules: `src/host/sources/workers.mjs`, `src/core/layout.mjs`, `src/viewers/workers/{render,viewer}.mjs`; changed: `launch.mjs` (anchor, direction, ratio), `reconciler.mjs` (two-role loop, planner, shape check), `instance.mjs` (ROLES, bus wiring, per-role tick). L1 tests changed because the band opens two panes: AC1.4 (2 splits then 0), AC1.2 (two projections per publish), LT-5 (foreign sibling now `partial:shape`, was `opened`).
 
 | Item | What was run and observed | Verdict | Evidence |
 |---|---|---|---|

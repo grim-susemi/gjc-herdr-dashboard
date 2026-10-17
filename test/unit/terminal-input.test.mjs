@@ -136,3 +136,26 @@ test("a Herdr subscription that closes after it started reports one failure", as
     dispose();
   } finally { server.close(); }
 });
+
+test("an error followed by the socket close reports exactly one failure", async () => {
+  const net = await import("node:net");
+  const failures = [];
+  let connection;
+  const name = "gjc-ti-err-" + process.pid;
+  const server = net.createServer((socket) => {
+    connection = socket;
+    socket.once("data", () => socket.write(JSON.stringify({ id: "dashboard-focus", result: { type: "subscription_started" } }) + "\n"));
+  });
+  const where = process.platform === "win32" ? "\\\\.\\pipe\\" + name
+    : (await import("node:path")).join((await import("node:os")).tmpdir(), name + ".sock");
+  await new Promise((done) => { server.listen(where, done); });
+  try {
+    const dispose = await watchHerdrFocus("w1:p2", () => {}, (cause) => failures.push(cause?.message),
+      { HERDR_ENV: "1", HERDR_PANE_ID: "w1:p2", HERDR_SOCKET_PATH: process.platform === "win32" ? name : where });
+    // A Herdr error reply reports the failure and destroys the socket, which then closes.
+    connection.write(JSON.stringify({ error: { message: "boom" } }) + "\n");
+    await new Promise((done) => setTimeout(done, 300));
+    assert.deepEqual(failures, ["boom"], "one notice for the error and the close that follows");
+    dispose();
+  } finally { server.close(); }
+});

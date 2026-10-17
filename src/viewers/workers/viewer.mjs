@@ -598,6 +598,8 @@ export async function startViewer(options, {
         prefs.expanded = { ...prefs.expanded, [id]: !prefs.expanded[id] };
       }
     }
+    // A press commits the position it was aimed at: the screen must not jump back to a stale pref.
+    prefs.scroll = at;
     dragY = mouse.y;
     prefs.follow = false;
     void commit();

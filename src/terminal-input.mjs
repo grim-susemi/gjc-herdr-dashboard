@@ -37,7 +37,10 @@ export const disablePointer = "\x1b[?1004l\x1b[?1006l\x1b[?1002l";
 
 // Herdr 0.9.3 does not forward pane blur as DEC 1004 terminal reports.
 // Its public lifecycle stream supplies the missing pane/tab/workspace events.
-export async function watchHerdrFocus(paneId, blur, failed, env = process.env) {
+export async function watchHerdrFocus(paneId, blur, report, env = process.env) {
+  // One failure notice per subscription, whichever of error, close or a Herdr error comes first.
+  let notified = false;
+  const failed = (cause) => { if (notified) return; notified = true; report(cause); };
   if (env.HERDR_ENV !== "1" || paneId !== env.HERDR_PANE_ID || !env.HERDR_SOCKET_PATH) return () => {};
   const path = process.platform === "win32"
     ? `\\\\.\\pipe\\${env.HERDR_SOCKET_PATH}` : env.HERDR_SOCKET_PATH;

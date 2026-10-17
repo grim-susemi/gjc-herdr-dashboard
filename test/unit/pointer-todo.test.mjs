@@ -473,3 +473,12 @@ test("stop pauses the stdin the viewer resumed, so the process can exit", async 
   viewer.stop();
   assert.equal(paused, 1);
 });
+
+test("a click after blur keeps the scroll position that was on screen", async (t) => {
+  const { f, viewer } = await open(t);
+  for (let step = 0; step < 3; step++) f.input.emit("data", wheelDown());
+  f.input.emit("data", blur);
+  const shown = viewer.frame.scroll;
+  f.input.emit("data", click(1));
+  assert.equal(viewer.frame.scroll, shown, "the press did not jump back to the stale pref");
+});

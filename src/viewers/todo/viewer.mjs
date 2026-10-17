@@ -506,6 +506,8 @@ export async function startViewer(options, {
       // Todo folds the closed phases as one group, so a click only selects the task.
       if (hit) prefs.selection = hit[0];
     }
+    // A press commits the position it was aimed at: the screen must not jump back to a stale pref.
+    prefs.scroll = at;
     dragY = mouse.y;
     prefs.follow = false;
     revealSelection = false;

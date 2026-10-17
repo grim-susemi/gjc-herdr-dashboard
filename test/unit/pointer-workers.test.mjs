@@ -483,3 +483,12 @@ test("stop pauses the stdin the viewer resumed, so the process can exit", async 
   viewer.stop();
   assert.equal(paused, 1);
 });
+
+test("a click after blur keeps the scroll position that was on screen", async (t) => {
+  const { f, viewer } = await open(t);
+  for (let step = 0; step < 3; step++) f.input.emit("data", "\x1b[<65;5;10M");
+  f.input.emit("data", "\x1b[O");
+  const shown = viewer.frame.scroll;
+  f.input.emit("data", "\x1b[<0;5;1M");
+  assert.equal(viewer.frame.scroll, shown);
+});
