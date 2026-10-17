@@ -431,6 +431,42 @@ test("--once prints exactly one frame to stdout and exits 0", async () => {
   rmSync(f.state, { recursive: true, force: true });
 });
 
+test("q without an injected client closes the own pane through the slot's recorded herdr vector", async (t) => {
+  const f = fixture(t);
+  const logPath = join(f.state, "herdr-calls.jsonl");
+  const fake = join(f.state, "fake-herdr.mjs");
+  writeFileSync(fake, "import { appendFileSync } from 'node:fs';\nappendFileSync(process.argv[2], JSON.stringify(process.argv.slice(3)) + '\\n');\nconsole.log('{\"id\":\"x\",\"result\":{}}');\n");
+  f.writeSlot({ ...slotFor(), herdr: [process.execPath, fake, logPath] });
+  f.writeProjection(projectionFor([{ name: "P", tasks: [{ content: "x", status: "pending" }] }]));
+  const viewer = await startViewer(options(f), { port: f.port, clock: f.clock,
+    env: { ...f.env, HERDR_PANE_ID: "w1:p9" }, output: f.output, input: f.input, exit: () => {} });
+  const retired = new Promise((done) => viewer.events.once("retired", done));
+  await viewer.key("q");
+  const info = await retired;
+  assert.equal(info.closed, true, `close outcome: ${info.closeReason}`);
+  const calls = readFileSync(logPath, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.deepEqual(calls, [["pane", "close", "w1:p9"]]);
+  assert.equal(f.readReady().closing, "q");
+});
+
+test("interactive mode: a projection that lands after the first paint appears on the next timer tick", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.input.setRawMode = () => {};
+  f.input.isTTY = true;
+  f.output.isTTY = true;
+  const watcher = { close() {}, on() {} };
+  const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
+    output: f.output, input: f.input, herdr: f.herdr, exit: () => {}, interactive: true,
+    watchFn: () => watcher });
+  t.after(async () => { await viewer.close(); });
+  assert.ok(!f.output.writes.at(-1).includes("late arrival"), "nothing to show yet");
+  // The owner publishes a Todo after the viewer already painted its empty frame.
+  f.writeProjection(projectionFor([{ name: "P", tasks: [{ content: "late arrival", status: "in_progress" }] }]));
+  f.clock.tick(1000);
+  assert.ok(f.output.writes.at(-1).includes("late arrival"), "the timer tick re-reads the projection");
+});
+
 test("interactive mode: pointer modes, raw mode, a repaint timer and the slot watcher", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());

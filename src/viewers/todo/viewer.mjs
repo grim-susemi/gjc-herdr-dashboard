@@ -43,6 +43,7 @@ import { closeOwnPane, createHeartbeat, createSlotWatcher, fenceDecision, genera
 import { disablePointer, enablePointer } from "../../terminal-input.mjs";
 import { ROOT_URL, createI18n } from "../../i18n.mjs";
 import { writeJson } from "../../storage.mjs";
+import { createHerdr } from "../../herdr.mjs";
 import { renderFrame, stepSelection, taskKeys } from "./render.mjs";
 
 export const USAGE =
@@ -184,6 +185,15 @@ export async function startViewer(options, {
     closing = false, disposed = false, closeJob = null, timer, watcher;
   let saving = Promise.resolve();
 
+  // Real runs have no injected client: use the Herdr argv vector the owner recorded in slot.json
+  // (plan 7.10) so `q` and a token-fence retirement can close this viewer's own pane.
+  function slotHerdr() {
+    const vector = Array.isArray(slot?.herdr) && slot.herdr.length > 0 ? slot.herdr : null;
+    if (vector === null) return undefined;
+    const call = createHerdr({ vector, env });
+    return (args) => call(...args);
+  }
+
   let resolveClosed;
   const closed = new Promise((done) => { resolveClosed = done; });
   const columnsOf = () => (options.width !== null ? Number(options.width) : Number(output.columns ?? 80));
@@ -210,8 +220,11 @@ export async function startViewer(options, {
     return frame;
   }
 
+  // The 1s timer and resize re-read slot, owner and projection before drawing; repainting the
+  // last frame alone would never show a Todo update that landed after the first paint.
   const paint = async () => {
-    if (isInteractive) output.write?.(`\x1b[H\x1b[2J${draw().text}`);
+    refresh();
+    if (isInteractive) output.write?.(`\x1b[H\x1b[2J${frame.text}`);
     return frame;
   };
 
@@ -271,7 +284,7 @@ export async function startViewer(options, {
       try { await writeReady({ closing: "q" }); }
       catch (cause) { events.emit("heartbeat-error", cause); }
       await saving;
-      const result = await closeOwnPane({ paneId: options.pane, env, herdr,
+      const result = await closeOwnPane({ paneId: options.pane, env, herdr: herdr ?? slotHerdr(),
         onClose: () => events.emit("pane-closed", reason) });
       events.emit("retired", { reason, closed: result.closed, closeReason: result.reason });
       finish("retired");
