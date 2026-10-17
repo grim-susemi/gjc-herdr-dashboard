@@ -93,5 +93,6 @@
   "workers.waitingBody": "Workers 원본을 기다립니다.",
   "workers.emptyBody": "실행 중인 작업이 없습니다.",
   "workers.errorBody": "Workers 원본을 읽을 수 없습니다.",
-  "workers.readError": "원천 오류: {error}"
+  "workers.readError": "원천 오류: {error}",
+  "focusSubscriptionFailed": "포커스 구독 실패: {error}"
 }

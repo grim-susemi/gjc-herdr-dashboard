@@ -12,7 +12,8 @@
 //        --token <token> --pane <paneId> [--once] [--lang ko|en|zh-cn] [--width N]
 //
 // Without `--once` and on a TTY the viewer runs interactively: raw mode, pointer
-// modes, a repaint timer, the slot watcher and the ready heartbeat. `--once` prints
+// modes, the SGR pointer/focus decoder, the Herdr focus subscription, a repaint
+// timer, the slot watcher and the ready heartbeat. `--once` prints
 // one frame to stdout and exits 0, which is what the snapshot tests use.
 //
 // Every side effect is injected through one `port` (raw UTF-8 file read, JSON read,
@@ -32,6 +33,9 @@
 //   startViewer(options, deps?): Promise<Viewer>
 //   main(argv?, deps?): Promise<number>
 //
+// `deps.watchFocus(paneId, blur, failed, env)` is the focus watcher (AC3.2/AC3.3);
+// it defaults to `watchHerdrFocus` and is only ever called for an interactive viewer.
+//
 // Viewer = { events, closed, refresh, key, close, stop, draw, setOwner, exit,
 //            frame, text, state }
 import { EventEmitter } from "node:events";
@@ -41,7 +45,8 @@ import { fileURLToPath } from "node:url";
 import { closeOwnPane, createHeartbeat, createSlotWatcher, fenceDecision, generationOf,
   isViewerFailpoint, ownerLiveness, readyRecord, t, VIEWER_FP_FLAG,
   viewerFailpointDelayMs } from "../common.mjs";
-import { disablePointer, enablePointer } from "../../terminal-input.mjs";
+import { disablePointer, enablePointer, terminalInput, watchHerdrFocus }
+  from "../../terminal-input.mjs";
 import { ROOT_URL, createI18n } from "../../i18n.mjs";
 import { writeJson } from "../../storage.mjs";
 import { createHerdr } from "../../herdr.mjs";
@@ -161,6 +166,7 @@ const defaultClock = { now: () => Date.now(), setInterval, clearInterval, setTim
 export async function startViewer(options, {
   port = defaultPort, clock = defaultClock, env = process.env, output = process.stdout,
   input = process.stdin, herdr, i18n = createI18n(ROOT_URL), watchFn = watch,
+  watchFocus = watchHerdrFocus,
   pid = process.pid, exit = (code) => process.exit(code),
   interactive = Boolean(input?.isTTY && output?.isTTY),
 } = {}) {
@@ -192,6 +198,11 @@ export async function startViewer(options, {
   let projection = null, availability = "waiting", error = "", slot = null, slotError = "",
     owner = null, ownerAlive = null, prefs = { ...EMPTY_PREFS, scopeKey: null }, frame = null,
     closing = false, disposed = false, closeJob = null, timer, watcher;
+  // Pointer drag anchor (1-based SGR row), cleared by release and by blur (AC3.1).
+  let dragY, disposeInput = null, disposeFocus = null;
+  // Selection reveal is disarmed by every manual pointer action and re-armed by a
+  // blur (AC3.2), so a wheel or drag can hold a scroll position the selection left behind.
+  let revealSelection = true;
   let saving = Promise.resolve();
 
   // Real runs have no injected client: use the Herdr argv vector the owner recorded in slot.json
@@ -227,7 +238,7 @@ export async function startViewer(options, {
     frame = renderFrame(projection, { columns: columnsOf(), rows: rowsOf(),
       language: language.language, color: isInteractive, expanded: prefs.expanded,
       scroll: prefs.scroll, selection: prefs.selection, follow: prefs.follow,
-      connection: connection(), notices });
+      connection: connection(), notices, revealSelection });
     return frame;
   }
 
@@ -278,7 +289,12 @@ export async function startViewer(options, {
     watcher?.close?.();
     clock.clearInterval(timer);
     heartbeat.stop();
-    input.off?.("data", onData);
+    disposeInput?.();
+    disposeInput = null;
+    // AC3.3: the focus subscription is released with the screen. A subscription that is
+    // still in flight disposes itself as soon as it resolves (see subscribeFocus).
+    disposeFocus?.();
+    disposeFocus = null;
     output.off?.("resize", onResize);
     events.emit("closed", { reason });
     resolveClosed({ reason });
@@ -422,21 +438,132 @@ export async function startViewer(options, {
       prefs.selection = stepped.selection;
       prefs.scroll = current.scroll;
     } else return Promise.resolve();
+    // The keyboard always reveals the selection: only a pointer action holds a manual
+    // scroll position, and any key that redraws hands it back to the selection.
+    revealSelection = true;
     const saved = savePrefs();
     draw();
     events.emit("frame", frame);
     return saved;
   }
 
-  const onData = (chunk) => { for (const character of String(chunk)) void key(character); };
   const onResize = () => { void paint(); };
+
+  // The wheel and the drag clamp against the last drawn frame: it carries both the row
+  // count and the body height, so a pointer can never scroll past the body (AC3.1).
+  const maxScrollOf = () => {
+    const current = frame ?? draw();
+    return Math.max(0, (current.bodyLines?.length ?? 0) - (current.bodyRows ?? 0));
+  };
+
+  // The shared tail of every pointer action: the frame is redrawn and the new scroll
+  // and follow state are persisted before the caller sees them.
+  function commit() {
+    const saved = savePrefs();
+    draw();
+    events.emit("frame", frame);
+    return saved;
+  }
+
+  // SGR pointer reports (AC3.1). Wheel turns follow off and steps the body by three
+  // rows; a left press selects the task under the cursor and starts a drag; a motion
+  // report with the left button pans the body; a release only ends the drag.
+  function onPointer(mouse) {
+    if (closing || disposed) return;
+    if (mouse.release) { dragY = undefined; return; }
+    if (mouse.button & 64) {
+      prefs.scroll = Math.min(Math.max(0, prefs.scroll + (mouse.button & 1 ? 3 : -3)), maxScrollOf());
+      prefs.follow = false;
+      revealSelection = false;
+      void commit();
+      return;
+    }
+    if ((mouse.button & 3) !== 0) return;
+    if (mouse.button & 32) {
+      if (dragY === undefined) return;
+      prefs.scroll = Math.min(Math.max(0, prefs.scroll + dragY - mouse.y), maxScrollOf());
+      dragY = mouse.y;
+      prefs.follow = false;
+      revealSelection = false;
+      void commit();
+      return;
+    }
+    // Left press. Only a body row can hit a task; every press (hit, miss or a header,
+    // divider, footer or blank row) turns follow off and starts a drag.
+    const current = frame ?? draw();
+    const line = mouse.y - 1;
+    const row = line - current.bodyStart + prefs.scroll;
+    if (line >= current.bodyStart && line < current.bodyStart + current.bodyRows) {
+      const hit = Object.entries(current.taskRanges ?? {})
+        .find(([, range]) => row >= range.start && row < range.end);
+      // Todo folds the closed phases as one group, so a click only selects the task.
+      if (hit) prefs.selection = hit[0];
+    }
+    dragY = mouse.y;
+    prefs.follow = false;
+    revealSelection = false;
+    void commit();
+  }
+
+  // AC3.2: losing the pane focus returns follow ON, ends any drag and re-arms the
+  // selection reveal, so the pane is back on the live selection the moment it is left.
+  // Gaining focus does nothing. Prefs are only written when the follow state changed.
+  function onFocus(focused) {
+    if (focused || closing || disposed) return;
+    dragY = undefined;
+    revealSelection = true;
+    if (prefs.follow === false) {
+      prefs.follow = true;
+      void commit();
+      return;
+    }
+    draw();
+    events.emit("frame", frame);
+  }
+
+  // AC3.3: the Herdr lifecycle subscription is best-effort. A rejection or a
+  // `failed(error)` callback shows exactly one footer notice and leaves the DEC 1004
+  // reports as the only focus source; nothing here may throw out of the viewer.
+  function subscribeFocus() {
+    let failed = false;
+    const report = (cause) => {
+      if (failed || disposed) return;
+      failed = true;
+      const notice = t(language.language, "focusSubscriptionFailed", { error: message(cause) });
+      if (!notices.includes(notice)) notices.push(notice);
+      draw();
+      events.emit("frame", frame);
+    };
+    let started;
+    try {
+      started = watchFocus(options.pane, () => onFocus(false), report, env);
+    } catch (cause) {
+      // outcome: a watcher that throws synchronously is the same failure as a rejected
+      // subscription, and the viewer keeps running on DEC 1004 alone.
+      report(cause);
+      return;
+    }
+    Promise.resolve(started).then((dispose) => {
+      if (typeof dispose !== "function") return;
+      // The subscription can land after `finish()`; it is disposed immediately then.
+      if (disposed) dispose();
+      else disposeFocus = dispose;
+    }, (cause) => { report(cause); });
+  }
 
   try {
     if (isInteractive) {
       enterScreen();
       input.setRawMode?.(true);
       input.resume?.();
-      input.on("data", onData);
+      // SGR pointer and DEC 1004 focus reports must be decoded before readline, or the
+      // trailing "M" of a mouse report would arrive as a key (AC3.1). A stdin without
+      // `on` (a one-shot process) has nothing to subscribe to.
+      if (typeof input.on === "function") {
+        disposeInput = terminalInput(input, {
+          key: (text, pressed) => { void key(pressed?.sequence || pressed?.name || text || ""); },
+          pointer: onPointer, focus: onFocus });
+      }
       output.on?.("resize", onResize);
     }
     // The ready write AND the first data paint are deferred together (R3): the 1 s repaint
@@ -452,6 +579,9 @@ export async function startViewer(options, {
         readFile: (path) => port.readRaw(path),
         onChange: (text) => { applySlotText(text); refresh(); },
         onError: (cause) => events.emit("watch-error", cause) });
+      // The subscription is started, never awaited: the ready write and the first
+      // paint must not wait for Herdr (AC3.3).
+      subscribeFocus();
     }
     if (alive) {
       await writeReady();

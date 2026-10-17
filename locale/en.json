@@ -93,5 +93,6 @@
   "workers.waitingBody": "Waiting for the Workers source.",
   "workers.emptyBody": "No work is running.",
   "workers.errorBody": "The Workers source is unavailable.",
-  "workers.readError": "Source error: {error}"
+  "workers.readError": "Source error: {error}",
+  "focusSubscriptionFailed": "Focus subscription failed: {error}"
 }

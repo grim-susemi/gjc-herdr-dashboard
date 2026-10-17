@@ -93,5 +93,6 @@
   "workers.waitingBody": "等待 Workers 来源。",
   "workers.emptyBody": "当前没有运行中的任务。",
   "workers.errorBody": "无法读取 Workers 来源。",
-  "workers.readError": "来源错误: {error}"
+  "workers.readError": "来源错误: {error}",
+  "focusSubscriptionFailed": "焦点订阅失败：{error}"
 }
