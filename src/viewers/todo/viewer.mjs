@@ -6,7 +6,7 @@
 // the native-display cache and every omo role-binding field. Added: the slot watch
 // with the token fence, the owner-liveness label, the projection read from
 // `<state>/data/<scopeKey>/todo.json`, scope rebinding when slot.json changes, and
-// the ready-delay environment variable used by the 25s-late-ready live test.
+// the `ready-delay-25s` launcher argument used by the 25s-late-ready live test (R3).
 //
 // CLI: node viewer.mjs --state <dir> [--layout <layoutKey>] --role todo
 //        --token <token> --pane <paneId> [--once] [--lang ko|en|zh-cn] [--width N]
@@ -39,11 +39,16 @@ import { readFileSync, watch } from "node:fs";
 import { isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { closeOwnPane, createHeartbeat, createSlotWatcher, fenceDecision, generationOf,
-  ownerLiveness, readyRecord, t } from "../common.mjs";
+  isViewerFailpoint, ownerLiveness, readyRecord, t, VIEWER_FP_FLAG,
+  viewerFailpointDelayMs } from "../common.mjs";
 import { disablePointer, enablePointer } from "../../terminal-input.mjs";
 import { ROOT_URL, createI18n } from "../../i18n.mjs";
 import { writeJson } from "../../storage.mjs";
 import { createHerdr } from "../../herdr.mjs";
+import { pidAlive as probePid } from "../../core/liveness.mjs";
+
+// null (unknowable) is treated as alive: a viewer must never claim a disconnect it cannot prove.
+const defaultPidAlive = (pid) => probePid(pid) !== false;
 import { renderFrame, stepSelection, taskKeys } from "./render.mjs";
 
 export const USAGE =
@@ -59,9 +64,10 @@ const PROJECTION_SCHEMA = "gjc-herdr-dashboard/todo/1";
 
 export function parseViewerArgs(args) {
   const result = { once: false, state: null, layout: null, role: "todo", token: null,
-    pane: null, lang: null, width: null };
+    pane: null, lang: null, width: null, failpoint: null };
   const fields = { "--state": "state", "--layout": "layout", "--role": "role",
-    "--token": "token", "--pane": "pane", "--lang": "lang", "--width": "width" };
+    "--token": "token", "--pane": "pane", "--lang": "lang", "--width": "width",
+    [VIEWER_FP_FLAG]: "failpoint" };
   for (let index = 0; index < args.length; index++) {
     const flag = args[index];
     if (flag === "--once") { result.once = true; continue; }
@@ -81,6 +87,9 @@ export function parseViewerArgs(args) {
     throw new TypeError(`${USAGE} (--layout must be a layout key)`);
   }
   if (result.width !== null && !/^\d{1,4}$/.test(result.width)) throw new TypeError(`${USAGE} (bad --width)`);
+  if (result.failpoint !== null && !isViewerFailpoint(result.failpoint)) {
+    throw new TypeError(`${USAGE} (unknown viewer failpoint)`);
+  }
   return result;
 }
 
@@ -170,7 +179,7 @@ export async function startViewer(options, {
   const ownerPath = `${slotsDir}/owner.json`;
   const readyPath = `${slotsDir}/roles/${options.role}.ready.json`;
   const startedAt = clock.now();
-  const readyDelay = Number(env.GJC_HERDR_DASHBOARD_VIEWER_READY_DELAY_MS ?? 0);
+  const readyDelay = viewerFailpointDelayMs(options.failpoint);
   const isInteractive = interactive && !options.once;
   // The ready file is written through the shared heartbeat helper so the periodic tick
   // and the closing mark cannot drift apart. It is the only state file this viewer
@@ -198,7 +207,9 @@ export async function startViewer(options, {
   const closed = new Promise((done) => { resolveClosed = done; });
   const columnsOf = () => (options.width !== null ? Number(options.width) : Number(output.columns ?? 80));
   const rowsOf = () => Number(output.rows ?? 24);
-  const pidAlive = (candidate) => (ownerAlive ? ownerAlive(candidate) : true);
+  // Production default: probe the owner pid (ESRCH = dead, EPERM = alive, anything else is
+  // inconclusive and fails closed to live). Tests inject `alive` through setOwner.
+  const pidAlive = (candidate) => (ownerAlive ? ownerAlive(candidate) : defaultPidAlive(candidate));
 
   function connection() {
     // Distinctness for AC1.9: read failure first, then owner liveness, then the
@@ -427,6 +438,11 @@ export async function startViewer(options, {
       input.resume?.();
       input.on("data", onData);
       output.on?.("resize", onResize);
+    }
+    // The ready write AND the first data paint are deferred together (R3): the 1 s repaint
+    // timer and the slot watcher start only after the delay, so a late viewer shows no data early.
+    if (readyDelay > 0) await new Promise((done) => clock.setTimeout(done, readyDelay));
+    if (isInteractive) {
       timer = clock.setInterval(() => { void paint(); }, 1000);
       timer?.unref?.();
       watcher = createSlotWatcher({ slotPath, watchFn, clock,
@@ -434,7 +450,6 @@ export async function startViewer(options, {
         onChange: (text) => { applySlotText(text); refresh(); },
         onError: (cause) => events.emit("watch-error", cause) });
     }
-    if (readyDelay > 0) await new Promise((done) => clock.setTimeout(done, readyDelay));
     await writeReady();
     heartbeat.start();
     refresh();

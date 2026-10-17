@@ -348,8 +348,26 @@ export function createInstance(pi, deps = {}) {
     heartbeatTimer = armTimer(() => {
       if (!armed) return;
       heartbeatOnce();
+      // R3 / LT-3: the same 5 s tick promotes a late-ready viewer (T13) without a second
+      // `/dashboard`. Only a pending role needs it, so an idle dashboard makes no Herdr call.
+      tickPendingPass();
     }, heartbeatMs);
     heartbeatTimer?.unref?.();
+  }
+
+  async function tickPendingPass() {
+    if (!latestCtx || !stateDir || layoutKey === null) return;
+    let read;
+    try { read = await readSlot(paths().slot); }
+    catch (error) {
+      // outcome: no readable slot means nothing is pending; the next tick looks again.
+      record(error, 'heartbeat-slot');
+      return;
+    }
+    if (read.status !== 'ok') return;
+    const roleRecord = read.slot?.roles?.todo ?? null;
+    if (roleRecord?.state !== 'pending') return;
+    await runAutoPass(latestCtx, 'heartbeat-tick');
   }
 
   function stopHeartbeat() {
@@ -538,8 +556,8 @@ export function createInstance(pi, deps = {}) {
     const key = text(read.slot?.scope?.scopeKey);
     if (!key) return { published: false, reason: 'no-scope' };
     scopeKey = key;
-    const record = read.slot?.roles?.todo ?? null;
-    if (!record || record.state === 'closed') return { published: false, reason: 'closed' };
+    const todoRecord = read.slot?.roles?.todo ?? null;
+    if (!todoRecord || todoRecord.state === 'closed') return { published: false, reason: 'closed' };
     let projection;
     try { projection = projectTodoOf()(ctx, { now: clock() }); }
     catch (error) {

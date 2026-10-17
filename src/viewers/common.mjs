@@ -153,6 +153,14 @@ export function generationOf(rootUrl, { readFile = readFileSync } = {}) {
   }
 }
 
+// R3 / SR9: the one place a viewer failpoint is parsed. The launcher passes
+// `--failpoint ready-delay-25s`; the name maps to a delay of the first ready write and the first
+// data paint. A name outside the table is a usage error, not a silent no-op.
+export const VIEWER_FP_DELAYS_MS = Object.freeze({ "ready-delay-25s": 25000 });
+export const VIEWER_FP_FLAG = "--failpoint";
+export const isViewerFailpoint = (name) => Object.hasOwn(VIEWER_FP_DELAYS_MS, name);
+export const viewerFailpointDelayMs = (name) => (isViewerFailpoint(name) ? VIEWER_FP_DELAYS_MS[name] : 0);
+
 export function readyRecord({ pid, token, paneId, gen = "dev", startedAt, now, closing }) {
   return { pid, token, paneId, gen, startedAt, heartbeatAt: now, ...(closing ? { closing } : {}) };
 }

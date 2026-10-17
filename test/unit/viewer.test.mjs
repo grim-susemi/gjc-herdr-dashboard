@@ -17,6 +17,7 @@ import { stripVTControlCharacters } from "node:util";
 import { test } from "node:test";
 import { EMPTY_PREFS, loadPreferences, main, parseViewerArgs, readProjection, savePreferences,
   startViewer } from "../../src/viewers/todo/viewer.mjs";
+import { viewerArgs } from "../../src/core/launch.mjs";
 
 const slotFor = ({ layoutKey = "a".repeat(24), scopeKey = "b".repeat(24), role = "todo",
   state = "pending", token = "tok", pane = "w1:p9" } = {}) => ({
@@ -101,7 +102,13 @@ test("parseViewerArgs accepts the contract CLI and rejects malformed input", () 
   const parsed = parseViewerArgs(["--state", "/tmp/s", "--layout", "a".repeat(24), "--role", "todo",
     "--token", "t", "--pane", "w1:p2", "--lang", "ko", "--width", "52", "--once"]);
   assert.deepEqual(parsed, { once: true, state: "/tmp/s", layout: "a".repeat(24), role: "todo",
-    token: "t", pane: "w1:p2", lang: "ko", width: "52" });
+    token: "t", pane: "w1:p2", lang: "ko", width: "52", failpoint: null });
+  // R3: the exact argv the launcher builds for fp5 must be accepted by the real viewer parser.
+  const launched = viewerArgs({ stateDir: "/tmp/s", layoutKey: "a".repeat(24), role: "todo", token: "t",
+    paneId: "w1:p2", language: "ko", failpoint: "ready-delay-25s" });
+  assert.equal(parseViewerArgs(launched).failpoint, "ready-delay-25s");
+  assert.throws(() => parseViewerArgs(["--state", "/tmp/s", "--token", "t", "--pane", "p",
+    "--failpoint", "bogus"]), /unknown viewer failpoint/);
   // The defaults: role todo, no layout, no language override, one frame not requested.
   assert.equal(parseViewerArgs(["--state", "/tmp/s", "--token", "t", "--pane", "p"]).role, "todo");
   for (const args of [[], ["--state", "/tmp/s", "--token", "t"], ["--state", "relative", "--token", "t", "--pane", "p"],
@@ -251,14 +258,14 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with fold and select
   assert.match(stripVTControlCharacters(second.text), /done one/);
 });
 
-test("a ready-delay environment variable postpones the first ready write", async (t) => {
-  const f = fixture(t, { env: { GJC_HERDR_DASHBOARD_VIEWER_READY_DELAY_MS: "25000" } });
+test("the ready-delay-25s failpoint postpones the first ready write", async (t) => {
+  const f = fixture(t);
   f.writeSlot(slotFor());
   f.writeProjection(projectionFor([]));
   // The viewer is started without awaiting it: the ready write is gated on the fake
   // clock, which this test drives by hand.
-  const starting = startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
-    output: f.output, input: f.input, herdr: f.herdr, exit: () => {}, interactive: false });
+  const starting = startViewer({ ...options(f), failpoint: "ready-delay-25s" }, { port: f.port, clock: f.clock,
+    env: f.env, output: f.output, input: f.input, herdr: f.herdr, exit: () => {}, interactive: false });
   await new Promise((done) => setImmediate(done));
   assert.throws(() => f.readReady(), /ENOENT/, "nothing is written before the delay");
   f.clock.advance(24999);
@@ -429,6 +436,44 @@ test("--once prints exactly one frame to stdout and exits 0", async () => {
   assert.equal(printed[0].endsWith("\n"), true);
   assert.deepEqual(f.calls, []);
   rmSync(f.state, { recursive: true, force: true });
+});
+
+test("R3 failpoint in interactive mode defers the ready write and the first data paint together", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([{ name: "P", tasks: [{ content: "early row", status: "pending" }] }]));
+  f.input.setRawMode = () => {};
+  f.input.isTTY = true;
+  f.output.isTTY = true;
+  const starting = startViewer({ ...options(f), failpoint: "ready-delay-25s" }, { port: f.port,
+    clock: f.clock, env: f.env, output: f.output, input: f.input, herdr: f.herdr, exit: () => {},
+    interactive: true, watchFn: () => ({ close() {}, on() {} }) });
+  await new Promise((done) => setImmediate(done));
+  f.clock.advance(24999);
+  f.clock.tick(1000);
+  assert.ok(!f.output.writes.some((text) => text.includes("early row")), "no data frame before the delay");
+  assert.throws(() => f.readReady(), /ENOENT/, "no ready file before the delay");
+  f.clock.advance(1);
+  const viewer = await starting;
+  t.after(async () => { await viewer.close(); });
+  assert.equal(f.readReady().token, "tok");
+  f.clock.tick(1000);
+  assert.ok(f.output.writes.at(-1).includes("early row"), "data appears after the delay");
+});
+
+test("the default owner probe reports a dead owner pid as disconnected once its heartbeat is 20 s old", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
+    output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
+  t.after(() => viewer.stop());
+  // pid 999999 does not exist: the default probe (no injected `alive`) must see ESRCH.
+  viewer.setOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 999999, heartbeatAt: f.clock.now() });
+  assert.equal(viewer.state.owner, "live", "a fresh heartbeat still counts as live");
+  f.clock.advance(20000);
+  assert.equal(viewer.state.owner, "disconnected");
+  viewer.refresh();
+  assert.match(stripVTControlCharacters(viewer.text), /연결 끊김/);
 });
 
 test("q without an injected client closes the own pane through the slot's recorded herdr vector", async (t) => {

@@ -462,6 +462,29 @@ test('LT-4 duplicate: a second install delegates and appends its warning to the 
   assert.equal(duplicate.state().counters.delegated, 2);
 });
 
+// ------------------------------------------------------------------- R3 heartbeat tick ----
+test('R3: the 5 s heartbeat tick runs an automatic pass while the todo record is pending, and not otherwise', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx } = world.ctx();
+  await pi.handlers.get('session_start')({}, ctx);
+  const idleCalls = world.fake.calls.length;
+  const idleAuto = handle.state().counters.auto;
+  // Nothing is pending (no dashboard opened yet): the tick must stay silent toward Herdr.
+  await world.timers.fire(5000);
+  assert.equal(handle.state().counters.auto, idleAuto, 'no pending role, no automatic pass');
+  assert.equal(world.fake.calls.length, idleCalls, 'and no Herdr call');
+
+  // Open the dashboard: the record is pending until the (fake) viewer reports ready.
+  await pi.commands.get('dashboard').handler({}, ctx);
+  world.notifications.length = 0;
+  const before = handle.state().counters.auto;
+  await world.timers.fire(5000);
+  assert.equal(handle.state().counters.auto, before + 1, 'a pending role is re-evaluated on the tick');
+  assert.equal(world.notifications.length, 0, 'an automatic pass never notifies');
+});
+
 // --------------------------------------------------------------------------------- G9 poll ----
 test('G9: an exception from the retained ctx disables the poll for good (event-only)', async t => {
   const world = await makeWorld(t);
