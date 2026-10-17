@@ -55,9 +55,8 @@ test("the projection never carries notes, ids, assignment text or transcript bod
 });
 
 test("an empty source is reported as empty, never as a missing source", () => {
-  assert.deepEqual(projectTodo(ctxOf([])),
-    { schema: TODO_SCHEMA, updatedAt: projectTodo(ctxOf([])).updatedAt, phases: [], empty: true,
-      sourceError: null });
+  assert.deepEqual(projectTodo(ctxOf([]), { now: 99 }),
+    { schema: TODO_SCHEMA, updatedAt: 99, phases: [], empty: true, sourceError: null });
   const withEmptyPhase = projectTodo(ctxOf([phase("Shell", [])]));
   assert.equal(withEmptyPhase.empty, true);
   assert.equal(readProjection("x", { read: () => withEmptyPhase }).availability, "empty");
