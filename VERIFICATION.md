@@ -44,3 +44,8 @@
 
 ### 프로브 중 발생한 사고
 G12 확인용 `/new` 입력 뒤 같은 pane에 `/reload`를 보냈는데, 그것은 slash 명령이 아니라 모델에게 보내는 일반 메시지가 되어 모델 호출(질문 도구 포함)이 한 번 일어났다. 소유자 자원에는 영향이 없고 harness 소유 pane에서만 일어났다. 이후 pane을 닫았다.
+
+### L0 종료 처리
+- `spike/`는 삭제했다(사본은 git 밖 `.evidence/L0/spike-src/`).
+- harness가 만든 Herdr session `gjcdash-probe`는 workspace 2개를 닫고 `herdr session stop`으로 중지했다. 기존 session(`default`, `piomo`, `gen10qa` 등)과 소유자 pane `w1:pT5`는 건드리지 않았다.
+- 이 L0 기록은 소유자 Go를 받기 전의 **권고용 기록**이다. L1 구현은 시작하지 않았다.
