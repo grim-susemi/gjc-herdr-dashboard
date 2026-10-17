@@ -1,5 +1,5 @@
 // Unit tests for src/runtime.mjs. Adapted from the pinned copy source (see
-// .sandbox/provenance-A.md), with the env override renamed and the GJC Node floor.
+// PROVENANCE.md, "Lane A — core state"), with the env override renamed and the GJC Node floor.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveViewerNode, nodeUnavailableText } from '../../src/runtime.mjs';

@@ -45,10 +45,11 @@ export function evidenceDirFor(level, lv) {
 // `node scripts/dev-shim.mjs --case <id> --state <abs> --herdr <json argv>` writes
 // `<case>/.gjc/extensions/gjc-herdr-dashboard.js`, which is the project-scope extension the pane's
 // gjc loads (its cwd is the case dir).
-export function createCase({ caseId, root = SANDBOX, state = null, herdr }) {
+export function createCase({ caseId, root = SANDBOX, state = null, herdr, viewerFailpoint = null }) {
   const paths = casePaths({ caseId, root, state });
   const argv = ['scripts/dev-shim.mjs', '--case', caseId, '--state', paths.stateDir];
   if (herdr) argv.push('--herdr', JSON.stringify(herdr));
+  if (viewerFailpoint) argv.push('--viewer-failpoint', viewerFailpoint);
   const shim = spawnSync(process.execPath, argv, { cwd: REPO, encoding: 'utf8', windowsHide: true });
   if (shim.status !== 0) {
     throw coded('live-case', `dev-shim failed (${shim.status}): ${shim.stdout}${shim.stderr}`);

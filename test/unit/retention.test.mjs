@@ -1,5 +1,5 @@
 // Unit tests for src/retention.mjs. Adapted from the pinned copy source (see
-// .sandbox/provenance-A.md) to the scope-directory model of plan 6 row R / A-15.
+// PROVENANCE.md, "Lane A — core state") to the scope-directory model of plan 6 row R / A-15.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs, { utimes, writeFile } from 'node:fs/promises';

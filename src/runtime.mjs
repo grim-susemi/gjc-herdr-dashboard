@@ -1,7 +1,7 @@
 // Viewer interpreter resolution. The viewer is always launched as a plain Node script, so the
 // host's own executable is only usable when it IS Node (a compiled GJC/Bun binary is not a
 // general JavaScript interpreter). Adapted from the pinned copy source (see
-// .sandbox/provenance-A.md).
+// PROVENANCE.md, "Lane A — core state").
 //
 // Exports:
 //   resolveViewerNode({env, execPath, run, language, message}) -> absolute path to a Node

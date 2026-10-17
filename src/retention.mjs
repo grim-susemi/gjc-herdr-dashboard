@@ -1,6 +1,6 @@
 // Retention of derived per-scope state (plan 6 row R, A-15). Only `data/<scopeKey>/` and
 // `prefs/<scopeKey>/` are pruned; `slots/` is never touched. Adapted from the pinned copy
-// source (see .sandbox/provenance-A.md).
+// source (see PROVENANCE.md, "Lane A — core state").
 //
 // Exports:
 //   retentionDaysFromEnv(env)  -> retention window in days. `GJC_HERDR_DASHBOARD_RETENTION_DAYS`

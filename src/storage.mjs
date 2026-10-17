@@ -1,5 +1,5 @@
 // Atomic JSON state files (plan 7.9: "write to tmp, then rename; retry on EPERM").
-// Adapted from the pinned copy source (see .sandbox/provenance-A.md).
+// Adapted from the pinned copy source (see PROVENANCE.md, "Lane A — core state").
 //
 // Exports:
 //   readJson(path)             -> parsed value; null when the file does not exist. Other read or

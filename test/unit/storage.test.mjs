@@ -1,5 +1,5 @@
 // Unit tests for src/storage.mjs. Adapted from the pinned copy source (see
-// .sandbox/provenance-A.md). Windows-only retry behaviour is asserted on win32; every other
+// PROVENANCE.md, "Lane A — core state"). Windows-only retry behaviour is asserted on win32; every other
 // platform asserts the fail-closed branch.
 //
 // Monkeypatching is done by direct assignment plus restore rather than `t.mock.method`, because

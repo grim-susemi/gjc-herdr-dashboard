@@ -219,5 +219,5 @@ node scripts/dev-shim.mjs --case <id> [--state <dir>] [--herdr <json argv>] [--v
 | `src/host/instance.mjs` | arming, 레지스트리, delegate, nested·mirror·state 판정 | L1(다른 레인) |
 | `test/live/*.mjs` | 라이브 재현 절차(L1–L6) | 예정 |
 | `scripts/{build,install,verify-package}.mjs` | 세대 설치·롤백 | L6 |
-| `PROVENANCE.md`, `VERIFICATION.md` | 복사 매핑, L0 실측 기록 | 완료 |
-| `.sandbox/provenance-*.md` | 레인별 복사·적응 근거 | 진행 중 |
+| `PROVENANCE.md` | 레인별 복사·적응 매핑(Lane A/C/D/E + 미매핑 파일) | 완료 |
+| `VERIFICATION.md` | L0 실측 기록 | 완료 |

@@ -1,5 +1,5 @@
 // Unit tests for src/herdr.mjs. Adapted from the pinned copy source (see
-// .sandbox/provenance-A.md) and extended for the GJC vector precedence of plan 7.10.
+// PROVENANCE.md, "Lane A — core state") and extended for the GJC vector precedence of plan 7.10.
 // Two host-portability adaptations are recorded in the provenance table: the POSIX quoting
 // round-trip uses `sh` (the `bash` on this host's PATH is the WSL launcher and cannot run the
 // command), and the real-child test spawns `node` through the HERDR vector env instead of an

@@ -1,6 +1,6 @@
 // Herdr invocation: argv vector resolution plus a shell-free `execFile` client, and the
 // PowerShell-safe command builder used for the viewer launch trailer.
-// Adapted from the pinned copy source (see .sandbox/provenance-A.md).
+// Adapted from the pinned copy source (see PROVENANCE.md, "Lane A — core state").
 //
 // Exports:
 //   shellCommand(args, platform)          -> single-line command string. win32 -> PowerShell

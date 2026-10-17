@@ -462,6 +462,28 @@ test('LT-4 duplicate: a second install delegates and appends its warning to the 
   assert.equal(duplicate.state().counters.delegated, 2);
 });
 
+// ------------------------------------------------------------------- R6 LT-6 clause 3 ----
+test('LT-6 c3: a main that fails eligibility at session_start arms on the next eligible /dashboard', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const registryBefore = world.registry.writes.length;
+  const callsBefore = world.fake.calls.length;
+  const ineligible = world.ctx({ hasUI: false });
+  await pi.handlers.get('session_start')({}, ineligible.ctx);
+  assert.equal(handle.armed(), false);
+  assert.equal(world.notifications.length, 0, 'a silent ineligible session_start');
+  assert.equal(world.registry.writes.length, registryBefore, 'no registry write');
+  assert.equal(world.fake.calls.length, callsBefore, 'no Herdr call');
+  assert.deepEqual(world.timers.periods(), [], 'no timers');
+
+  const eligible = world.ctx();
+  await pi.commands.get('dashboard').handler({}, eligible.ctx);
+  assert.equal(handle.armed(), true, JSON.stringify(handle.state().errors));
+  assertOneNotify(world, /Todo opened/);
+  assert.deepEqual(world.timers.periods(), [1000, 5000]);
+});
+
 // ------------------------------------------------------------------- R3 heartbeat tick ----
 test('R3: the 5 s heartbeat tick runs an automatic pass while the todo record is pending, and not otherwise', async t => {
   const world = await makeWorld(t);
