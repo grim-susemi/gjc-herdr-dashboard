@@ -1,0 +1,20 @@
+{
+  "todo": "Todo",
+  "completed": "완료",
+  "dropped": "제외",
+  "emptyPhase": "(빈 단계)",
+  "waitingBody": "원본 Todo 연결을 기다립니다.",
+  "emptyBody": "원본 체크리스트가 비어 있습니다.",
+  "errorBody": "원본 Todo를 읽을 수 없습니다.",
+  "readError": "읽기 오류: {error}",
+  "live": "실시간",
+  "waiting": "연결 대기",
+  "empty": "원본 비어 있음",
+  "disconnectedAt": "연결 끊김 {time}",
+  "sourceError": "원천 오류",
+  "followOn": "자동 추적 ON",
+  "followOff": "자동 추적 OFF",
+  "prefsError": "화면 설정: {error}",
+  "slotMissing": "역할 정보를 찾을 수 없습니다.",
+  "invalidLanguage": "언어 값이 올바르지 않아 한국어로 표시합니다: {value}"
+}

@@ -1,0 +1,220 @@
+// Frame renderer tests for the Todo viewer.
+//
+// Adapted from omo-herdr-dashboard @4082c750 `packages/todo/test/render.test.mjs`.
+// Kept as behaviour: grapheme width, truncation and wrapping; bounded frames over
+// a layout matrix; fold/unfold of closed phases; narrow 34/52 column layouts;
+// hostile terminal control sequences; footer content. Dropped with the features
+// they covered: the `ask` panel and its own scroll, the strike-reveal animation,
+// the `native-todo` projection and the reference click ranges of the omo band.
+import assert from "node:assert/strict";
+import { stripVTControlCharacters } from "node:util";
+import { test } from "node:test";
+import { clean, fit, width, wrap } from "../../src/viewers/common.mjs";
+import { counts, isClosedPhase, marks, renderFrame, taskKeys } from "../../src/viewers/todo/render.mjs";
+
+// Independent cell oracle for the ASCII/Hangul fixtures, not renderer.width.
+const cells = (line) => Array.from(stripVTControlCharacters(line))
+  .reduce((total, point) => total + (/[\u1100-\u115f\uac00-\ud7a3]/u.test(point) ? 2 : 1), 0);
+
+const projection = (phases, extra = {}) => ({ schema: "gjc-herdr-dashboard/todo/1", updatedAt: 1,
+  phases, empty: phases.every((phase) => phase.tasks.length === 0), sourceError: null, ...extra });
+
+const mixed = () => projection([
+  { name: "Foundation", tasks: [{ content: "Confirmed authority", status: "completed" },
+    { content: "Retired alternative", status: "abandoned" }] },
+  { name: "Implementation", tasks: [
+    { content: "현재진행중인작업을읽기쉽게보여줍니다".repeat(3), status: "in_progress" },
+    { content: "Concurrent current work", status: "in_progress" },
+    { content: "Verify source", status: "pending" }] },
+  { name: "Empty shell", tasks: [] },
+]);
+
+test("grapheme width, truncation and wrapping retain independently expected cells", () => {
+  assert.equal(width("한글A"), 5);
+  assert.equal(width("e\u0301"), 1);
+  assert.equal(width("\u0301"), 0);
+  assert.equal(width("\ud83c\uddf0\ud83c\uddf7"), 2);
+  assert.equal(width("\ud83d\udc69\u200d\ud83d\udcbb"), 2);
+  assert.equal(fit("한글A", 4), "한~");
+  assert.equal(fit("한글A", 4, true), "한~ ");
+  assert.deepEqual(wrap("가나다라마바사", 6), ["가나다", "라마바", "사"]);
+  assert.deepEqual(wrap("e\u0301e\u0301e\u0301", 2), ["e\u0301e\u0301", "e\u0301"]);
+  assert.deepEqual(wrap("한글", 1), ["?", "?"]);
+});
+
+test("counts and closed-phase classification follow the shared status vocabulary", () => {
+  // Given the four statuses the shared contract allows plus an unknown one.
+  const tasks = [{ status: "completed" }, { status: "abandoned" }, { status: "in_progress" },
+    { status: "pending" }];
+  // Then only completed and abandoned count as closed, and the two are counted apart.
+  assert.deepEqual(counts(tasks), { total: 4, closed: 2, completed: 1, dropped: 1 });
+  assert.equal(isClosedPhase({ tasks: [{ status: "completed" }, { status: "abandoned" }] }), true);
+  assert.equal(isClosedPhase({ tasks: [] }), false);
+  assert.equal(isClosedPhase({ tasks: [{ status: "pending" }] }), false);
+  assert.equal(marks.abandoned, "[×]");
+});
+
+for (const [columns, rows] of [[80, 24], [52, 23], [40, 16], [34, 18], [24, 8], [12, 4], [1, 1]]) {
+  test(`${columns}x${rows}: a bounded frame whose footer survives`, () => {
+    const frame = renderFrame(mixed(), { columns, rows, color: false, language: "ko" });
+    assert.equal(frame.lines.length, rows);
+    // The footer is the last row in every layout and always carries both required
+    // tokens (AC-F1/F3 is a content assertion). From the 24-column width upward it
+    // also fits untruncated; below that it is the only row allowed to overflow.
+    const footer = stripVTControlCharacters(frame.lines.at(-1));
+    assert.match(footer, /자동 추적 ON/);
+    assert.match(footer, /실시간/);
+    if (columns >= 24) assert.ok(frame.footerFits, `footer fits at ${columns}`);
+    for (const line of frame.lines.slice(0, -1)) assert.ok(cells(line) <= columns, JSON.stringify(line));
+    assert.doesNotMatch(frame.text, /j\/k|a\/z|c q|q 닫기|^f /m);
+  });
+}
+
+test("phase shells, fold ranges and every status stay reachable by body scroll", () => {
+  const snapshot = mixed();
+  const full = renderFrame(snapshot, { columns: 40, rows: 16, color: false, expanded: true });
+  assert.equal(Object.keys(full.phaseRanges).length, 3);
+  assert.equal(Object.keys(full.taskRanges).length, 5);
+  assert.equal(Object.values(full.taskRanges).filter((range) => range.status === "in_progress").length, 2);
+  assert.equal(full.bodyLines.filter((line) => line.includes("[•]")).length, 2);
+  assert.equal(full.selectableKeys.length, 5);
+  assert.deepEqual(full.selectableKeys, taskKeys(snapshot));
+  for (const [, phase] of snapshot.phases.entries()) {
+    const range = Object.values(full.phaseRanges).find((value) => full.bodyLines[value.start].includes(phase.name));
+    assert.ok(range, `phase ${phase.name} has a body row`);
+    const frame = renderFrame(snapshot, { columns: 40, rows: 16, scroll: range.start,
+      color: false, expanded: true });
+    assert.ok(frame.lines.some((line) => line.includes(phase.name)));
+  }
+  const shell = renderFrame(projection([{ name: "Empty", tasks: [] }]), { columns: 40, rows: 16, color: false, language: "en" });
+  assert.match(shell.text, /Empty 0\/0/);
+  assert.match(shell.text, /\(empty phase\)/);
+});
+
+test("a fully closed phase folds away entirely until 'c' expands it", () => {
+  const snapshot = projection([{ name: "Closed", tasks: [
+    { content: "DONE_HIDE", status: "completed" }, { content: "DROP_HIDE", status: "abandoned" }] },
+  { name: "Empty", tasks: [] },
+  { name: "Open", tasks: [{ content: "LIVE_KEEP", status: "in_progress" }] }]);
+  const original = structuredClone(snapshot);
+  const folded = renderFrame(snapshot, { columns: 80, rows: 40, color: false, language: "en" });
+  const expanded = renderFrame(snapshot, { columns: 80, rows: 40, color: false, language: "en", expanded: true });
+  // Auto-collapsed: the closed phase contributes no body row at all, and its counts
+  // survive only in the header, which is what keeps the frame truthful.
+  assert.doesNotMatch(folded.text, /DONE_HIDE|DROP_HIDE|Closed/);
+  assert.match(folded.text, /Todo \[2\/3\]  done:1 · drop:1/);
+  assert.equal(Object.keys(folded.phaseRanges).length, 2);
+  assert.match(expanded.text, /DONE_HIDE/);
+  assert.match(expanded.text, /DROP_HIDE/);
+  assert.match(expanded.text, /Closed 2\/2 drop:1/);
+  assert.match(expanded.text, /Empty 0\/0/);
+  assert.equal(Object.keys(expanded.phaseRanges).length, 3);
+  assert.ok(expanded.bodyLines.length > folded.bodyLines.length);
+  // The renderer never mutates its input.
+  assert.deepEqual(snapshot, original);
+});
+
+test("a phase that still holds pending work is never hidden; only closed phases fold away", () => {
+  const snapshot = projection([{ name: "Waiting", tasks: [{ content: "QUEUED_VISIBLE", status: "pending" }] },
+    { name: "Running", tasks: [{ content: "ACTIVE_KEEP", status: "in_progress" }] },
+    { name: "Finished", tasks: [{ content: "DONE_HIDDEN", status: "completed" }] }]);
+  const folded = renderFrame(snapshot, { columns: 60, rows: 20, color: false });
+  // Pending work is the whole point of a todo list: it is listed without pressing 'c'.
+  assert.match(folded.text, /QUEUED_VISIBLE/);
+  assert.match(folded.text, /ACTIVE_KEEP/);
+  assert.match(folded.text, /Waiting 0\/1/);
+  // A fully closed phase is the only thing that starts folded, and 'c' reveals it.
+  assert.doesNotMatch(folded.text, /DONE_HIDDEN/);
+  const expanded = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true });
+  assert.match(expanded.text, /DONE_HIDDEN/);
+  assert.ok(expanded.bodyLines.length > folded.bodyLines.length);
+});
+
+test("waiting, empty, disconnected and source error have distinct labels", () => {
+  const waiting = renderFrame(null, { color: false, language: "ko" });
+  const empty = renderFrame(projection([], { empty: true }), { color: false, language: "ko" });
+  const disconnected = renderFrame(mixed(), { color: false, language: "ko",
+    connection: { kind: "disconnected", at: new Date(2026, 0, 1, 9, 5).getTime() } });
+  const failed = renderFrame(mixed(), { color: false, language: "ko",
+    connection: { kind: "source-error" } });
+  const labels = [waiting, empty, disconnected, failed].map((frame) =>
+    stripVTControlCharacters(frame.lines.at(-1)).split(" · ").at(-1));
+  assert.equal(new Set(labels).size, 4, labels.join(" | "));
+  assert.match(labels[0], /연결 대기/);
+  assert.match(labels[1], /원본 비어 있음/);
+  assert.match(labels[2], /연결 끊김 09:05/);
+  assert.match(labels[3], /원천 오류/);
+});
+
+test("a read error is pinned above the footer and still leaves the footer intact", () => {
+  const frame = renderFrame(mixed(), { columns: 34, rows: 18, color: false, language: "ko",
+    connection: { kind: "source-error" }, notices: [] ,
+    selection: taskKeys(mixed())[0] });
+  const plain = stripVTControlCharacters(frame.text);
+  assert.match(plain, /실시간|원천 오류/);
+  assert.equal(frame.lines.length, 18);
+  for (const line of frame.lines) assert.ok(cells(line) <= 34);
+});
+
+test("terminal control sequences in task content cannot clear, retitle or recolor the frame", () => {
+  const hostile = "safe\x1b[2J\x1b]0;foreign\x07\x1b[31m text\x1b[0m\x00\x08\u202e";
+  assert.equal(clean(hostile), "safe text");
+  const snapshot = projection([{ name: hostile,
+    tasks: [{ content: hostile, status: "in_progress" }] }]);
+  const frame = renderFrame(snapshot, { color: false, language: "ko" });
+  assert.doesNotMatch(frame.text, /[\x00-\x09\x0b-\x1f\x7f-\x9f\u202e]/u);
+  assert.doesNotMatch(frame.text, /foreign/);
+  assert.match(frame.text, /safe text/);
+});
+
+test("the selection marker follows the requested key and falls back to current work", () => {
+  const snapshot = mixed();
+  const keys = taskKeys(snapshot);
+  const explicit = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true,
+    selection: keys[4] });
+  assert.match(stripVTControlCharacters(explicit.text), /^>\[ \] Verify source$/m);
+  assert.equal(explicit.selection, keys[4]);
+  assert.equal(explicit.selectionIndex, 4);
+  // No selection requested: the first in-progress task is marked.
+  const inferred = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true });
+  assert.equal(inferred.selection, keys[2]);
+  assert.equal(inferred.selectionIndex, 2);
+  // A stale key from another scope never wins, and never leaves nothing selected.
+  const stale = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true,
+    selection: "[\"gone\"]" });
+  assert.equal(stale.selection, keys[2]);
+  assert.doesNotMatch(stripVTControlCharacters(stale.text), /^>\[ \] Verify source$/m);
+});
+
+test("truncation shortens a task row before it can touch the footer", () => {
+  const long = projection([{ name: "N", tasks: [
+    { content: "긴내용".repeat(40), status: "in_progress" }] }]);
+  for (const columns of [34, 52]) {
+    const frame = renderFrame(long, { columns, rows: 20, color: false, language: "ko", follow: false });
+    const footer = stripVTControlCharacters(frame.lines.at(-1));
+    assert.match(footer, /자동 추적 OFF/);
+    assert.match(footer, /실시간/);
+    assert.ok(cells(footer) <= columns);
+    // A long body row wraps instead of being cut, and no wrapped row may overflow.
+    const rows = frame.bodyLines.filter((line) => line.includes("긴내용"));
+    assert.ok(rows.length > 1, "a long row wraps across several body rows");
+    for (const line of rows) assert.ok(cells(line) <= columns, JSON.stringify(line));
+    const last = rows.at(-1);
+    assert.ok(cells(last) < columns, "the final wrapped row is a partial line");
+  }
+});
+
+test("the footer carries follow and connection but no keyboard legend in every language", () => {
+  for (const [language, followOn, followOff, live] of [["ko", "자동 추적 ON", "자동 추적 OFF", "실시간"],
+    ["en", "Follow ON", "Follow OFF", "Live"], ["zh-cn", "自动跟随 ON", "自动跟随 OFF", "实时"]]) {
+    for (const columns of [34, 52]) {
+      for (const follow of [true, false]) {
+        const frame = renderFrame(mixed(), { columns, rows: 20, color: false, language, follow });
+        const footer = stripVTControlCharacters(frame.lines.at(-1));
+        assert.match(footer, new RegExp(follow ? followOn : followOff), `${language} ${columns} follow=${follow}`);
+        assert.match(footer, new RegExp(live), `${language} ${columns} live token`);
+        assert.doesNotMatch(footer, /j\/k|q 닫기|a\/z|Tab|Space/);
+      }
+    }
+  }
+});

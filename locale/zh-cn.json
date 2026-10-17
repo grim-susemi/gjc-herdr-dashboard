@@ -1,0 +1,20 @@
+{
+  "todo": "Todo",
+  "completed": "完成",
+  "dropped": "移除",
+  "emptyPhase": "(空阶段)",
+  "waitingBody": "等待原生 Todo 连接。",
+  "emptyBody": "原生清单为空。",
+  "errorBody": "无法读取原生 Todo。",
+  "readError": "读取错误: {error}",
+  "live": "实时",
+  "waiting": "等待中",
+  "empty": "列表为空",
+  "disconnectedAt": "连接断开 {time}",
+  "sourceError": "来源错误",
+  "followOn": "自动跟随 ON",
+  "followOff": "自动跟随 OFF",
+  "prefsError": "视图设置: {error}",
+  "slotMissing": "找不到角色状态。",
+  "invalidLanguage": "语言值无效，改用韩语显示: {value}"
+}

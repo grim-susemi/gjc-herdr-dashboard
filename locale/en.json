@@ -1,0 +1,20 @@
+{
+  "todo": "Todo",
+  "completed": "done",
+  "dropped": "drop",
+  "emptyPhase": "(empty phase)",
+  "waitingBody": "Waiting for the native Todo source.",
+  "emptyBody": "The native checklist is empty.",
+  "errorBody": "The native Todo source is unavailable.",
+  "readError": "Read error: {error}",
+  "live": "Live",
+  "waiting": "Waiting",
+  "empty": "Empty",
+  "disconnectedAt": "Disconnected {time}",
+  "sourceError": "Source error",
+  "followOn": "Follow ON",
+  "followOff": "Follow OFF",
+  "prefsError": "View preferences: {error}",
+  "slotMissing": "Role state is missing.",
+  "invalidLanguage": "Unsupported language value; showing Korean: {value}"
+}
