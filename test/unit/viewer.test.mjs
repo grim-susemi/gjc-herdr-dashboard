@@ -396,7 +396,7 @@ test("a bad prefs file shows a notice but never crashes the viewer", async (t) =
   assert.equal(viewer.state.availability, "live");
 });
 
-test("owner liveness labels: cooperative exit within 5s and a kill within 20s", async (t) => {
+test("owner liveness labels: cooperative exit within 5s and a kill within 20s (10 s heartbeat age)", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
   f.writeProjection(projectionFor([{ name: "P", tasks: [{ content: "work", status: "pending" }] }]));
@@ -408,13 +408,13 @@ test("owner liveness labels: cooperative exit within 5s and a kill within 20s", 
   viewer.setOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 4321,
     heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
   assert.match(stripVTControlCharacters(viewer.text), /연결 끊김/);
-  // A killed owner keeps the live label until its heartbeat is 20s old.
+  // A killed owner keeps the live label until its heartbeat is 10s old.
   const killed = { schema: "gjc-herdr-dashboard/owner/1", pid: 4321, heartbeatAt: f.clock.now() };
   viewer.setOwner(killed, { alive: () => false });
   f.clock.advance(5000);
   viewer.refresh();
   assert.match(stripVTControlCharacters(viewer.text), /실시간/);
-  f.clock.advance(20000);
+  f.clock.advance(10000);
   viewer.refresh();
   assert.match(stripVTControlCharacters(viewer.text), /연결 끊깁니다|연결 끊김/);
   // The pane stays: no Herdr call, and the viewer is still open.
@@ -461,7 +461,7 @@ test("R3 failpoint in interactive mode defers the ready write and the first data
   assert.ok(f.output.writes.at(-1).includes("early row"), "data appears after the delay");
 });
 
-test("the default owner probe reports a dead owner pid as disconnected once its heartbeat is 20 s old", async (t) => {
+test("the default owner probe reports a dead owner pid as disconnected once its heartbeat is 10 s old", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
   const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
@@ -470,7 +470,7 @@ test("the default owner probe reports a dead owner pid as disconnected once its 
   // pid 999999 does not exist: the default probe (no injected `alive`) must see ESRCH.
   viewer.setOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 999999, heartbeatAt: f.clock.now() });
   assert.equal(viewer.state.owner, "live", "a fresh heartbeat still counts as live");
-  f.clock.advance(20000);
+  f.clock.advance(10000);
   assert.equal(viewer.state.owner, "disconnected");
   viewer.refresh();
   assert.match(stripVTControlCharacters(viewer.text), /연결 끊김/);

@@ -258,11 +258,12 @@ export function fenceDecision(slot, { role, token } = {}) {
 
 // Owner liveness for the footer label (AC1.9). `stoppedAt` means the owner stopped
 // cooperatively, so the label flips immediately (well inside the 5s contract). A
-// killed owner only flips once its heartbeat is at least `killedWithinMs` old, and a
+// killed owner flips once its heartbeat is at least `killedWithinMs` (two missed 5 s beats) old, which
+// keeps kill -> label inside the 20 s contract even with the 1 s repaint, and a
 // pid that is still alive keeps the live label no matter how stale its heartbeat is
 // — heartbeat age alone is never treated as proof of death (fail-closed). The pane
 // always stays open.
-export function ownerLiveness(owner, { now, pidAlive = () => true, killedWithinMs = 20000 } = {}) {
+export function ownerLiveness(owner, { now, pidAlive = () => true, killedWithinMs = 10000 } = {}) {
   if (!owner || typeof owner !== "object") return "absent";
   if (Number.isFinite(owner.stoppedAt)) return "disconnected";
   if (pidAlive(owner.pid)) return "live";

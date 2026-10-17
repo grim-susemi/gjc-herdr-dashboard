@@ -189,16 +189,16 @@ test("the watcher survives a watch that cannot start, relying on the poll", () =
   assert.equal(clock.size, 0);
 });
 
-test("owner liveness: stoppedAt is immediate, a kill waits 20s, an unprobeable pid stays live", () => {
+test("owner liveness: stoppedAt is immediate, a kill waits 10s, an unprobeable pid stays live", () => {
   const now = 100_000;
   assert.equal(ownerLiveness(null, { now }), "absent");
   // Cooperative exit: reported as soon as it is written, never as live.
   assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now, stoppedAt: now }, { now }), "disconnected");
   assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now - 1000, stoppedAt: now - 1000 }, { now }), "disconnected");
-  // Killed: the boundary is exactly 20s, and just under it the owner still counts live.
+  // Killed: the boundary is exactly 10s, and just under it the owner still counts live.
   const gone = () => false;
-  assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now - 19999 }, { now, pidAlive: gone }), "live");
-  assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now - 20000 }, { now, pidAlive: gone }), "disconnected");
+  assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now - 9999 }, { now, pidAlive: gone }), "live");
+  assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now - 10000 }, { now, pidAlive: gone }), "disconnected");
   assert.equal(ownerLiveness({ pid: 1 }, { now, pidAlive: gone }), "disconnected", "no heartbeat at all");
   // A live pid with a stale heartbeat is still live: G10 success is not evidence of death.
   assert.equal(ownerLiveness({ pid: 1, heartbeatAt: now - 600_000 }, { now, pidAlive: () => true }), "live");

@@ -85,20 +85,31 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
     await sendPrompt(fixture, parent, "Call the todo_write tool once with a phase LV13 and one pending task lv13-row. Then reply done.");
     const promptAt = Date.now();
     let rowAt = null;
+    let screenAt = null;
     let idleAfter = null;
     while (Date.now() - promptAt < 150_000) {
       await sleep(250);
       if (rowAt === null && rowSeen()) rowAt = Date.now();
-      if (rowAt !== null && status() === "idle") { idleAfter = Date.now(); break; }
+      if (rowAt !== null && screenAt === null) {
+        const pane = viewerPanes(fixture)[0];
+        if (pane && stripAnsi(fixture.readPane(pane.pane_id)).includes("lv13-row")) screenAt = Date.now();
+      }
+      if (screenAt !== null) break;
     }
     assert(rowAt !== null, "a model-driven todo_write reached the data file", {});
     // updatedAt is the host clock when the projection was taken (right after tool_execution_end);
     // generatedAt adds the writer merge. rowAt is the first poll (<=250 ms) that saw the row on disk.
+    assert(screenAt !== null, "the todo_write row appeared on the viewer screen", {});
     const eventToDiskMs = rowAt - firstSeen.updatedAt;
+    // updatedAt is the host clock right after tool_execution_end: event -> viewer screen is the AC1.2 span.
+    const eventToScreenMs = screenAt - firstSeen.updatedAt;
     writeEvidence(evidence, "ac1-2-todo-write.txt",
       "first_seen_at=" + rowAt + " projection_updatedAt=" + firstSeen.updatedAt + " generatedAt=" + firstSeen.generatedAt +
-      "\nevent_to_disk_ms=" + eventToDiskMs + " (sampled every 250 ms)\nprompt_to_row_ms=" + (rowAt - promptAt) + " (includes the model turn)\n");
-    assert(eventToDiskMs <= 2_000, "AC1.2: the row is on disk within 2 s of the todo_write event (" + eventToDiskMs + " ms)", {});
+      "\nevent_to_disk_ms=" + eventToDiskMs + "\nevent_to_viewer_screen_ms=" + eventToScreenMs + " (sampled every 250 ms plus a pane read; the viewer repaints every 1 s)\nprompt_to_row_ms=" + (rowAt - promptAt) + " (includes the model turn)\n");
+    assert(eventToScreenMs <= 2_000, "AC1.2: the row is on the viewer screen within 2 s of the todo_write event (" + eventToScreenMs + " ms)", {});
+
+    for (let i = 0; i < 60 && status() !== "idle"; i += 1) await sleep(2_000);
+    await sleep(2_000);
 
     // /todo append emits no event (README 4.5): recorded, not gated; the 1 s leaf poll or the next event reflects it.
     fixture.sendText(parent, "/todo");
@@ -114,7 +125,7 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
     }
     writeEvidence(evidence, "ac1-2-todo-append.txt",
       "todo_append_reflected_ms_after_enter=" + reflectedMs + " (README 4.5: no event, next-event path; G9 value freshness was never measured)");
-    result.ac12 = { todoWriteEventToDiskMs: eventToDiskMs, todoAppendReflectedMs: reflectedMs };
+    result.ac12 = { todoWriteEventToDiskMs: eventToDiskMs, todoWriteEventToScreenMs: eventToScreenMs, todoAppendReflectedMs: reflectedMs };
 
     // ---- LV-6: a task subagent run leaves the Herdr log and the state tree alone ---------------
     const stateBefore = tree(paths.stateDir);
@@ -143,7 +154,7 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
     const gjcPids = new Set([String(ownerBefore.pid)]);
     const foreign = Object.keys(byPpid).filter((k) => !gjcPids.has(k));
     writeEvidenceJson(evidence, 'lv6-calls-by-caller.json', { subBegin, ownerPid: ownerBefore.pid, byPpid, verbs: subWindow.reduce((m, e) => { const v = e.argv.slice(0, 2).join(' '); m[v] = (m[v] ?? 0) + 1; return m; }, {}) });
-    assert(foreign.length === 0, 'every Herdr call during the subagent run came from the main gjc (the sub process made none)', { byPpid, ownerPid: ownerBefore.pid });
+    assert(foreign.length === 0, 'every Herdr call during the subagent run came from the main gjc process (a subagent runs inside it, so this attributes calls to the process, not to the sub session; the sub-session guarantee is LT-6)', { byPpid, ownerPid: ownerBefore.pid });
     // The parent's own passes (turn_end/agent_end) may log `pane list` calls; what must not appear is
     // any mutation (split/run/close/rename). A raw count is recorded; the gate is mutations.
     const log = fixture.rawLog().split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
@@ -158,16 +169,22 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
     const paneBefore = viewerPanes(fixture)[0].pane_id;
     for (let i = 0; i < 60 && status() !== 'idle'; i += 1) await sleep(2_000);
     await sleep(3_000);
-    fixture.sendText(parent, '/ne');
-    await sleep(900);
-    fixture.sendText(parent, 'w');
-    await sleep(900);
-    fixture.sendKeys(parent, 'enter');
+    // Keystrokes into the input popup can be swallowed (recorded harness race): retry the whole command.
     let slotAfterNew = slotBeforeNew;
-    for (let i = 0; i < 40; i += 1) {
-      await sleep(1_000);
-      slotAfterNew = readJson(join(slotsDir, slotKey, 'slot.json'));
-      if (slotAfterNew.scope?.scopeKey !== slotBeforeNew.scope?.scopeKey) break;
+    for (let attempt = 1; attempt <= 3 && slotAfterNew.scope?.scopeKey === slotBeforeNew.scope?.scopeKey; attempt += 1) {
+      fixture.sendKeys(parent, 'escape');
+      await sleep(600);
+      fixture.sendText(parent, '/ne');
+      await sleep(900);
+      fixture.sendText(parent, 'w');
+      await sleep(900);
+      fixture.sendKeys(parent, 'enter');
+      for (let i = 0; i < 15; i += 1) {
+        await sleep(1_000);
+        slotAfterNew = readJson(join(slotsDir, slotKey, 'slot.json'));
+        if (slotAfterNew.scope?.scopeKey !== slotBeforeNew.scope?.scopeKey) break;
+      }
+      fixture.record('assertion', '/new attempt ' + attempt + ': scope ' + (slotAfterNew.scope?.scopeKey !== slotBeforeNew.scope?.scopeKey ? 'changed' : 'unchanged'));
     }
     writeEvidenceJson(evidence, 'lv11.json', { before: slotBeforeNew.scope, after: slotAfterNew.scope,
       paneBefore, paneAfter: viewerPanes(fixture)[0]?.pane_id });
@@ -198,6 +215,7 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
     writeEvidence(evidence, 'viewer-after-exit.txt', frame);
     writeEvidence(evidence, 'ac1-9-exit.txt', `disconnect_label_ms_after_enter=${disconnectMs}`);
     assert(disconnectMs !== null, 'the viewer showed 연결 끊김 after /exit', { frame });
+    assert(disconnectMs <= 5_000, `AC1.9: 연결 끊김 within 5 s of a normal exit (took ${disconnectMs} ms)`, { frame });
     assert(viewerPanes(fixture).length === 1, 'the viewer pane stays after /exit');
     result.ac19Exit = { disconnectMs };
     writeEvidenceJson(evidence, 'result.json', result);

@@ -110,12 +110,11 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
     writeEvidence(evidence, 'viewer-after-owner-kill.txt', frame);
     writeEvidenceJson(evidence, 'list-after-owner-kill.json', fixture.listPanes());
     assert(label !== null, 'the viewer shows 연결 끊김 after the owner was killed', { frame });
-    // AC1.9: kill -> label within 20 s of the LAST HEARTBEAT (killedWithinMs). The gate is anchored on the
-    // owner heartbeat, not on the kill: a heartbeat written just before the kill delays the label by up to 20 s.
-    const lastHeartbeat = owner.heartbeatAt;
+    // AC1.9: kill -> label within 20 s (plan gate, measured from the kill). The heartbeat-anchored span is
+    // recorded as well because the 20 s liveness gate counts from the last owner heartbeat.
     const freshOwner = readJson(join(dir, 'owner.json'));
-    writeEvidenceJson(evidence, 'ac1-9-timing.json', { killedAt, labelMs: label, ownerHeartbeatAt: freshOwner.heartbeatAt, killToLabelMs: label, lastHeartbeatToLabelMs: killedAt + label - freshOwner.heartbeatAt });
-    assert(killedAt + label - freshOwner.heartbeatAt <= 22_500, `연결 끊김 within 20 s of the last owner heartbeat (+1 s viewer repaint, +1 s sampling, +0.5 s kill/read skew) (took ${killedAt + label - freshOwner.heartbeatAt} ms)`, { frame, freshOwner });
+    writeEvidenceJson(evidence, 'ac1-9-timing.json', { killedAt, killToLabelMs: label, ownerHeartbeatAt: freshOwner.heartbeatAt, lastHeartbeatToLabelMs: killedAt + label - freshOwner.heartbeatAt });
+    assert(label <= 20_000, `AC1.9: 연결 끊김 within 20 s of the kill (took ${label} ms)`, { frame, freshOwner });
     assert(viewerPanes(fixture).length === 1, 'the viewer pane stays after the owner dies');
     const afterOwner = readJson(join(dir, 'owner.json'));
     assert(!Number.isFinite(afterOwner.stoppedAt), 'no stoppedAt: this was a kill, not an exit');
