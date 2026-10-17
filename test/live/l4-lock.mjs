@@ -65,11 +65,13 @@ await runScript('l4-lock (LV-10)', async () => {
     await new Promise((done) => { setTimeout(done, 15_000); });
 
     const panes = viewerPanes(fixture);
-    assert(panes.length <= 1, `at most one viewer pane, got ${panes.length}`,
+    assert(panes.length <= 1, `at most one Todo viewer pane, got ${panes.length}`,
       { panes: fixture.listPanes() });
     const log = fixture.rawLog();
     const splits = log.split(/\r?\n/).filter((line) => /"split"/.test(line));
-    assert(splits.length <= 1, `at most one pane split, got ${splits.length}`, { log });
+    // One pass opens the whole band (Todo + Workers = 2 splits); the second call must add none.
+    assert(splits.length <= 2, `at most the band's two pane splits, got ${splits.length}`, { log });
+    assert(viewerPanes(fixture, 'workers').length <= 1, 'at most one Workers viewer pane', { panes: fixture.listPanes() });
     const notices = notifyTexts(fixture, ws.rootPaneId);
     const lockErrors = notices.filter((line) => LOCK_ERROR.test(line));
     assert(lockErrors.length === 0, `no lock/busy error notify, got ${JSON.stringify(lockErrors)}`,

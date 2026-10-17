@@ -17,7 +17,7 @@
 //   launchGjc(fixture, paneId, options)        -> the typed command string
 //   notifyLines(frame)                         -> ['ext dev · …', …]
 //   waitForNotify(fixture, paneId, pattern, options) -> {frame, line, all}
-//   viewerPanes(fixture)                       -> panes whose label starts with 'GJC '
+//   viewerPanes(fixture, role = 'todo')       -> panes labelled `GJC <Role> ·` (role null = every GJC pane)
 //   assert(condition, message, details?)
 //   evidenceDirFor(level, lv)
 //   runScript(name, fn)                        -> never returns; exits 0 or 1
@@ -157,8 +157,13 @@ export async function expectNoNotify(fixture, paneId, pattern, {
   return true;
 }
 
-export const viewerPanes = (fixture) =>
-  fixture.listPanes().filter((pane) => /^GJC /.test(String(pane.label ?? '')));
+// `role` filters by label (`GJC Todo ·`, `GJC Workers ·`); the default is the Todo pane, which is the
+// L1 single-viewer view. Pass `null` for every dashboard pane.
+export const viewerPanes = (fixture, role = 'todo') => fixture.listPanes().filter((pane) => {
+  const label = String(pane.label ?? '');
+  if (role === null) return /^GJC /.test(label);
+  return label.startsWith(`GJC ${role[0].toUpperCase()}${role.slice(1)} `);
+});
 
 export function assert(condition, message, details = null) {
   if (condition !== true) throw coded('live-assertion', message, details);
@@ -183,6 +188,7 @@ export async function runScript(name, fn) {
     return result;
   } catch (error) {
     console.error(`${name}: FAIL ${error.code ?? 'error'}: ${error.message}`);
+    if (error.details && !error.details.frame) console.error('--- details ---\n' + JSON.stringify(error.details).slice(0, 1500));
     if (error.details?.frame) {
       console.error('--- last frame ---');
       console.error(String(error.details.frame).slice(0, 4000));

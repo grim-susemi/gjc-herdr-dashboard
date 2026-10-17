@@ -88,13 +88,13 @@ await runScript('lt3-delay (LV-3)', async () => {
     assert(notifyMs <= 15_000, `the first notify within 15 s (took ${notifyMs} ms)`);
     writeEvidence(evidence, 'notify-1.txt', opened.line);
 
-    // Wrapper log: 1 split, 1 run, run < 5 s.
+    // Wrapper log: the L2 band opens two role panes in one pass: 2 splits, 2 runs, each run < 5 s.
     const log = fixture.rawLog().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
     const splits = log.filter((e) => e.argv?.[0] === 'pane' && e.argv?.[1] === 'split');
     const runs = log.filter((e) => e.argv?.[0] === 'pane' && e.argv?.[1] === 'run');
-    assert(splits.length === 1, `exactly one split, got ${splits.length}`, { log });
-    assert(runs.length === 1, `exactly one run, got ${runs.length}`, { log });
-    assert(runs[0].ms < 5_000, `the run returned in <5 s (took ${runs[0].ms} ms)`, { run: runs[0] });
+    assert(splits.length === 2, `exactly two splits (Todo + Workers), got ${splits.length}`, { log });
+    assert(runs.length === 2, `exactly two runs (one viewer per role), got ${runs.length}`, { log });
+    assert(runs.every((run) => run.ms < 5_000), `every run returned in <5 s (took ${runs.map((run) => run.ms).join(', ')} ms)`, { runs });
 
     // Sample every 5 s until the slot role is ready or 45 s passed.
     const samples = [];

@@ -209,7 +209,9 @@ test("a bus card is never re-projected from the jobs surface, but a job card upd
   assert.equal(other.snapshot().cards[0].background, true);
   other.onProgress(progress("y1", "running", { toolCount: 4, tokens: 77 }));
   const merged = other.snapshot().cards[0];
-  assert.equal(merged.background, true);
+  // The host reports the same run on the jobs surface AND the bus; once the bus has named it, it is a
+  // foreground-tracked run, not a job-only background card (live LV-7 showed every card marked).
+  assert.equal(merged.background, false);
   assert.equal(merged.toolCount, 4);
   assert.equal(merged.tokens, 77);
   assert.equal(merged.title, "Job card");

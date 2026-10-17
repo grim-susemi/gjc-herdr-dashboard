@@ -222,6 +222,8 @@ export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX
       return;
     }
     const card = cardFor(payload.id);
+    // The bus names this run, so it is not a job-only (background) card even if a job sync saw it first.
+    card.background = false;
     const agent = lineText(payload.agent, AGENT_LIMIT);
     if (agent !== null) card.agent = agent;
     setTitle(card, lineText(payload.description, TITLE_LIMIT), TITLE_RANK.description);
@@ -279,6 +281,7 @@ export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX
     } else if (card === null) {
       card = cardFor(id);
     }
+    card.background = false; // bus-reported: see onLifecycle
     if (agent !== null) card.agent = agent;
     if (index !== null) card.index = index;
     const description = firstText([progress.description, payload.description], TITLE_LIMIT);
