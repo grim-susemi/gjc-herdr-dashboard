@@ -49,4 +49,4 @@ G12 확인용 `/new` 입력 뒤 같은 pane에 `/reload`를 보냈는데, 그것
 ### L0 종료 처리
 - `spike/`는 삭제했다(사본은 git 밖 `.evidence/L0/spike-src/`).
 - harness가 만든 Herdr session `gjcdash-probe`는 workspace 2개를 닫고 `herdr session stop`으로 중지했다. 기존 session(`default`, `piomo`, `gen10qa` 등)과 소유자 pane `w1:pT5`는 건드리지 않았다.
-- 이 L0 기록은 소유자 Go를 받기 전의 **권고용 기록**이다. L1 구현은 시작하지 않았다.
+- 소유자 Go(2026-10-17 10:35 KST)를 받은 뒤 이 기록을 확정했다. 보강 증거: `g10-output.txt`(G10 bun/node 단독 실행; gjc 프로세스 안에서의 실행은 아님), `g13-config-path.txt`(`gjc config path`가 환경변수 격리와 무관하게 `C:\Users\USER\.gjc\agent`를 출력). 아키텍트 비차단 지적(SR 자체검증 분기 보강, SR9 FAILPOINT/INSTALL 범위, SR5 verify-package import, G12 reload 실측 또는 AC4.7 축소, 제품 스캔 0개 가드, SR8 우회)은 L1 이월 항목이다.
