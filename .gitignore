@@ -1,0 +1,5 @@
+.sandbox/
+.evidence/
+.gjc/
+dist/
+node_modules/
