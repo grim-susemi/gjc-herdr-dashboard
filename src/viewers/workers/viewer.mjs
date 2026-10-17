@@ -336,6 +336,9 @@ export async function startViewer(options, {
     disposed = true;
     leaveScreen();
     input.setRawMode?.(false);
+    // The viewer resumed stdin when it went interactive; leaving it flowing would keep the
+    // TTY read handle (and the process) alive after the viewer closed.
+    if (isInteractive) input.pause?.();
     watcher?.close?.();
     clock.clearInterval(timer);
     heartbeat.stop();
@@ -562,8 +565,12 @@ export async function startViewer(options, {
   function onPointer(mouse) {
     if (closing || disposed) return;
     if (mouse.release) { dragY = undefined; return; }
+    // The drawn frame owns the scroll position the user sees: follow, resize and a list that
+    // shrank all correct it, so every pointer step starts from it, not from the stored pref.
+    const shown = frame ?? draw();
+    const at = shown.scroll ?? prefs.scroll;
     if (mouse.button & 64) {
-      prefs.scroll = Math.min(Math.max(0, prefs.scroll + (mouse.button & 1 ? 3 : -3)), maxScrollOf());
+      prefs.scroll = Math.min(Math.max(0, at + (mouse.button & 1 ? 3 : -3)), maxScrollOf());
       prefs.follow = false;
       void commit();
       return;
@@ -571,7 +578,7 @@ export async function startViewer(options, {
     if ((mouse.button & 3) !== 0) return;
     if (mouse.button & 32) {
       if (dragY === undefined) return;
-      prefs.scroll = Math.min(Math.max(0, prefs.scroll + dragY - mouse.y), maxScrollOf());
+      prefs.scroll = Math.min(Math.max(0, at + dragY - mouse.y), maxScrollOf());
       dragY = mouse.y;
       prefs.follow = false;
       void commit();
@@ -581,7 +588,7 @@ export async function startViewer(options, {
     // divider, footer or blank row) turns follow off and starts a drag.
     const current = frame ?? draw();
     const line = mouse.y - 1;
-    const row = line - current.bodyStart + prefs.scroll;
+    const row = line - current.bodyStart + at;
     if (line >= current.bodyStart && line < current.bodyStart + current.bodyRows) {
       const hit = Object.entries(current.ranges ?? {})
         .find(([, range]) => row >= range.start && row < range.end);

@@ -42,7 +42,7 @@ export async function watchHerdrFocus(paneId, blur, failed, env = process.env) {
   const path = process.platform === "win32"
     ? `\\\\.\\pipe\\${env.HERDR_SOCKET_PATH}` : env.HERDR_SOCKET_PATH;
   const socket = net.createConnection(path);
-  let buffer = "", disposed = false;
+  let buffer = "", disposed = false, started = false;
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Herdr focus subscription timed out")), 5000);
     const settle = (error) => { clearTimeout(timeout); if (error) reject(error); else resolve(); };
@@ -56,7 +56,7 @@ export async function watchHerdrFocus(paneId, blur, failed, env = process.env) {
       while ((end = buffer.indexOf("\n")) >= 0) {
         const message = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
         if (message.error) { settle(new Error(message.error.message)); failed(new Error(message.error.message)); socket.destroy(); return; }
-        if (message.result?.type === "subscription_started") settle();
+        if (message.result?.type === "subscription_started") { started = true; settle(); }
         const event = message.data;
         if (event?.type === "pane_focused" && event.pane_id !== paneId ||
           event?.type === "tab_focused" && event.tab_id !== env.HERDR_TAB_ID ||
@@ -65,7 +65,14 @@ export async function watchHerdrFocus(paneId, blur, failed, env = process.env) {
       }
     });
     socket.on("error", (cause) => { settle(cause); if (!disposed) failed(cause); });
-    socket.once("close", () => { if (!disposed) settle(new Error("Herdr focus subscription closed")); });
+    socket.once("close", () => {
+      if (disposed) return;
+      // Before the subscription started this rejects the pending promise; afterwards the
+      // promise is settled, so the caller is told through `failed` (one notice).
+      const closed = new Error("Herdr focus subscription closed");
+      settle(closed);
+      if (started) failed(closed);
+    });
   }).catch((cause) => { disposed = true; socket.destroy(); throw cause; });
   return () => { disposed = true; socket.destroy(); };
 }

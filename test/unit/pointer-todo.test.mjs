@@ -441,3 +441,35 @@ test("dispose detaches the input decoder, so post-dispose bytes are inert", asyn
   assert.equal(viewer.state.prefs.follow, true);
   assert.equal(f.input.listenerCount("data"), 0, "the decoder released its listener");
 });
+
+test("a wheel after blur starts from the scroll position the frame shows, not the stale pref", async (t) => {
+  const { f, viewer } = await open(t);
+  for (let step = 0; step < 3; step++) f.input.emit("data", wheelDown());
+  assert.equal(viewer.frame.scroll, 9);
+  f.input.emit("data", blur);
+  const shown = viewer.frame.scroll;
+  assert.ok(shown < 9, "blur pulled the frame back to the live selection");
+  f.input.emit("data", wheelDown());
+  assert.equal(viewer.frame.scroll, shown + 3, "one wheel step moves 3 rows from what is on screen");
+});
+
+test("a click after blur selects the row drawn on screen", async (t) => {
+  const { f, viewer } = await open(t);
+  for (let step = 0; step < 3; step++) f.input.emit("data", wheelDown());
+  f.input.emit("data", blur);
+  const frame = viewer.frame;
+  const [key] = Object.entries(frame.taskRanges).find(([, range]) => range.start >= frame.scroll + 2);
+  f.input.emit("data", click(rowOfTask(viewer, key)));
+  assert.equal(viewer.state.prefs.selection, key);
+});
+
+test("stop pauses the stdin the viewer resumed, so the process can exit", async (t) => {
+  const f = fixture(t);
+  let paused = 0;
+  f.input.pause = () => { paused += 1; };
+  const viewer = await startViewer(f.options, { port: f.port, clock: f.clock, env: {}, output: f.output,
+    input: f.input, exit: () => {}, interactive: true, watchFn: () => ({ close() {} }),
+    watchFocus: fakeFocus().watchFocus });
+  viewer.stop();
+  assert.equal(paused, 1);
+});

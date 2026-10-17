@@ -461,3 +461,25 @@ test("a resize repaint is the geometry a click is judged against", async (t) => 
   f.input.emit("data", click(viewer.frame.bodyStart + 1));
   assert.equal(viewer.state.prefs.selection, "c0", "the first body row still is");
 });
+
+test("a wheel after blur starts from the scroll position the frame shows, not the stale pref", async (t) => {
+  const { f, viewer } = await open(t);
+  for (let step = 0; step < 3; step++) f.input.emit("data", "\x1b[<65;5;10M");
+  const scrolled = viewer.frame.scroll;
+  assert.ok(scrolled > 0);
+  f.input.emit("data", "\x1b[O");
+  const shown = viewer.frame.scroll;
+  f.input.emit("data", "\x1b[<65;5;10M");
+  assert.equal(viewer.frame.scroll, Math.min(shown + 3, viewer.frame.maxScroll));
+});
+
+test("stop pauses the stdin the viewer resumed, so the process can exit", async (t) => {
+  const f = fixture(t);
+  let paused = 0;
+  f.input.pause = () => { paused += 1; };
+  const viewer = await startViewer(f.options, { port: f.port, clock: f.clock, env: {}, output: f.output,
+    input: f.input, exit: () => {}, interactive: true, watchFn: () => ({ close() {} }),
+    watchFocus: fakeFocus().watchFocus });
+  viewer.stop();
+  assert.equal(paused, 1);
+});

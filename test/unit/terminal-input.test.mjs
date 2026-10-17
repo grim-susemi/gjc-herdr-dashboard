@@ -115,3 +115,24 @@ test("an unreachable Herdr socket reports the failure instead of hanging the vie
   );
   assert.ok(failures.length >= 1, "the failure callback fired");
 });
+
+test("a Herdr subscription that closes after it started reports one failure", async () => {
+  const net = await import("node:net");
+  const path = process.platform === "win32" ? "gjc-ti-close-" + process.pid : "";
+  const failures = [];
+  let connection;
+  const server = net.createServer((socket) => {
+    connection = socket;
+    socket.once("data", () => socket.write(JSON.stringify({ id: "dashboard-focus", result: { type: "subscription_started" } }) + "\n"));
+  });
+  const where = process.platform === "win32" ? "\\\\.\\pipe\\" + path : (await import("node:path")).join((await import("node:os")).tmpdir(), "gjc-ti-" + process.pid + ".sock");
+  await new Promise((done) => { server.listen(where, done); });
+  try {
+    const dispose = await watchHerdrFocus("w1:p2", () => {}, (cause) => failures.push(cause?.message),
+      { HERDR_ENV: "1", HERDR_PANE_ID: "w1:p2", HERDR_SOCKET_PATH: process.platform === "win32" ? path : where });
+    connection.destroy();
+    await new Promise((done) => setTimeout(done, 100));
+    assert.deepEqual(failures, ["Herdr focus subscription closed"]);
+    dispose();
+  } finally { server.close(); }
+});
