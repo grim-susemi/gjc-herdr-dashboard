@@ -158,8 +158,9 @@ omo를 읽기만 했고 실행하지 않았다).
 
 - 위 한계들은 **계획과 L0 실측**에 근거한다. 이 저장소의 단위 테스트는 자격·투영·shim·문구처럼
   가짜 호스트로 결정할 수 있는 것만 단언한다.
-- 라이브 Herdr/GJC에서의 프레임·포커스·타이밍, L2–L6(workers pane, band 배치, 마우스·포커스,
-  adopt·retention, 세대 설치)은 아직 구현·검증 전이므로 여기서 동작을 주장하지 않는다.
+- L1(Todo pane)의 라이브 프레임·타이밍은 `VERIFICATION.md` `## L1`에 하네스 소유 Herdr 세션 실측으로
+  기록돼 있다(`/resume`, 교차 프로세스 락, Todo 값 신선도는 제외). L2–L6(workers pane, band 배치,
+  마우스·포커스, adopt·retention, 세대 설치)은 아직 구현·검증 전이므로 여기서 동작을 주장하지 않는다.
 - `npm test`는 `test/unit/`만 돌린다. `test/live/`는 소유자 승인 아래 별도로 실행한다.
 
 ## 5. 개발용 shim

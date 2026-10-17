@@ -5,7 +5,7 @@
 //      pane) - or T16 if the pane stayed (the sequence is recorded either way). Exactly one role pane
 //      afterwards.
 //   B. kill the harness gjc WITHOUT `/exit` (no `stoppedAt`): the viewer's default owner probe must see
-//      ESRCH and show `연결 끊김` within ~20 s (heartbeat age gate), and the viewer pane must stay.
+//      ESRCH and show `연결 끊김` within 20 s of the kill (a dead owner with a 10 s old heartbeat), and the viewer pane must stay.
 //
 // Run: node test/live/kill-recovery.mjs
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -111,7 +111,7 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
     writeEvidenceJson(evidence, 'list-after-owner-kill.json', fixture.listPanes());
     assert(label !== null, 'the viewer shows 연결 끊김 after the owner was killed', { frame });
     // AC1.9: kill -> label within 20 s (plan gate, measured from the kill). The heartbeat-anchored span is
-    // recorded as well because the 20 s liveness gate counts from the last owner heartbeat.
+    // recorded as well; the viewer flips a dead owner once its heartbeat is 10 s old.
     const freshOwner = readJson(join(dir, 'owner.json'));
     writeEvidenceJson(evidence, 'ac1-9-timing.json', { killedAt, killToLabelMs: label, ownerHeartbeatAt: freshOwner.heartbeatAt, lastHeartbeatToLabelMs: killedAt + label - freshOwner.heartbeatAt });
     assert(label <= 20_000, `AC1.9: 연결 끊김 within 20 s of the kill (took ${label} ms)`, { frame, freshOwner });
