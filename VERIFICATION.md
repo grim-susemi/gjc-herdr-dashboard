@@ -15,14 +15,14 @@
 | G3 | main/sub의 kind·hasUI·isTTY | main(interactive): hasUI=true, isTTY=true. `-p` 모드: main kind=main depth=0 hasUI=false isTTY=false. 서브에이전트(`task`, executor)는 `sessionMetadata.kind="sub"`, `taskDepth=1`, `currentAgentType="executor"`, hasUI=false, isTTY=false이고 같은 프로세스에서 factory가 세션마다 한 번씩 호출됨(인스턴스 3개: main 1 + sub 2). `ctx.mode`는 없음. 대화형 main 아래의 sub는 락 문제로 실측하지 못했다(아래 한계) | PASS(`kind`와 hasUI로 판별 가능, 대화형 sub는 미실측) | `probe-g3-g5-fg.jsonl` |
 | G6 | split/rename/run/list/layout/process-info/read/close, viewer `HERDR_PANE_ID` | split(`--no-focus`), rename, layout(`--pane`), process-info(`--pane`), run, wait-output, read, close 모두 성공. viewer에서 `HERDR_PANE_ID=w2:p2`와 HERDR_* 9개 키 확인. 부모 포커스 불변은 아래 "G6 포커스" 행 | PASS | `probe.jsonl` |
 | G7 | 사용할 명령이 존재 | `pane list/layout/process-info/read/rename/split/close/send-text/send-keys/wait-output/run`, `tab create/get/focus/rename/close`, `session list/attach/stop/delete`, `workspace create/...` 존재 | PASS | `G7-*.txt` |
-| G9 | 보관한 ctx로 1s 타이머 | 예외 없음. `getLeafId`, `getSessionId`는 string 반환 | PASS | probe jsonl |
+| G9 | 보관한 ctx로 1s 타이머 `getLeafId`, switch 뒤 `getSessionId` | 전환 이전: 타이머 호출에 예외 없음, `getLeafId`·`getSessionId`는 string 반환. **전환(`/new`, `/resume`, `/fork`) 이후 보관 ctx 사용은 미측정** | 부분(전환 전만 PASS, 전환 후 미측정 -> 계획의 실패 경로 "이벤트로만 갱신"을 기본으로 채택) | `probe-g1-headless.jsonl` |
 | G10 | `process.kill(pid,0)`: 자기/죽은/타 사용자 | Bun 1.4.0과 Node 모두 자기=true, 존재하지 않는 pid=ESRCH, 시스템 pid 4=EPERM | PASS | `.sandbox/g10.mjs` 실행 출력 |
 | G11 | `pi.on` 반환값 | undefined. `ctx.mode` 없음 | PASS(기록) | probe jsonl |
 | G12 | `/new`·`/resume`·`/fork`·reload 이벤트 순서 | `/new`: `session_before_switch` -> `session_switch`. 같은 프로세스가 유지됨(pid 동일, factory 재호출 없음). `session_switch.reason`은 `"new"\|"resume"\|"fork"` 타입이다(`shared-events.ts`). `/reload`는 slash 명령이 아니라 확인하지 못했다. `/fork`는 메시지가 확정되지 않은 상태에서는 `No messages to branch from`이라 이벤트가 없고, `/resume`과 함께 실측하지 못했다 | 부분 | `probe-g12-new.jsonl` |
 | U9 | split/close 20회 | 20회 성공, id 목록 기록. id는 재사용되지 않고 증가 | PASS | `probe.jsonl` |
 | U10 | 새 pane에서 `exit` | pane이 list에서 사라짐 | PASS | `probe.jsonl` |
 | U12 | split 직접 명령·label 옵션 | split 옵션: `--pane --current --direction --ratio --cwd --env --right-click --focus --no-focus`. 직접 명령/label 옵션은 없음 | 기록 | `probe.jsonl` |
-| G13 | `GJC_CODING_AGENT_DIR=<case>/.gjc/agent`로 project-scope 밖 user-scope shim 로드 | `<dir>/extensions/*.js`가 로드됨(factory 실행, `import.meta.url`은 절대 URL 대상). 첫 시도는 `<dir>`을 `.gjc` 상위로 잘못 줘서 실패. `--agent-dir`은 CLI 플래그가 아니라 환경변수만 있음 | PASS | `.sandbox/probe-g13*.jsonl` |
+| G13 | `GJC_CODING_AGENT_DIR`로 바꾼 agent-dir의 `extensions/*.js`를 project-scope에서 로드(드릴용) | **정정: user-scope 로드는 확인하지 못했다.** 앞선 PASS는 같은 case 디렉터리의 project-scope shim(`work/.gjc/extensions/`)이 남아 있어서 생긴 오판이었다. project-scope shim을 제거하고 다시 돌리면 `GJC_CODING_AGENT_DIR`로 지정한 agent-dir의 `extensions/`는 로드되지 않았다(`probe-g13v` 재현). 같은 환경변수로 실행한 `gjc config path`도 `C:\Users\USER\.gjc\agent`를 출력했고, 대화형 시작은 여전히 `C:\Users\USER\.gjc\agent\sdk\sessions\index.jsonl.lock`을 잡으려 했다. 즉 이 0.18.11 바이너리는 이 환경에서 `GJC_CODING_AGENT_DIR`를 따르지 않는다(원인은 미확인) | FAIL(user-scope 드릴 불가) -> 계획 경로: 드릴은 dev shim 경로로만 하고 L6 사용자 범위 드릴은 소유자 승인 아래에서 | `.sandbox/probe-g13v` 재현 명령 |
 | U7 | socket `events.subscribe` -> `pane_focused` | Windows에서 `\\.\pipe\<HERDR_SOCKET_PATH 전체>` 형태로 연결(omo와 동일). subscribe ack 후 `pane_focused`, `tab_focused`, `workspace_focused` 수신 | PASS | `probe.jsonl` |
 | G6 포커스 | `split --no-focus` 전후 focused 집합 불변 | `[w1:p1]` -> `[w1:p1]` | PASS | `probe.jsonl` |
 | U11 | 셸 종류, trailer, 한글·공백 인용 | 셸은 Windows PowerShell(5.1). `pane run`으로 한글·공백 경로와 따옴표 인자가 그대로 전달됨 | PASS | 명령 출력 |
@@ -36,9 +36,9 @@
 | F1 | `typeof ctx.getProjectProgress` | interactive에서 `undefined`(FAIL 예상대로). print 모드 ctx에는 함수가 있으나 대화형 main에는 없음 | 3번째 pane 생략 + 목표 1줄 | probe jsonl |
 
 ### 남은 항목 / 한계
-- **G12** `/resume`, `/fork`, reload 이벤트 순서: `/new`만 실측했다(`session_before_switch` -> `session_switch`, reason `new`, factory 재호출 없음). `SessionSwitchEvent.reason`은 `"new"|"resume"|"fork"`로 선언돼 있다. 대화형 `gjc`를 다시 띄우려 했으나 공용 SDK 인덱스 락(`~/.gjc/agent/sdk/sessions/index.jsonl.lock`, 09:49 생성)이 `acquire_timeout`으로 새 대화형 세션을 막았다. 그 락은 이 작업의 프로세스 소유가 아니어서 건드리지 않았다. §7.1③는 "같은 sessionId + 같은 moduleUrl이면 교체" 규칙이 reload를 덮으므로 분기 선택은 /new와 같은 `session_switch` 처리로 두고 L4에서 실측한다.
-- **G9** switch 이후 보관 ctx 사용: 타이머는 switch 이전에만 실측했다. `session_switch` 후에는 이벤트로 갱신한다는 계획의 실패 경로를 기본으로 삼는다.
-- **G3** 대화형 main 아래의 sub는 실측하지 못했다(위와 같은 락). print 모드의 sub 판별은 확인했다.
+- **G12** `/resume`, `/fork`, reload 이벤트 순서: `/new`만 실측했다(`session_before_switch` -> `session_switch`, reason `new`, factory 재호출 없음). `SessionSwitchEvent.reason`은 `"new"|"resume"|"fork"`로 선언돼 있다. 대화형 `gjc`는 공용 SDK 인덱스 락(`~/.gjc/agent/sdk/sessions/index.jsonl.lock`, 09:49 KST에 생성된 빈 디렉터리, owner 기록 없음)에 막혀 `acquire_timeout`으로 종료한다. 이 락은 이 작업의 소유가 아니고 `file-lock.ts`가 소유 증명이 없는 락은 지우지 않으므로 건드리지 않았다. 격리 agent-dir로 우회하려 했으나 G13 정정대로 환경변수가 이 바이너리에서 따라지지 않아 같은 락을 다시 만났다. `gjc -p --resume/--fork`는 실행 중 전환 이벤트를 검증하지 못하므로 대체 수단이 아니다.
+- **G9** 전환 후 보관 ctx 사용 미측정(위 표). **G3** 대화형 main 아래의 sub 미측정(print 모드의 sub 판별만 확인).
+- **G13** user-scope 설치 드릴 불가(위 표). L6 드릴은 dev shim 경로 + 소유자 승인 아래의 사용자 범위 드릴로 진행한다.
 - B1/B2 baseline 실패 13개 중 유지 기능 테스트의 적응은 L1 이후.
 - 소유자 Go는 아직 받지 않았다.
 
