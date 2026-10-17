@@ -442,7 +442,10 @@ export async function startViewer(options, {
     // The ready write AND the first data paint are deferred together (R3): the 1 s repaint
     // timer and the slot watcher start only after the delay, so a late viewer shows no data early.
     if (readyDelay > 0) await new Promise((done) => clock.setTimeout(done, readyDelay));
-    if (isInteractive) {
+    // A `q` (or a token-fence retirement) during the delay already ran finish(): start nothing.
+    // Nothing starts for a viewer that already finished.
+    const alive = !(closing || disposed);
+    if (alive && isInteractive) {
       timer = clock.setInterval(() => { void paint(); }, 1000);
       timer?.unref?.();
       watcher = createSlotWatcher({ slotPath, watchFn, clock,
@@ -450,12 +453,14 @@ export async function startViewer(options, {
         onChange: (text) => { applySlotText(text); refresh(); },
         onError: (cause) => events.emit("watch-error", cause) });
     }
-    await writeReady();
-    heartbeat.start();
-    refresh();
+    if (alive) {
+      await writeReady();
+      heartbeat.start();
+      refresh();
+    }
     // `--once` prints exactly one frame and exits 0; the interactive path paints on
     // the timer instead (and on every state change).
-    if (options.once || !isInteractive) output.write?.(`${draw().text}\n`);
+    if (alive && (options.once || !isInteractive)) output.write?.(`${draw().text}\n`);
   } catch (cause) {
     events.emit("error", cause);
     closing = true;

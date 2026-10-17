@@ -67,7 +67,7 @@ const isList = (argv) => argv[0] === 'pane' && argv[1] === 'list';
 
 // `pane split` answers `{"id":"cli:pane:split","result":{"pane":{"pane_id":"w1:p6",…}}}` (measured,
 // `.sandbox/lv4split.json`); the flatter shapes are accepted too, so a CLI change cannot silently
-// disable the delay rule.
+// lose the pane id in the log.
 export function paneIdOf(reply) {
   if (reply === null || typeof reply !== 'object') return null;
   const value = reply.result ?? reply;

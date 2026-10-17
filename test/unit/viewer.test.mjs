@@ -476,6 +476,26 @@ test("the default owner probe reports a dead owner pid as disconnected once its 
   assert.match(stripVTControlCharacters(viewer.text), /연결 끊김/);
 });
 
+test("a q during the failpoint delay retires the viewer and nothing starts afterwards", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([]));
+  f.input.setRawMode = () => {};
+  const starting = startViewer({ ...options(f), failpoint: "ready-delay-25s" }, { port: f.port,
+    clock: f.clock, env: f.env, output: f.output, input: f.input, herdr: f.herdr, exit: () => {},
+    interactive: true, watchFn: () => ({ close() {}, on() {} }) });
+  await new Promise((done) => setImmediate(done));
+  f.input.emit("data", "q");
+  await new Promise((done) => setImmediate(done));
+  f.clock.advance(25000);
+  const viewer = await starting;
+  await viewer.closed;
+  const ready = f.readReady();
+  assert.equal(ready.closing, "q", "the closing mark written by q is not overwritten after the delay");
+  f.clock.tick(10000);
+  assert.equal(f.readReady().closing, "q", "no heartbeat restarts after the delay");
+});
+
 test("q without an injected client closes the own pane through the slot's recorded herdr vector", async (t) => {
   const f = fixture(t);
   const logPath = join(f.state, "herdr-calls.jsonl");

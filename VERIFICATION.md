@@ -53,7 +53,7 @@ G12 확인용 `/new` 입력 뒤 같은 pane에 `/reload`를 보냈는데, 그것
 
 ## L1 (Todo pane, instance lifecycle and lock)
 
-Unit: `node scripts/test.mjs` 356 tests, 356 pass (LT-1..LT-8 incl. LT-4 matrix, LT-6 clauses 1-3, A-29..A-32 obligations, SR1-SR9, R3 heartbeat-tick and viewer-failpoint argv). Reconciler stress: 15 repeated runs, 0 failures after replacing a timer-based wait with a deterministic gate. `live-wrapper.test.mjs` once failed a single full-suite run (`delay-run-25s` detach test, since deleted) and passed 6/6 isolated re-runs; the flag no longer exists.
+Unit: `node scripts/test.mjs` 357 tests, 357 pass (LT-1..LT-8 incl. LT-4 matrix, LT-6 clauses 1-3, A-29..A-32 obligations, SR1-SR9, R3 heartbeat-tick and viewer-failpoint argv). Reconciler stress: 15 repeated runs, 0 failures after replacing a timer-based wait with a deterministic gate. `live-wrapper.test.mjs` once failed a single full-suite run (`delay-run-25s` detach test, since deleted) and passed 6/6 isolated re-runs; the flag no longer exists.
 
 Live (harness-owned Herdr session `gjcdash-l1`, interactive `gjc --no-session --no-title` in `.sandbox/case-lv1`, dev shim, GJC 0.18.11; session stopped and workspace closed afterwards; owner pane `w1:pT5` and all other sessions untouched):
 
@@ -79,6 +79,8 @@ Defects found live and fixed (both missed by unit tests; regression tests added 
 Also fixed from unit work: a throwing binding seam in `arm()` produced zero notifies (now one `failed:internal`).
 
 Not run live in L1: LV-5 adopt (L4), `/resume` (no persisted session under the shared SDK lock), cross-process lock contention (unit tests LT-7 a-d with fakes), G9 value freshness, G12 resume/fork/reload.
+L1 architect re-review (HEAD b52655f): B1-B8 PASS, no HIGH blocker, APPROVE. Non-blocking items carried to L2+: the heartbeat tick checks only `roles.todo` (iterate ROLES when the workers role lands); the tick reuses the retained ctx without an in-flight guard; an in-flight pass or heartbeat can outlive `session_shutdown` (`writeOwner`/`markStopped` are not queued, pre-existing); LV-3 notify said `열림` at 52.6 s (harness retry) rather than `pending` within 15 s, and `early-frame.txt` is empty because the pane label appears only after the first pass; AC1.7 external-close has no committed evidence file (L1 LV-1 run only). Fixed after the review: a `q` during the failpoint delay now stops the viewer from starting timers/ready/heartbeat (unit test added).
+
 Lock directory growth: one generation file pair per pass; four files remained after a long session, so the existing GC keeps it bounded.
 
 ### L1 live fault scripts (re-run by the caller; each script also self-cleans and records `verifiedAbsent`)

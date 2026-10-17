@@ -903,14 +903,9 @@ test('triggers: turn_end, agent_end, goal_updated, todo_write and each bus chann
 // `gjc-adapter` tolerates `null` where an object is expected so that "a host that hands a handler an
 // unexpected shape cannot make the extension throw inside an event".
 //
-// EXPECTED TO FAIL: `src/host/instance.mjs:442` calls the injected `bindingOf(ctx, env)` seam
-// outside any try/catch (and `:772` awaits `arm()` outside the `try` block whose own comment at
-// `:802` claims to be "the last resort for a fault in the steps before it (binding, rebind)").
-// A host whose `ctx.sessionManager` accessor throws, or a seam that returns `undefined`, therefore
-// escapes the handler with zero notifies — the one outcome the module exists to prevent.
-// The real `bindingOf` never throws and always returns an object, so this is a robustness gap in
-// `instance.mjs`, not a product break today; it is left failing and reported rather than worked
-// around, because `deps` documents every key as injectable and the adapter guarantees the shape.
+// Regression: `arm()` used to run outside the handler's `try`, so a host whose `ctx.sessionManager`
+// accessor throws (or a seam that returns `undefined`) escaped with zero notifies. `arm()` now runs
+// inside the `try`, and the fault surfaces as one `failed:internal` notify.
 test('binding-seam-fault: a throwing binding seam still owes one notify', async t => {
   const world = await makeWorld(t);
   const pi = piOf();

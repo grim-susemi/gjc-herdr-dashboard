@@ -93,7 +93,7 @@ export function createFixture(options = {}) {
   if (typeof session !== 'string' || session.trim() === '') throw coded('live-session-name', 'session name required');
   const bin = binary ?? realHerdrBinary(env);
   // The wrapper's log directory. It MUST be per-case: two live scripts sharing one log would see
-  // each other's splits (the delay rule and the LV-10 "one split" assertion both read it).
+  // each other's splits (the LV-3 and LV-10 "one split" assertions both read it).
   const workDir = options.logDir
     ?? (String(env.GJC_LIVE_LOG_DIR ?? '').trim() === ''
       ? join(SANDBOX, `live-${session}`) : env.GJC_LIVE_LOG_DIR);

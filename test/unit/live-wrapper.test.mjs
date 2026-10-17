@@ -161,7 +161,7 @@ test("fail-split-once: the first split fails with structured JSON, then the flag
     { env, spawnFn: spawn, stdout: io2.stdout, stderr: io2.stderr });
   assert.equal(code2, 0);
   assert.equal(calls.length, 1);
-  assert.equal(lines(log).at(-1).paneId, "w1:p9", "the split result is logged for the delay rule");
+  assert.equal(lines(log).at(-1).paneId, "w1:p9", "the split result is logged");
 });
 
 test("planCall: no verb other than the two flagged ones is ever intercepted", (t) => {
