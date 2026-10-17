@@ -15,6 +15,7 @@
 // with a fake clock and a fake process table. That limitation is recorded in `lock-coverage.json`.
 //
 // Run: node test/live/l4-lock.mjs
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { createFixture, REPO, SANDBOX } from './fixture.mjs';
 import { assert, createCase, evidenceDirFor, launchGjc, notifyLines, runScript, viewerPanes,
@@ -40,6 +41,9 @@ const notifyTexts = (fixture, paneId) =>
 
 await runScript('l4-lock (LV-10)', async () => {
   const evidence = evidenceDirFor('L1', LV);
+  // A previous run's state tree and wrapper log would leak splits and ready files into this one.
+  rmSync(join(SANDBOX, `case-${CASE}`), { recursive: true, force: true });
+  rmSync(join(SANDBOX, `live-${SESSION}`), { recursive: true, force: true });
   const paths = createCase({ caseId: CASE, herdr: [process.execPath, WRAPPER] });
   const fixture = createFixture({ session: SESSION, evidenceDir: evidence,
     logDir: join(SANDBOX, `live-${SESSION}`, CASE) });

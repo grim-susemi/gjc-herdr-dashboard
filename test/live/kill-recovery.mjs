@@ -57,13 +57,26 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
     writeEvidence(evidence, 'notify-open-1.txt', first.line);
     const dir = await until(() => slotDir(paths.stateDir), 'slot dir');
     const ready = await until(() => readJson(join(dir, 'roles', 'todo.ready.json')), 'ready.json');
-    const firstPane = (await until(() => viewerPanes(fixture)[0], 'viewer pane'))?.pane_id;
+    let firstPane = (await until(() => viewerPanes(fixture)[0], 'viewer pane'))?.pane_id;
     writeEvidenceJson(evidence, 'list-after-open.json', fixture.listPanes());
     assert(Boolean(firstPane), 'a viewer pane exists after the first open', { panes: fixture.listPanes() });
 
+    // ---- A0. AC1.7 external close: the harness closes the viewer pane; the next /dashboard is T4 -------
+    const extPane = firstPane;
+    const closeBody = fixture.herdr(['pane', 'close', extPane]);
+    writeEvidenceJson(evidence, 'external-close-reply.json', closeBody ?? {});
+    await sleep(3_000);
+    assert(!viewerPanes(fixture).some((pane) => pane.pane_id === extPane), 'the externally closed pane is gone', { panes: fixture.listPanes() });
+    const extOpen = await sendSlash(fixture, ws.rootPaneId, 'dashboard', OPENED, { label: 'open after external close' });
+    writeEvidence(evidence, 'notify-after-external-close.txt', extOpen.line);
+    firstPane = (await until(() => viewerPanes(fixture)[0], 'viewer pane after external close')).pane_id;
+    assert(viewerPanes(fixture).length === 1, 'exactly one role pane after the external-close recovery', { panes: fixture.listPanes() });
+    fixture.record('assertion', `ac1.7 external-close: T4 -> ${extOpen.line}`);
+    const ready0 = await until(() => { const r = readJson(join(dir, 'roles', 'todo.ready.json')); return r.pid !== ready.pid ? r : null; }, 'new ready after external close');
+
     // ---- A. AC1.7 viewer kill --------------------------------------------------------------
-    const killResult = killPid(ready.pid);
-    writeEvidence(evidence, 'kill-viewer.txt', `pid=${ready.pid} pane=${firstPane}\n${killResult.stdout}${killResult.stderr}`);
+    const killResult = killPid(ready0.pid);
+    writeEvidence(evidence, 'kill-viewer.txt', `pid=${ready0.pid} pane=${firstPane}\n${killResult.stdout}${killResult.stderr}`);
     await sleep(6_000);
     const afterKill = viewerPanes(fixture);
     const paneStayed = afterKill.some((pane) => pane.pane_id === firstPane);
@@ -76,7 +89,7 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
     assert(panes.length === 1, `exactly one role pane after recovery, got ${panes.length}`, { panes });
     const recovery = paneStayed ? 'T16 (pane stayed, relaunched in place)' : 'T4 (pane gone, new pane)';
     const newReady = readJson(join(dir, 'roles', 'todo.ready.json'));
-    assert(newReady.pid !== ready.pid, 'a new viewer process is ready', { old: ready.pid, newReady });
+    assert(newReady.pid !== ready0.pid, 'a new viewer process is ready', { old: ready0.pid, newReady });
     fixture.record('assertion', `ac1.7 viewer-kill: ${recovery}; notify ${second.line}`);
 
     // ---- B. AC1.9 owner kill (no /exit) ----------------------------------------------------
@@ -88,7 +101,7 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
     let label = null;
     let frame = '';
     while (Date.now() - killedAt < 60_000) {
-      await sleep(3_000);
+      await sleep(500);
       const pane = viewerPanes(fixture)[0];
       if (!pane) break;
       frame = stripAnsi(fixture.readPane(pane.pane_id));
@@ -97,7 +110,12 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
     writeEvidence(evidence, 'viewer-after-owner-kill.txt', frame);
     writeEvidenceJson(evidence, 'list-after-owner-kill.json', fixture.listPanes());
     assert(label !== null, 'the viewer shows 연결 끊김 after the owner was killed', { frame });
-    assert(label <= 40_000, `연결 끊김 within the 20 s gate plus a tick (took ${label} ms)`, { frame });
+    // AC1.9: kill -> label within 20 s of the LAST HEARTBEAT (killedWithinMs). The gate is anchored on the
+    // owner heartbeat, not on the kill: a heartbeat written just before the kill delays the label by up to 20 s.
+    const lastHeartbeat = owner.heartbeatAt;
+    const freshOwner = readJson(join(dir, 'owner.json'));
+    writeEvidenceJson(evidence, 'ac1-9-timing.json', { killedAt, labelMs: label, ownerHeartbeatAt: freshOwner.heartbeatAt, killToLabelMs: label, lastHeartbeatToLabelMs: killedAt + label - freshOwner.heartbeatAt });
+    assert(killedAt + label - freshOwner.heartbeatAt <= 22_500, `연결 끊김 within 20 s of the last owner heartbeat (+1 s viewer repaint, +1 s sampling, +0.5 s kill/read skew) (took ${killedAt + label - freshOwner.heartbeatAt} ms)`, { frame, freshOwner });
     assert(viewerPanes(fixture).length === 1, 'the viewer pane stays after the owner dies');
     const afterOwner = readJson(join(dir, 'owner.json'));
     assert(!Number.isFinite(afterOwner.stoppedAt), 'no stoppedAt: this was a kill, not an exit');

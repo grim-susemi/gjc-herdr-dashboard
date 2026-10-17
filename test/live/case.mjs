@@ -69,6 +69,17 @@ export function launchCommand({ dir, herdr, args = DEFAULT_ARGS, clearEnv = LAUN
   return parts.join('; ');
 }
 
+// A long single `send-text` is dropped by the gjc input box (measured: 90 characters in one call
+// produced no turn), while 12-character chunks arrive intact. Enter follows after a short settle.
+export async function sendPrompt(fixture, paneId, text, { chunk = 12, gapMs = 150, settleMs = 1_500 } = {}) {
+  for (let at = 0; at < text.length; at += chunk) {
+    fixture.sendText(paneId, text.slice(at, at + chunk));
+    await new Promise((done) => { setTimeout(done, gapMs); });
+  }
+  await new Promise((done) => { setTimeout(done, settleMs); });
+  fixture.sendKeys(paneId, 'enter');
+}
+
 export async function launchGjc(fixture, paneId, options) {
   const command = launchCommand(options);
   fixture.sendText(paneId, command);

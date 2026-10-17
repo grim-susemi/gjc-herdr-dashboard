@@ -118,8 +118,10 @@ export function planCall(argv, env = {}) {
   return plain;
 }
 
-export function logLine({ at, argv, ok, code, ms, paneId = null }) {
-  const line = { at, atMs: Date.parse(at), argv: [...argv], ok, code, ms };
+export function logLine({ at, argv, ok, code, ms, paneId = null, ppid = process.ppid }) {
+  // `ppid` is the process that spawned this wrapper (the gjc that issued the call), so a log can
+  // prove which gjc process made each Herdr call (LV-6: a subagent must make none).
+  const line = { at, atMs: Date.parse(at), argv: [...argv], ok, code, ms, ppid };
   if (paneId !== null) line.paneId = paneId;
   return `${JSON.stringify(line)}\n`;
 }

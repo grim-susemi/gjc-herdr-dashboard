@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { createFixture, REPO, SANDBOX } from './fixture.mjs';
 import { assert, createCase, evidenceDirFor, expectNoNotify, launchGjc, notifyLines, runScript,
-  sendSlash, stripAnsi, viewerPanes, writeEvidence, writeEvidenceJson } from './case.mjs';
+  stripAnsi, viewerPanes, waitForNotify, writeEvidence, writeEvidenceJson } from './case.mjs';
 
 const LV = 'LV-3';
 const CASE = 'lv3';
@@ -49,7 +49,7 @@ await runScript('lt3-delay (LV-3)', async () => {
   try {
     await fixture.startSession();
     const ws = fixture.createWorkspace({ cwd: paths.dir, label: CASE });
-    const message = `Call the todo_write tool exactly once with one phase named LV3 containing one pending task "${ROW}", then reply done.`;
+    const message = `Call the todo_write tool exactly once with one phase named LV3 containing one task "${ROW}" (leave it pending), then reply done.`;
     await launchGjc(fixture, ws.rootPaneId, { dir: paths.dir, herdr: [process.execPath, WRAPPER],
       args: ['--no-session', '--no-title', `'${message}'`],
       extra: [...fixture.wrapperEnv(), ['GJC_LIVE_HERDR_SESSION', SESSION]] });
@@ -63,15 +63,29 @@ await runScript('lt3-delay (LV-3)', async () => {
     }
     await fixture.waitIdle(ws.rootPaneId, { timeoutMs: 120_000, quiet: 4 });
 
+    const parentIdle = async () => (fixture.listPanes().find((p) => p.pane_id === ws.rootPaneId)?.agent_status === 'idle');
+    for (let i = 0; i < 90 && !(await parentIdle()); i += 1) await sleep(2_000);
     await sleep(5_000);
     rmSync(join(fixture.logDir, "wrapper.log.jsonl"), { force: true });
-    const dashboardSentAt = Date.now();
-    const opened = await sendSlash(fixture, ws.rootPaneId, 'dashboard', PENDING,
-      { label: 'the first /dashboard notify' });
-    const notifyMs = Date.now() - dashboardSentAt;
-    // sendSlash retries the keystrokes (popup race), so the latency includes harness retries; it is
-    // evidence, and the real timing gate is the wrapper run duration below.
-    writeEvidence(evidence, 'notify-latency.txt', `${notifyMs} ms (attempt ${opened.attempt})`);
+    // A keystroke batch that the input popup swallowed (measured race, case.mjs sendSlash) is re-sent;
+    // the 15 s notify gate is measured from the batch that was accepted, and every batch is recorded.
+    let opened = null;
+    let notifyMs = null;
+    const batches = [];
+    for (let attempt = 1; attempt <= 3 && opened === null; attempt += 1) {
+      const sentAt = Date.now();
+      await fixture.slash(ws.rootPaneId, "dashboard");
+      batches.push(sentAt);
+      try {
+        opened = await waitForNotify(fixture, ws.rootPaneId, PENDING, { label: "the first /dashboard notify", timeoutMs: 15_000 });
+        notifyMs = Date.now() - sentAt;
+      } catch (error) {
+        if (attempt === 3) throw error;
+        await sleep(5_000);
+      }
+    }
+    writeEvidence(evidence, 'notify-latency.txt', `${notifyMs} ms from the accepted keystroke batch #${batches.length} (gate: 15 s; R3 text says pending, the first call answers opened (T1))`);
+    assert(notifyMs <= 15_000, `the first notify within 15 s (took ${notifyMs} ms)`);
     writeEvidence(evidence, 'notify-1.txt', opened.line);
 
     // Wrapper log: 1 split, 1 run, run < 5 s.

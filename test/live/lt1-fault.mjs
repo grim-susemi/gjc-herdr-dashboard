@@ -27,6 +27,9 @@ const OPENED = /열림|opened/;
 
 await runScript('lt1-fault (LV-2)', async () => {
   const evidence = evidenceDirFor('L1', LV);
+  // A previous run's state tree and wrapper log would leak splits and ready files into this one.
+  rmSync(join(SANDBOX, `case-${CASE}`), { recursive: true, force: true });
+  rmSync(join(SANDBOX, `live-${SESSION}`), { recursive: true, force: true });
   const paths = createCase({ caseId: CASE, herdr: [process.execPath, WRAPPER] });
   const fixture = createFixture({ session: SESSION, evidenceDir: evidence,
     logDir: join(SANDBOX, `live-${SESSION}`, CASE) });
