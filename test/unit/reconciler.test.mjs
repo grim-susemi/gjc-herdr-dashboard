@@ -1016,11 +1016,10 @@ test('rebind, writeOwner and markStopped never create a slot, and a blocked rebi
   assert.equal(stoppedRecord.instanceId, 'inst-1');
   assert.equal(await world.slotBytes(), null, 'no slot was created by any of the three');
   // A rebind while another process holds a live generation is busy and writes nothing.
-  const other = world.spawn({ newPassId: () => 'pass-hold' });
-  let release;
-  const gate = new Promise(resolve => { release = resolve; });
-  const holding = other.explicit({ hooks: { afterLastCheck: () => gate } });
-  await new Promise(resolve => setTimeout(resolve, 1));
+  const frozen = frozenHolder(world, { newPassId: () => 'pass-hold' });
+  const release = frozen.release;
+  const holding = frozen.pass;
+  await frozen.ready;
   const blocked = await world.reconciler.rebind({ ...world.binding, sessionId: 's-3' });
   assert.equal(blocked.ok, false);
   assert.equal(blocked.code, 'busy');
