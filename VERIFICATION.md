@@ -53,7 +53,7 @@ G12 확인용 `/new` 입력 뒤 같은 pane에 `/reload`를 보냈는데, 그것
 
 ## L1 (Todo pane, instance lifecycle and lock)
 
-Unit: `node scripts/test.mjs` 341 tests, 341 pass (LT-1..LT-8 incl. LT-4 matrix, LT-6, A-29..A-32 obligations, SR1-SR9). Reconciler stress: 15 repeated runs, 0 failures after replacing a timer-based wait with a deterministic gate.
+Unit: `node scripts/test.mjs` 356 tests, 356 pass (LT-1..LT-8 incl. LT-4 matrix, LT-6 clauses 1-3, A-29..A-32 obligations, SR1-SR9, R3 heartbeat-tick and viewer-failpoint argv). Reconciler stress: 15 repeated runs, 0 failures after replacing a timer-based wait with a deterministic gate. `live-wrapper.test.mjs` once failed a single full-suite run (`delay-run-25s` detach test, since deleted) and passed 6/6 isolated re-runs; the flag no longer exists.
 
 Live (harness-owned Herdr session `gjcdash-l1`, interactive `gjc --no-session --no-title` in `.sandbox/case-lv1`, dev shim, GJC 0.18.11; session stopped and workspace closed afterwards; owner pane `w1:pT5` and all other sessions untouched):
 
@@ -63,10 +63,13 @@ Live (harness-owned Herdr session `gjcdash-l1`, interactive `gjc --no-session --
 | AC1.4 `/dashboard` x3 | pane count stays 1, notify `정상`, parent focus unchanged | PASS | `LV-1/list-after-x3.json` |
 | AC1.2 todo_write | `todo_write` by the model -> `data/<scopeKey>/todo.json` has Setup/alpha/beta; slot record pending -> ready; viewer frame shows the phase after reopen | PASS (after fix 1 below) | `LV-1/viewer-frame.txt`, `state-tree.txt` |
 | AC1.3 reopen | `f` -> `자동 추적 OFF`; `q` -> pane closes itself; `/dashboard` reopens with `자동 추적 ON`; the Setup phase is shown | PASS (after fix 2 below) | `LV-1/reopen-frame.txt` |
-| AC1.7 external close | harness closed the viewer pane; next `/dashboard` created a new pane (`열림`) | PASS for external close only; viewer kill and 25 s delay not run live | - |
-| AC1.9 disconnect | clean `/exit` wrote `stoppedAt`; viewer showed `연결 끊김 14:32` and the pane stayed | PASS for normal exit; kill within 20 s not run live | `LV-1/disconnected-frame.txt`, `owner-after-exit.json` |
+| AC1.7 external close | harness closed the viewer pane; next `/dashboard` created a new pane (`열림`) | PASS | - |
+| AC1.7 viewer kill | `node test/live/kill-recovery.mjs`: `taskkill` of the viewer pid from `roles/todo.ready.json`; the pane disappeared (U10, shell trailer `; exit`); the next `/dashboard` took T4 (`열림`, new pane, new viewer pid, exactly one role pane) | PASS | `.evidence/L1/LV-7b/` |
+| AC1.9 disconnect (exit) | clean `/exit` wrote `stoppedAt`; viewer showed `연결 끊김 14:32` and the pane stayed | PASS | `LV-1/disconnected-frame.txt`, `owner-after-exit.json` |
+| AC1.9 owner kill | `kill-recovery.mjs`: `taskkill` of the owner gjc pid without `/exit` (no `stoppedAt`); the viewer, using the default `pidAlive` probe, showed `연결 끊김` 21.7 s later (20 s heartbeat gate + 3 s sample) and the pane stayed. This is the live proof for review blocker B3 | PASS | `LV-7b/viewer-after-owner-kill.txt`, `list-after-owner-kill.json` |
 | AC1.10 / LV-13 | parent `agent_status` working -> idle while the dashboard was open; no reporter verbs in product code (SR2) | PASS | `LV-13/list-during-prompt.json` |
 | AC1.11 / LV-11 | `/new` changed `scopeKey` and `scopeEpoch` 1 -> 2; viewer pane id unchanged; new data dir created. `/resume` not measured (no persisted session, shared SDK lock) | PASS for `/new` only | state tree |
+| AC1.13 (L1 exit) | LT-7 (a)-(h) pass in unit tests (`test/unit/reconciler.test.mjs` LT-7 a-h; the lock file protocol and its unlink audit in `test/unit/slot.test.mjs`); the busy notify carries the lock path and generation (instance test `busy` rows); the README documents manual recovery M1-M5 with preconditions and exact file behavior (`README.md` recovery section) | PASS (fakes; cross-process contention not live) | `test/unit/reconciler.test.mjs`, `test/unit/slot.test.mjs`, `README.md` |
 | AC1.5 / LV-4 | gjc started without `HERDR_*`: notify `ineligible: outside-herdr`; no state dir created | PASS | `LV-4-outside-herdr.txt` |
 | AC1.6 / LV-6 | one `task` subagent run: only lock-generation files changed, all lock files carry the main gjc pid and instanceId; no new pane | PASS (the herdr-call count 0 from a wrapper log was not measured; unit test LT-6 covers it with fakes) | `LV-6/` |
 
@@ -75,18 +78,22 @@ Defects found live and fixed (both missed by unit tests; regression tests added 
 2. The viewer had no default Herdr client, so `q` never closed its own pane in a real run. It now uses the argv vector recorded in `slot.json.herdr`.
 Also fixed from unit work: a throwing binding seam in `arm()` produced zero notifies (now one `failed:internal`).
 
-Not run live in L1: LV-2 (fault injection `fail-split-once`), LV-3 (25 s delayed run), LV-10 (two simultaneous `/dashboard`), AC1.7 viewer-kill, AC1.9 owner-kill, LV-5 adopt. These are covered only by unit tests with fakes; the wrapper-based fault flags (`test/live/herdr-wrapper.mjs`) are not implemented yet.
+Not run live in L1: LV-5 adopt (L4), `/resume` (no persisted session under the shared SDK lock), cross-process lock contention (unit tests LT-7 a-d with fakes), G9 value freshness, G12 resume/fork/reload.
 Lock directory growth: one generation file pair per pass; four files remained after a long session, so the existing GC keeps it bounded.
 
 ### L1 live fault scripts (re-run by the caller; each script also self-cleans and records `verifiedAbsent`)
 
-Harness: `test/live/{herdr-wrapper,fixture,case}.mjs` (wrapper logs every Herdr call and injects faults only through flag files; the fixture refuses input to any pane it did not create). Unit tests for the wrapper: `test/unit/live-wrapper.test.mjs` (14).
+Harness: `test/live/{herdr-wrapper,fixture,case}.mjs` (wrapper logs every Herdr call and injects faults only through flag files; the fixture refuses input to any pane it did not create). Unit tests for the wrapper: `test/unit/live-wrapper.test.mjs`. The wrapper has exactly two fault flags (`fail-split-once`, `fail-list`); it never delays or edits a call (stage-05 R3 l.153).
 
 | LV | Script | Observed | Result | Evidence |
 |---|---|---|---|---|
 | LV-2 | `node test/live/lt1-fault.mjs` | `fail-split-once` + `/dashboard` x2: first notify `실패(pane split: herdr-split)` with zero panes, second `ext dev · Todo 열림` with exactly one `GJC Todo` pane | PASS | `.evidence/L1/LV-2/` |
-| LV-3 | `node test/live/lt3-delay.mjs` | `delay-run-25s` + one `/dashboard`: the viewer painted `Todo [0/0]` + `자동 추적 ON` within 45 s, one split, one pane, no second notify in a 20 s quiet window | PASS | `.evidence/L1/LV-3/viewer-frame.txt` |
+| LV-3 | `node test/live/lt3-delay.mjs` | dev shim `--viewer-failpoint ready-delay-25s`; one model turn wrote a Todo row (`todo_write`), then ONE `/dashboard`: wrapper log has 1 split and 1 run (29 ms, <5 s); notify `열림`; 5 s `pane list` samples show 1 role pane and slot role `pending` with no data row until +25.5 s; slot role `ready` (T13) at +30.7 s; the frame then shows `lv3-row-alpha` and the footer `자동 추적 ON · 실시간`; no second `/dashboard` notify in a 10 s quiet window. `notify-latency.txt` records 52.6 s because `sendSlash` retries keystrokes on its popup race (harness, attempt 2); the timing gates are the wrapper run duration and the slot samples | PASS | `.evidence/L1/LV-3/{samples.json,wrapper.log.jsonl,early-frame.txt,viewer-frame.txt,notify-latency.txt}` |
+| AC1.7 / AC1.9 kills | `node test/live/kill-recovery.mjs` (see the rows above) | PASS | `.evidence/L1/LV-7b/` |
 | LV-10 | `node test/live/l4-lock.mjs` | two `/dashboard` sent back to back in one parent: at most one split and one viewer pane, no lock/busy notify | PASS (single-parent only; true cross-process contention is covered by unit tests LT-7 a-d with fakes, not live) | `.evidence/L1/LV-10/` |
 
-Note: a wrapper that sleeps is killed by the reconciler's 5 s per-call timeout, so the delayed `pane run` is deferred to a detached helper (the log therefore shows two `pane run` lines for LV-3).
-Still not run live: AC1.7 viewer-kill, AC1.9 owner-kill, LV-5 adopt (L4).
+Reviewer round 1 (architect, HEAD `496c33f`) found three defects that the unit tests and the first LV-3 run had hidden; all are fixed and covered:
+1. B1 `heartbeat-tick`: the host never ran the automatic pass on the 5 s tick, so a late viewer (T13) was never promoted without another `/dashboard`. Fixed in `instance.mjs` (pass runs only while the todo record is `pending`); instance test `R3: the 5 s heartbeat tick runs ...`.
+2. B2 viewer failpoint: the launcher passed `--failpoint ready-delay-25s` but the viewer rejected the flag (exit 2, pane dropped) and read an unplanned env var instead. The flag is now parsed in `src/viewers/common.mjs` (SR9), the env var is gone, and the delay gates the ready write, the heartbeat, the repaint timer and the slot watcher. Tests feed the real `viewerArgs()` output to `parseViewerArgs` and run the interactive late viewer.
+3. B3 owner probe: the viewer never probed the owner pid (`ownerAlive=null` meant always alive). It now uses `core/liveness.mjs#pidAlive` (only ESRCH is dead); unit test without an injected `alive`, plus the live owner-kill row above.
+The earlier LV-3 PASS used a wrapper `delay-run-25s` flag that the plan deleted (R3 l.153) and never observed T13; that run and flag were removed and LV-3 was redone through the product failpoint.
