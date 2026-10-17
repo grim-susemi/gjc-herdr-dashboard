@@ -733,6 +733,13 @@ export function createReconciler(deps = {}) {
     const normalized = normalizeBinding(sessionId === null ? binding : { ...binding, sessionId });
     const paths = pathsFor(normalized);
     lastBinding = normalized;
+    // R1: taking over another instance's record is the explicit pass's owner step (it classifies
+    // the previous owner first). Arming and the 5 s heartbeat only refresh a record that is absent
+    // or already ours, so a restart is adopted by `/dashboard` and a live owner is never overwritten.
+    const ownerState = await readOwnerState(paths);
+    if (ownerState.corrupt || (ownerState.owner !== null && ownerState.owner.instanceId !== instanceId)) {
+      return { ok: false, skipped: true, code: ownerState.corrupt ? 'owner-unreadable' : 'owner-elsewhere', path: paths.owner };
+    }
     const owner = ownerRecord({ pid, instanceId, sessionId: normalized.sessionId, now: now() });
     await writeOwnerFile(paths.owner, owner);
     return { ok: true, path: paths.owner, owner };

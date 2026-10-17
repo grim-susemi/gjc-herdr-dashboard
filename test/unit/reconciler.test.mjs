@@ -1213,3 +1213,34 @@ test('A-29: the reconciler writes no data file and the data writer is gated by t
   assert.equal(afterClose.roles.todo.id, 'T2');
   assert.equal(await world.slotBytes() !== null, true);
 });
+
+test("AC4.1: arming and the heartbeat never take over a record another instance owns; the explicit pass does", async t => {
+  const world = await createWorld(t);
+  const { record } = await openTodo(world);
+  await world.ready("todo", world.readyRecord({ paneId: record.paneId, token: record.token }));
+  // The previous process stopped; this (new) instance arms and heartbeats before any /dashboard.
+  await writeJson(world.paths.owner, { schema: "gjc-herdr-dashboard/owner/1", pid: 9999,
+    instanceId: "inst-old", sessionId: "s-1", heartbeatAt: START - 30000, stoppedAt: START - 1000 });
+  const heartbeat = await world.reconciler.writeOwner(world.binding);
+  assert.equal(heartbeat.ok, false);
+  assert.equal(heartbeat.code, "owner-elsewhere");
+  const kept = JSON.parse(await readFile(world.paths.owner, "utf8"));
+  assert.equal(kept.instanceId, "inst-old", "the stopped record is left for the explicit pass to classify");
+  // The explicit pass sees the previous owner, adopts the role and only then writes its own record.
+  const pass = await world.explicit();
+  assert.equal(pass.roles.todo.code, "adopted");
+  assert.equal(JSON.parse(await readFile(world.paths.owner, "utf8")).instanceId, "inst-1");
+  // From then on the heartbeat refreshes its own record.
+  const own = await world.reconciler.writeOwner(world.binding);
+  assert.equal(own.ok, true);
+});
+
+test("an unreadable owner record is not overwritten by the heartbeat", async t => {
+  const world = await createWorld(t);
+  await openTodo(world);
+  await writeFile(world.paths.owner, "{ not json");
+  const heartbeat = await world.reconciler.writeOwner(world.binding);
+  assert.equal(heartbeat.ok, false);
+  assert.equal(heartbeat.code, "owner-unreadable");
+  assert.equal(await readFile(world.paths.owner, "utf8"), "{ not json");
+});

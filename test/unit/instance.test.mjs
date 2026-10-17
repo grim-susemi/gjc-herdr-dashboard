@@ -926,3 +926,32 @@ test('binding-seam-fault: a throwing binding seam still owes one notify', async 
   await pi.commands.get('dashboard').handler({}, ctx);
   assertOneNotify(world, /failed/);
 });
+
+test("G12: session_switch rebinds the scope at once, without waiting for another event", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx, state } = world.ctx({ sessionId: "s-1" });
+  await pi.commands.get("dashboard").handler({}, ctx);
+  const firstScope = handle.state().scopeKey;
+  const paneIds = world.fake.paneIds();
+  state.sessionId = "s-2";
+  await pi.handlers.get("session_switch")({ reason: "new" }, ctx);
+  assert.equal(handle.state().binding.sessionId, "s-2");
+  assert.notEqual(handle.state().scopeKey, firstScope);
+  assert.equal((await world.slot()).scope.sessionId, "s-2");
+  assert.deepEqual(world.fake.paneIds(), paneIds, "no pane change on a session switch");
+});
+
+test("a session switch with no event after it is still picked up by the 1 s poll", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx, state } = world.ctx({ sessionId: "s-1", leafId: "leaf-1" });
+  await pi.commands.get("dashboard").handler({}, ctx);
+  state.sessionId = "s-2";
+  state.leafId = null; // a fresh session has no leaf yet
+  await world.timers.fire(1000);
+  assert.equal(handle.state().binding.sessionId, "s-2");
+  assert.equal((await world.slot()).scope.sessionId, "s-2");
+});

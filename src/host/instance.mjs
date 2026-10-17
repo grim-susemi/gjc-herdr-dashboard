@@ -464,11 +464,18 @@ export function createInstance(pi, deps = {}) {
     // throwing - disables polling permanently (`pollMode: 'event-only'`); the event triggers then
     // carry the instance. That is why this variant of the auto pass rethrows instead of recording.
     try {
+      // A new session (`/new`, `/resume`, fork) has no leaf yet, so the leaf alone would leave the
+      // scope bound to the old session until the next event; the session id is the rebind key.
+      const current = bindingOfCtx()(latestCtx, envOf());
+      const sessionMoved = validBinding(current) && binding !== null && current.sessionId !== binding.sessionId;
       const leaf = latestCtx?.sessionManager?.getLeafId?.();
-      if (typeof leaf !== 'string' || leaf === '') return;
-      if (lastLeaf === null) { lastLeaf = leaf; return; }
-      if (leaf === lastLeaf) return;
-      lastLeaf = leaf;
+      const leafOk = typeof leaf === 'string' && leaf !== '';
+      if (!sessionMoved) {
+        if (!leafOk) return;
+        if (lastLeaf === null) { lastLeaf = leaf; return; }
+        if (leaf === lastLeaf) return;
+      }
+      if (leafOk) lastLeaf = leaf;
       await runAutoPass(latestCtx, 'poll', { strict: true });
     } catch (error) {
       // outcome: reported through `disablePoll`, which records it once and stops the timer.
@@ -857,6 +864,14 @@ export function createInstance(pi, deps = {}) {
       if (outcome.kind !== 'owner') return; // a delegate arms nothing and touches nothing.
     }
     await runAutoPass(ctx, 'session_start');
+  });
+
+  // G12: `/new`, `/resume` and fork arrive as `session_switch` in the same process (the factory is not
+  // called again), with the new session already on the ctx. The scope follows it at once instead of
+  // at the next unrelated event.
+  pi?.on?.('session_switch', async (_event, ctx) => {
+    if (!armed) return;
+    await runAutoPass(ctx, 'session_switch');
   });
 
   pi?.on?.('session_shutdown', async () => {

@@ -171,7 +171,10 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
     await sleep(3_000);
     // Keystrokes into the input popup can be swallowed (recorded harness race): retry the whole command.
     let slotAfterNew = slotBeforeNew;
-    for (let attempt = 1; attempt <= 3 && slotAfterNew.scope?.scopeKey === slotBeforeNew.scope?.scopeKey; attempt += 1) {
+    for (let attempt = 1; attempt <= 6 && slotAfterNew.scope?.scopeKey === slotBeforeNew.scope?.scopeKey; attempt += 1) {
+      // A turn still running queues the command instead of running it: wait for idle before every try.
+      for (let i = 0; i < 60 && status() !== 'idle'; i += 1) await sleep(2_000);
+      await sleep(2_000);
       fixture.sendKeys(parent, 'escape');
       await sleep(600);
       fixture.sendText(parent, '/ne');
@@ -179,7 +182,7 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
       fixture.sendText(parent, 'w');
       await sleep(900);
       fixture.sendKeys(parent, 'enter');
-      for (let i = 0; i < 15; i += 1) {
+      for (let i = 0; i < 20; i += 1) {
         await sleep(1_000);
         slotAfterNew = readJson(join(slotsDir, slotKey, 'slot.json'));
         if (slotAfterNew.scope?.scopeKey !== slotBeforeNew.scope?.scopeKey) break;

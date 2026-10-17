@@ -144,11 +144,11 @@ test('§7.1 item 1: the factory body reads no host value and creates no registry
   assert.deepEqual(fsHits, [], `the factory wrote files: ${fsHits}`);
 });
 
-test('the factory registers the six handlers, three bus channels and the one command', () => {
+test('the factory registers the seven handlers, three bus channels and the one command', () => {
   const pi = recordingPi();
   entry(pi);
   assert.deepEqual(pi.calls.map(call => `${call.method}:${call.name}`), [
-    'on:session_start', 'on:session_shutdown', 'on:turn_end', 'on:agent_end',
+    'on:session_start', 'on:session_switch', 'on:session_shutdown', 'on:turn_end', 'on:agent_end',
     'on:tool_execution_end', 'on:goal_updated',
     'events.on:task:subagent:lifecycle', 'events.on:task:subagent:progress',
     'events.on:task:subagent:event',

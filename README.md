@@ -119,7 +119,7 @@ omo를 읽기만 했고 실행하지 않았다).
 
 ### 4.8 reload는 실측하지 않았다 (G12)
 
-`/new`는 실측했다(`session_before_switch` → `session_switch`, factory 재호출 없음, 같은 프로세스).
+`/new`는 실측했다(`session_before_switch` → `session_switch`, factory 재호출 없음, 같은 프로세스). 확장은 `session_switch`를 받아 즉시 scope를 새 세션으로 옮기고, 1초 poll도 sessionId 변화를 본다(L4에서 `/new` 직후 scope가 늦게 바뀌던 간헐 실패로 발견·수정).
 `/resume`·`/fork`·`/reload`는 이 환경에서 측정하지 못했다(persisted 세션 시작이 공용 SDK 인덱스
 락에 막힘, `/reload`는 slash 명령이 아님). 대응: 같은 sessionId + 같은 moduleUrl이면 인스턴스를
 교체하고, sessionId가 같고 moduleUrl만 다르면 교체하지 않고 delegate + `warn:duplicate-install`
