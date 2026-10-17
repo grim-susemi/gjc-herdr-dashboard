@@ -689,12 +689,18 @@ test('AC1.4: three /dashboard calls leave exactly one GJC Todo pane', async t =>
   const pi = piOf();
   const handle = createInstance(pi, world.deps());
   const { ctx } = world.ctx();
-  for (let index = 0; index < 3; index += 1) await pi.commands.get('dashboard').handler({}, ctx);
+  await pi.commands.get('dashboard').handler({}, ctx);
+  // L2: the first pass opens the whole band, so it splits once per role (Todo, then Workers anchored
+  // on the Todo pane). The repeat calls add nothing: their records are already pending.
+  const splitsAfterFirst = world.fake.calls.filter(call => call.argv[1] === 'split').length;
+  assert.equal(splitsAfterFirst, 2, `L2 opens the band: ${JSON.stringify(world.fake.paneIds())}`);
+  await pi.commands.get('dashboard').handler({}, ctx);
+  await pi.commands.get('dashboard').handler({}, ctx);
   const label = `GJC Todo · ${world.layoutKey.slice(0, 8)}`;
   const ours = world.fake.paneIds().filter(id => world.fake.labelOf(id) === label);
   assert.equal(ours.length, 1, `panes: ${JSON.stringify(world.fake.paneIds())}`);
-  assert.equal(world.fake.calls.filter(call => call.argv[1] === 'split').length, 1,
-    'only the first call may split');
+  assert.equal(world.fake.calls.filter(call => call.argv[1] === 'split').length, splitsAfterFirst,
+    'the repeat calls may not split');
   assert.equal(world.fake.calls.filter(call => call.argv[1] === 'close').length, 0);
   assert.equal(world.notifications.length, 3, 'one notify per call (LT-4)');
   assert.equal(handle.state().counters.explicit, 3);
@@ -792,14 +798,20 @@ test('AC1.2: todo_write publishes a Todo projection in one call; a non-todo tool
   writes.length = 0;
   await pi.handlers.get('tool_execution_end')({ toolName: 'read' }, ctx);
   assert.deepEqual(writes, [], 'a non-todo tool publishes nothing');
-  assert.equal(handle.state().counters.published, 1, 'only the explicit pass published so far');
+  // L2: the explicit pass published BOTH projections - its own todo.json and the workers.json of
+  // the band it just opened.
+  assert.equal(handle.state().counters.published, 2, 'the explicit pass published todo + workers');
+  const workersFile = dataPaths(world.stateDir, scopeKey).workers;
   await pi.handlers.get('tool_execution_end')({ toolName: 'todo_write' }, ctx);
-  assert.deepEqual(writes, [file], 'todo_write publishes exactly one projection, for this scope');
+  assert.deepEqual(writes, [file, workersFile],
+    'todo_write publishes one projection per live role, for this scope');
   const stored = JSON.parse(await readFile(file, 'utf8'));
   assert.equal(stored.schema, 'gjc-herdr-dashboard/todo/1');
   assert.deepEqual(stored.phases,
     [{ name: '오늘', tasks: [{ content: '문서 쓰기', status: 'in_progress' }] }]);
-  assert.equal(handle.state().counters.published, 2);
+  assert.equal(JSON.parse(await readFile(workersFile, 'utf8')).schema,
+    'gjc-herdr-dashboard/workers/1');
+  assert.equal(handle.state().counters.published, 4);
 });
 
 test('§7.1 item 5: no projection is published while the slot carries no live todo record', async t => {

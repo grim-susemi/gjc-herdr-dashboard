@@ -18,24 +18,32 @@
 //     zero action; `closed` is written only by T3 (automatic or explicit) and by an explicit T20.
 //
 // PASS ORDER (plan 7.4 / the task contract): lock -> owner -> rebind -> role rows -> placement ->
-// focus -> result. Placement (the band layout of plan 7.8) belongs to L2's `layout.mjs` and is not
-// part of this lane; the role rows therefore go straight to focus, and the pass performs no
-// geometry work. Nothing in this module reads or writes pane geometry except the pre-split parent
-// size guard in `launch.mjs`-style form below.
+// focus -> result. Placement (the band layout of plan 7.8) is planned here with the pure planner in
+// `layout.mjs` and executed through `launch.mjs`'s split argv:
+//   * the role loop runs the roles it is given, in that order (`['todo','workers']` in production),
+//     so Workers can use the Todo record this very pass created as its split anchor;
+//   * before every create the pass reads `pane layout --pane <parent>` and asks `planBand` which
+//     roles the measured rect may host (size floors -> that role reports `partial:size`);
+//   * Workers additionally needs a non-closed Todo record in the slot, else `partial:no-anchor`;
+//   * after a create the pass verifies the band with `isBandShape`/`foreignPanes` and reports
+//     `partial:shape` when it is not a band. A foreign sibling is never closed, moved, resized or
+//     renamed; only the existing O+ rows ever close one of OUR panes.
+// An automatic pass never creates anything (A-32: at most `pane list`/`process-info`/`layout`).
 //
 // Exported signatures
 //   createReconciler(deps) -> { explicitPass, autoPass, writeOwner, markStopped, rebind }
 //   deps: { stateDir, herdr, vector, now, pidAlive, instanceId, pid, newToken, newPassId,
 //           viewerPath, nodePath, checkNode, language, gen, sleep, env,
 //           // optional, documented extensions of the shared contract
-//           registryOwnerInstanceId, herdrTimeoutMs, explicitBudgetMs, autoBudgetMs,
-//           minParentSize, platform }
+//           registryOwnerInstanceId, herdrTimeoutMs, explicitBudgetMs, autoBudgetMs, platform }
+//   The L1 `minParentSize` guard is gone: `planBand` measures the same floors that a create would
+//   have to satisfy, from the same `pane layout` read, and reports the same `partial:size`.
 //   `sleep` is accepted for interface compatibility with the shared contract and is deliberately
 //   unused: the R1 generation-file protocol needs no timed wait (no heartbeat takeover, no retry
 //   loop), so this module never sleeps.
 //   explicitPass(input) -> result (see runPass); one notify is formatted by the caller.
 //   autoPass(input)     -> result with `mode:'auto'`, no notify anywhere, mutations 0.
-//   input: { binding:{socket,parentPaneId,tabId,sessionId}, roles:['todo'],
+//   input: { binding:{socket,parentPaneId,tabId,sessionId}, roles:['todo','workers'],
 //            trigger?, failpoint?, hooks? }   // trigger is recorded for A-31 evidence; failpoint
 //                                 // injects the R3 crash/ready-delay fixture; hooks drive the lock
 //                                 // race tests (afterClassify / afterLastCheck).
@@ -48,6 +56,7 @@
 //   carry `lock`, which is what the adapter renders as the holder snapshot.
 import { randomUUID } from 'node:crypto';
 import { readJson } from '../storage.mjs';
+import { BAND_LAYOUT, foreignPanes, isBandShape, planBand } from './layout.mjs';
 import { launchRole } from './launch.mjs';
 import { ageMs, isO, isOPlus, pidAlive as probePid, viewerState } from './liveness.mjs';
 import { OWNER_SCHEMA, acquireLock, clearIntent, generationIsCurrent, key8Of, labelOf, layoutKeyOf,
@@ -64,8 +73,11 @@ const AUTO_CODES = { T1: 'none', T2: 'none', T3: 'closed', T4: 'discarded', T5: 
   T21: 'unresponsive', T22: 'none', T0: 'none' };
 const AUTO_ORDER = ['quarantined', 'closed', 'discarded', 'ready', 'pending-slow', 'pending',
   'unresponsive', 'busy', 'none'];
-const DEFAULT_MIN_PARENT_SIZE = { width: 40, height: 8 };
 const paneIdOf = pane => pane?.pane_id ?? pane?.paneId ?? null;
+// The role order a pass must use (contract "Roles/ordering"): Todo is the band's anchor, so it is
+// always resolved before Workers in the same pass. A caller that hands the roles in another order
+// cannot break that invariant; the pass sorts into this order and keeps the caller's SET.
+const ROLE_ORDER = ['todo', 'workers'];
 
 // Herdr verbs that change pane or focus state. Read-only classification (`list`, `layout`,
 // `process-info`) is not a mutation, which is the same basis base T3/T4 use.
@@ -79,8 +91,7 @@ export function createReconciler(deps = {}) {
     pid = process.pid, newToken = () => randomUUID(), newPassId = () => randomUUID(),
     viewerPath = null, nodePath = null, checkNode = null, language = 'ko', gen = 'dev',
     sleep = null, env = process.env, registryOwnerInstanceId = null, herdrTimeoutMs = 5000,
-    explicitBudgetMs = 15000, autoBudgetMs = 5000,
-    minParentSize = DEFAULT_MIN_PARENT_SIZE, platform = process.platform,
+    explicitBudgetMs = 15000, autoBudgetMs = 5000, platform = process.platform,
   } = deps;
   if (typeof stateDir !== 'string' || stateDir === '') throw new TypeError('createReconciler needs stateDir');
   if (typeof herdr !== 'function') throw new TypeError('createReconciler needs a herdr function');
@@ -174,7 +185,13 @@ export function createReconciler(deps = {}) {
     const budgetMs = explicit ? explicitBudgetMs : autoBudgetMs;
     const deadline = startedAt + budgetMs;
     const binding = normalizeBinding(input?.binding);
-    const roles = Array.isArray(input?.roles) && input.roles.length > 0 ? [...input.roles] : ['todo'];
+    const requested = Array.isArray(input?.roles) && input.roles.length > 0 ? [...input.roles] : ['todo'];
+    const roles = [...new Set(requested)].sort((left, right) => {
+      const leftIndex = ROLE_ORDER.indexOf(left);
+      const rightIndex = ROLE_ORDER.indexOf(right);
+      return (leftIndex < 0 ? ROLE_ORDER.length : leftIndex)
+        - (rightIndex < 0 ? ROLE_ORDER.length : rightIndex);
+    });
     const paths = pathsFor(binding);
     const layoutKey = layoutKeyFor(binding);
     const key8 = key8Of(layoutKey);
@@ -282,21 +299,91 @@ export function createReconciler(deps = {}) {
       return { pane: present ? 'present' : 'absent', O, Oplus, V, age: ageMs(record.pendingSince, now()) };
     };
 
-    // The parent must be able to hold the role column at all (plan 7.8 floor: readable 40 columns,
-    // minimum 8 rows). The full lowering ladder is L2's layout work; this guard only refuses to
-    // create a pane that the measured parent rect cannot host, and reports partial:size instead.
-    // An unreadable rect is not a refusal: the split itself is the backstop.
-    const parentFits = async () => {
-      let layout = null;
-      try { layout = await call('pane', 'layout', '--pane', binding.parentPaneId); }
-      catch (error) {
-        // outcome: without a readable rect the guard abstains and the split decides.
-        return { ok: true, detail: error.code ?? error.message };
+    // ---- placement (plan 7.8). The planner is pure; this function is the only bridge between it
+    // and Herdr. One `pane layout --pane <parent>` per pass, cached, because the rect it reports is
+    // the same for the Todo row and the Workers row that follows it (the layout read is a mutation-
+    // free verb, allowed in an automatic pass too). Every decision the planner makes is reported
+    // as a role row; nothing is ever waited for (LT-5).
+    let layoutRead = null;
+    const placementLayout = async () => {
+      if (layoutRead === null) {
+        try { layoutRead = { layout: (await call('pane', 'layout', '--pane', binding.parentPaneId))?.layout ?? null }; }
+        catch (error) {
+          // outcome: an unreadable rect is not a refusal - the planner gets no parent rect, so it
+          // falls back to whatever is already open and the split itself is the backstop.
+          layoutRead = { layout: null, detail: error.code ?? error.message };
+        }
       }
-      const rect = (layout?.layout?.panes ?? []).find(pane => paneIdOf(pane) === binding.parentPaneId)?.rect;
-      if (!rect) return { ok: true, detail: 'no-rect' };
-      if (Number(rect.width) < minParentSize.width || Number(rect.height) < minParentSize.height) {
-        return { ok: false, detail: `parent ${rect.width}x${rect.height} < ${minParentSize.width}x${minParentSize.height}` };
+      return layoutRead;
+    };
+    const rectOfPane = (layout, paneId) => (Array.isArray(layout?.panes) ? layout.panes : [])
+      .find(pane => paneIdOf(pane) === paneId)?.rect ?? null;
+
+    // What `planBand` says about this role right now. `slotState` is the pass's CURRENT slot snapshot,
+    // so an anchor is only ever a record the slot still carries as non-closed: an orphan this pass is
+    // about to abandon (T20 not-O+) or a record whose pane is already gone never narrows the floors.
+    // The anchor of a Workers plan is the Todo pane (the pane its `down` split would happen in), which
+    // is exactly the contract's existing-Todo case; an existing Workers pane is passed too so the
+    // planner never reports it as dropped.
+    const placementOf = async (role, slotState) => {
+      const read = await placementLayout();
+      const layout = read.layout;
+      const parentRect = rectOfPane(layout, binding.parentPaneId);
+      const rectOfRole = name => {
+        const anchor = slotState?.roles?.[name] ?? null;
+        return anchor && anchor.state !== 'closed' && typeof anchor.paneId === 'string'
+          ? rectOfPane(layout, anchor.paneId) : null;
+      };
+      const existing = {};
+      const anchorRect = rectOfRole(role === 'workers' ? 'todo' : role);
+      if (anchorRect) existing.todo = anchorRect;
+      if (role === 'workers') {
+        const mine = rectOfRole('workers');
+        if (mine) existing.workers = mine;
+      }
+      return { layout, parentRect, plan: planBand({ parentRect, roles: [role], existing }) };
+    };
+
+    // After a create: does the tab hold exactly the band we planned? A missing layout read or a
+    // foreign sibling is `partial:shape`, and the pass still keeps whatever the floors allowed - it
+    // never closes, moves, resizes or renames the foreign pane (AC2.8).
+    //
+    // "Ours" means the parent, the Todo pane and (when one is open) the Workers pane: a workers pane
+    // that is still on its record is our pane, not a foreign sibling, so a Todo recreate that leaves
+    // the band mis-shaped reports `partial:shape` rather than blaming our own pane.
+    //
+    // The region the shape is measured against is the union of OUR pane rects, not the tab's raw
+    // `area`: a tab can hold space no pane covers (the fixture models "the viewer vanished" by
+    // deleting the pane from the pane table, which returns no space to the parent), and no real
+    // Herdr tab leaves such a hole. The union is exactly the region our panes claim, so `isBandShape`
+    // still checks the contractual geometry (parent left, Todo right at the region's full height,
+    // Workers below Todo at Todo's width) and still rejects every pane that is not one of ours;
+    // `foreignPanes` names those for the detail.
+    const verifyShape = async (role, record, slotState) => {
+      const read = await placementLayout();
+      const layout = read.layout;
+      if (!layout) return { ok: true, detail: read.detail ?? 'layout:unreadable' };
+      const todo = slotState?.roles?.todo ?? null;
+      const workers = slotState?.roles?.workers ?? null;
+      const livePaneOf = entry => (entry && entry.state !== 'closed' && typeof entry.paneId === 'string'
+        ? entry.paneId : null);
+      const ids = { parent: binding.parentPaneId, todo: null };
+      ids.todo = role === 'todo' ? record?.paneId ?? null : livePaneOf(todo);
+      const workersPaneId = role === 'workers' ? record?.paneId ?? null : livePaneOf(workers);
+      if (typeof ids.todo !== 'string' || ids.todo === '') return { ok: true, detail: 'shape:no-todo' };
+      // The band check covers Workers whenever one is open (before or after this create).
+      if (workersPaneId) ids.workers = workersPaneId;
+      const foreign = foreignPanes(layout, ids);
+      if (foreign.length > 0) return { ok: false, detail: `shape:foreign:${foreign.join(',')}` };
+      const rects = Object.values(ids).map(id => rectOfPane(layout, id)).filter(Boolean);
+      if (rects.length !== Object.keys(ids).length) return { ok: true, detail: 'shape:no-rect' };
+      const left = Math.min(...rects.map(rect => rect.x));
+      const top = Math.min(...rects.map(rect => rect.y));
+      const right = Math.max(...rects.map(rect => rect.x + rect.width));
+      const bottom = Math.max(...rects.map(rect => rect.y + rect.height));
+      const area = { x: left, y: top, width: right - left, height: bottom - top };
+      if (!isBandShape({ area, panes: layout.panes }, ids)) {
+        return { ok: false, detail: 'shape:not-a-band' };
       }
       return { ok: true, detail: null };
     };
@@ -501,10 +588,34 @@ export function createReconciler(deps = {}) {
           if (action.type === 'create') {
             if (out.failure) continue;
             if (!explicit) continue;
-            const fits = await parentFits();
-            if (!fits.ok) {
+            // Workers' anchor is the Todo record of THIS slot: created earlier in this same pass or
+            // already live. Without a non-closed Todo record there is no pane to split, so the role
+            // creates nothing and says exactly why (contract "Roles/ordering").
+            const todoRecord = slot?.roles?.todo ?? null;
+            if (role !== 'todo' && (!todoRecord || todoRecord.state === 'closed'
+                || typeof todoRecord.paneId !== 'string' || todoRecord.paneId === '')) {
+              out.code = 'partial:no-anchor';
+              out.detail = `${role}:no-todo-record`;
+              continue;
+            }
+            // Plan 7.8's floors, measured on the rect this split would really happen in. A role the
+            // planner refuses is the ladder's lower rung: `partial:size`, and nothing is created.
+            const placement = await placementOf(role, slot);
+            // Workers splits the Todo pane, so a Todo record whose pane is not in the measured layout
+            // has no region to split at all: the floors cannot allow it, and attempting the split
+            // would only leave an intent behind (the L1 `parentFits` abstained here; the planner's own
+            // contract reports `size` for an unmeasurable region, which is the honest answer).
+            const anchorMeasurable = role === 'todo' || placement.layout === null
+              ? true
+              : placement.layout.panes.some(pane => paneIdOf(pane) === todoRecord.paneId);
+            if (!anchorMeasurable) {
               out.code = 'partial:size';
-              out.detail = fits.detail;
+              out.detail = `size:${role}:no-anchor-rect`;
+              continue;
+            }
+            if (placement.plan.roles.includes(role) !== true) {
+              out.code = 'partial:size';
+              out.detail = `size:${role}`;
               continue;
             }
             const token = newToken();
@@ -513,6 +624,11 @@ export function createReconciler(deps = {}) {
             const launch = await launchRole({
               herdr: call, paths, layoutKey, stateDir, role, token, label, language,
               parent: { socket: binding.socket, paneId: binding.parentPaneId, tabId: binding.tabId },
+              // Todo keeps the L1 argv (the parent as anchor, `right`, no ratio); every other role
+              // states its anchor, direction and ratio explicitly (contract "Launch parameters").
+              anchorPaneId: role === 'todo' ? binding.parentPaneId : todoRecord.paneId,
+              direction: role === 'todo' ? 'right' : 'down',
+              ratio: role === 'todo' ? null : BAND_LAYOUT.todoHeight,
               scope: { sessionId: binding.sessionId, scopeKey: scope.scopeKey,
                 scopeEpoch: scope.scopeEpoch, language },
               slot, viewerPath: viewerPathFor(role), nodePath, checkNode, env, now, platform,
@@ -528,6 +644,19 @@ export function createReconciler(deps = {}) {
               focus.before = launch.focus.before;
               focus.after = launch.focus.after;
               focus.restored = launch.focus.restored;
+              // The tab changed: the next planner read and the shape check must see the new pane, so
+              // the cached pre-split layout is dropped here.
+              layoutRead = null;
+              // Plan 7.8 "확인": the shape is verified after the pane exists. Only a clean creation
+              // can be downgraded - a row that already reports a kept orphan or a failure keeps the
+              // stronger code it has (A-29) - and a foreign sibling is reported, never touched.
+              if (out.code === 'opened') {
+                const shape = await verifyShape(role, record, slot);
+                if (!shape.ok) {
+                  out.code = 'partial:shape';
+                  out.detail = shape.detail;
+                }
+              }
             } else {
               out.code = launch.code;
               out.detail = launch.detail;
@@ -541,6 +670,7 @@ export function createReconciler(deps = {}) {
                 slot = launch.slot;
                 record = launch.record ?? record;
               }
+              layoutRead = null;
             }
             continue;
           }

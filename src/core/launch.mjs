@@ -50,6 +50,10 @@
 //                                  | {ok:false, code, detail}
 //   launchRole(options)            -> {ok, code, paneId?, tabId?, shellPid?, token, label, record?,
 //                                      slot?, splitPaneIds, focus, detail?}
+//     L2 adds `anchorPaneId` (default: the parent pane), `direction` (default 'right') and `ratio`
+//     (default null = no `--ratio` flag). Todo keeps the L1 argv exactly: the parent as anchor,
+//     `--direction right --no-focus` and no ratio flag. Workers: anchor = the Todo record's
+//     paneId, `--direction down --ratio 0.35 --no-focus`.
 import { accessSync, constants } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { resolveHerdrVector, shellCommand } from '../herdr.mjs';
@@ -59,6 +63,9 @@ export const LAUNCH_FAILPOINT_ENV = 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT';
 export const VIEWER_FAILPOINT_ENV = 'GJC_HERDR_DASHBOARD_VIEWER_FAILPOINT';
 export const CRASH_FAIL_POINTS = ['fp1', 'fp2', 'fp3', 'fp4', 'fp5'];
 export const VIEWER_FAILPOINTS = ['ready-delay-25s'];
+// The L1 default: Todo is the first role, it is split to the right of the parent, and Herdr's own
+// default ratio (0.5) is used, so the argv carries no `--ratio` at all. Every later role states its
+// anchor and direction explicitly (contract "Launch parameters").
 const SPLIT_DIRECTION = 'right';
 
 // `fp5` is the viewer-side delay, not a crash: the launch itself completes normally.
@@ -187,6 +194,12 @@ export async function launchRole(options = {}) {
     env = process.env, now = () => Date.now(), platform = process.platform,
     checkNode, viewerAccess, resolveVector, vector = null,
     failpoint = undefined, focusCheck = true,
+    // L2 (contract "Launch parameters"): which pane this role splits, in which direction, and at
+    // what ratio. The defaults reproduce the L1 Todo argv byte for byte: anchor = the parent pane,
+    // direction `right`, no `--ratio` flag at all (Herdr's own default is already 0.5, and adding
+    // the flag would be a second, unverified spelling of the same geometry). Workers passes the
+    // Todo pane as its anchor with `down` + 0.35.
+    anchorPaneId = null, direction = SPLIT_DIRECTION, ratio = null,
     // The reconciler passes guarded writers so the pass's budget check and generation re-check
     // also cover the state writes this sequence makes (steps 3, 6, 7). Defaults keep the module
     // usable on its own in the launch tests.
@@ -205,6 +218,20 @@ export async function launchRole(options = {}) {
   const viewerFailpoint = pre.viewerFailpoint ?? (crash === 'fp5' ? VIEWER_FAILPOINTS[0] : null);
   const parentPaneId = parent?.paneId;
   const parentTabId = parent?.tabId;
+  // The split anchor is the caller's explicit pane when it has one, the parent pane otherwise. A
+  // missing anchor must not become the string 'undefined' in the argv: it fails before any pane is
+  // touched, exactly like a bad viewer path (the caller can only report `failed:herdr-split`).
+  const anchorOf = typeof anchorPaneId === 'string' && anchorPaneId !== ''
+    ? anchorPaneId : parentPaneId;
+  if (typeof anchorOf !== 'string' || anchorOf === '') {
+    return abort('failed:herdr-split', 'split:no-anchor');
+  }
+  const splitDirection = direction === 'down' || direction === 'up' || direction === 'left' ||
+    direction === 'right' ? direction : SPLIT_DIRECTION;
+  // `ratio` is a Herdr split ratio in (0, 1); anything else is treated as "no flag" so a bad value
+  // cannot produce an argv Herdr would read as something else.
+  const splitRatio = typeof ratio === 'number' && Number.isFinite(ratio) && ratio > 0 && ratio < 1
+    ? ratio : null;
   const at = () => (typeof now === 'function' ? now() : Date.now());
 
   if (focusCheck) {
@@ -228,9 +255,12 @@ export async function launchRole(options = {}) {
   }
 
   // 4. split. The result of THIS call is the only source of the run target.
+  const splitArgv = ['pane', 'split', anchorOf, '--direction', splitDirection];
+  if (splitRatio !== null) splitArgv.push('--ratio', String(splitRatio));
+  splitArgv.push('--no-focus');
   let split;
   try {
-    split = await herdr('pane', 'split', parentPaneId, '--direction', SPLIT_DIRECTION, '--no-focus');
+    split = await herdr(...splitArgv);
   } catch (error) {
     if (isControlFailure(error)) throw error;
     if (error.code === 'timeout') {

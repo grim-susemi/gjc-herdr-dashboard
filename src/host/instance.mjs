@@ -14,10 +14,15 @@
 //   * the 5 s owner heartbeat (`reconciler.writeOwner`) and the 1 s `getLeafId()` poll that turns a
 //     `/todo` edit into an automatic pass (G9 measured that the retained ctx keeps answering; if it
 //     ever throws, polling is disabled for good and the instance stays event-only);
-//   * the data publish: `projectTodo(ctx)` -> `data/<scopeKey>/todo.json`, and only while the slot
-//     still carries a non-closed `todo` record (§7.1 item 5). The writer merges a burst of
-//     publishes into one 200 ms write; the explicit path flushes so `/dashboard` never returns
-//     before its own projection is on disk.
+//   * the data publish: `projectTodo(ctx)` -> `data/<scopeKey>/todo.json` and the Workers tracker's
+//     `snapshot()` -> `data/<scopeKey>/workers.json`, each only while the slot still carries a
+//     non-closed record for ITS role (§7.1 item 5). The writer merges a burst of publishes into one
+//     200 ms write; the explicit path flushes so `/dashboard` never returns before its own
+//     projection is on disk.
+//   * the workers bus subscription (L2 §7.6): `createWorkersTracker` is built at ARM time, the three
+//     BUS_CHANNELS feed it, `ctx.getJobs()` fills the background rows, and every handler is wrapped
+//     so a throw becomes `sourceError` instead of escaping into the host (AC2.7, LT-1);
+//   * the 5 s tick that promotes a LATE-ready viewer of ANY role in `ROLES`, not just Todo (R3).
 // WHAT IT DELIBERATELY DOES NOT OWN
 //   * panes, focus, records and lock files: `src/core/reconciler.mjs`;
 //   * eligibility, binding and message wording: `src/host/gjc-adapter.mjs`;
@@ -37,7 +42,8 @@
 //   language, rawLanguage, invalidLanguage, pollMode ('poll'|'event-only'), binding, layoutKey,
 //   scopeKey, owner, delegate, delegateInstanceId, duplicateNotified, vector, vectorError,
 //   lastOwnerPath, heartbeatAt, lastLeaf, lastResultCode, lastNotify, superseded, counters, errors,
-//   pruneFailures.
+//   pruneFailures, workers.
+//   `workers` is the tracker's reporting view for a drill: `{ sourceError, ignored, cards }`.
 //
 // `deps` (every key optional; the real default is named in parentheses). The factory body only
 // registers handlers and closes over these: it reads no environment value, starts no timer,
@@ -60,6 +66,7 @@
 //   bindingOf           (gjc-adapter bindingOf)
 //   notifyText          (gjc-adapter notifyText)
 //   projectTodo         (sources/todo projectTodo)
+//   workersTrackerFactory (sources/workers createWorkersTracker)
 //   pruneScopes         (retention pruneExpiredScopes)
 //   retentionDays       (retention retentionDaysFromEnv)
 //   scanScopes          (scanScopeKeys)
@@ -83,6 +90,7 @@ import { resolveViewerNode } from '../runtime.mjs';
 import { generationOf } from '../viewers/common.mjs';
 import { bindingOf, checkEligibility, notifyText } from './gjc-adapter.mjs';
 import { projectTodo } from './sources/todo.mjs';
+import { createWorkersTracker } from './sources/workers.mjs';
 
 // §7.1 item 3: one registry per process, keyed by the layout key (pane owner unit).
 export const REGISTRY_KEY = Symbol.for('gjc.herdr.dashboard/1');
@@ -92,12 +100,16 @@ export const HOST_ENV = 'GJC_HERDR_DASHBOARD_HOST';
 export const LANG_ENV = 'GJC_HERDR_DASHBOARD_LANG';
 export const OWNER_HEARTBEAT_MS = 5000;
 export const POLL_MS = 1000;
-export const ROLES = Object.freeze(['todo']);
+// The dashboard's roles, in the order a pass opens them: Todo is the band's anchor, so Workers can
+// only be split after Todo exists (contract "Roles/ordering").
+export const ROLES = Object.freeze(['todo', 'workers']);
 export const DASHBOARD_COMMAND = 'dashboard';
 export const DASHBOARD_DESCRIPTION = 'Open the Herdr dashboard for this session';
 // The subagent telemetry channels G5 measured (`VERIFICATION.md`). Plan §7.4 lists "bus" as an
-// automatic-pass trigger; L1 has no workers projection yet, so a bus event only re-runs the
-// automatic pass (data write + rebind), never a pane mutation and never a notify.
+// automatic-pass trigger: a bus event feeds the workers tracker AND re-runs the automatic pass
+// (data write + rebind), never a pane mutation and never a notify. `task:subagent:event` carries
+// raw child events and is deliberately not consumed - it is subscribed only so the subscription set
+// matches the measured host surface.
 export const BUS_CHANNELS = Object.freeze(['task:subagent:lifecycle', 'task:subagent:progress',
   'task:subagent:event']);
 
@@ -150,6 +162,8 @@ export function createInstance(pi, deps = {}) {
   const bindingOfCtx = () => (typeof deps.bindingOf === 'function' ? deps.bindingOf : bindingOf);
   const notifyTextOf = () => (typeof deps.notifyText === 'function' ? deps.notifyText : notifyText);
   const projectTodoOf = () => (typeof deps.projectTodo === 'function' ? deps.projectTodo : projectTodo);
+  const workersTrackerOf = () => (typeof deps.workersTrackerFactory === 'function'
+    ? deps.workersTrackerFactory : createWorkersTracker);
   // The timer seams stay LAZY functions: naming the global `setInterval` inside a closure body is
   // not an access at factory time (§7.1 item 1), and the injected variant wins when present.
   const armTimer = (fn, ms) => (typeof deps.setInterval === 'function' ? deps.setInterval : setInterval)(fn, ms);
@@ -189,6 +203,10 @@ export function createInstance(pi, deps = {}) {
   let vectorError = null;
   let reconciler = null;
   let dataWriter = null;
+  // Built at ARM time (a sub session must not even construct one) and reset whenever the scope
+  // key changes: the cards, the source error and the ignore counter all belong to one scope.
+  let workersTracker = null;
+  let busUnsubscribe = null;
   let latestCtx = null;
   let lastLeaf = null;
   let pollMode = 'event-only';
@@ -326,6 +344,9 @@ export function createInstance(pi, deps = {}) {
       ? deps.reconcilerFactory : createReconciler)(reconcilerDeps);
     dataWriter = (typeof deps.dataWriterFactory === 'function'
       ? deps.dataWriterFactory : createDataWriter)({ stateDir, now: () => clock() });
+    // §7.6: the workers tracker is pure state; this instance is its only feeder. Rebuilt on every
+    // arm so a re-armed instance never inherits another scope's cards.
+    workersTracker = workersTrackerOf()({ now: () => clock() });
   }
 
   async function heartbeatOnce() {
@@ -365,13 +386,70 @@ export function createInstance(pi, deps = {}) {
       return;
     }
     if (read.status !== 'ok') return;
-    const roleRecord = read.slot?.roles?.todo ?? null;
-    if (roleRecord?.state !== 'pending') return;
+    // R3 / LT-3: EVERY role in ROLES can be the one a late viewer left pending, so the tick must
+    // check each of them - a workers viewer that missed the ready window would otherwise stay
+    // pending until the next user call.
+    const pending = ROLES.some(role => read.slot?.roles?.[role]?.state === 'pending');
+    if (!pending) return;
     await runAutoPass(latestCtx, 'heartbeat-tick');
   }
 
   function stopHeartbeat() {
     if (heartbeatTimer !== null) { disarmTimer(heartbeatTimer); heartbeatTimer = null; }
+  }
+
+  // A scheduled workers publish: the bus handlers may only enqueue (AC2.7), so this is the one place
+  // a payload becomes a file. It never rejects into the caller - a failed publish is recorded in
+  // state() and the next trigger retries.
+  function scheduleWorkersPublish() {
+    if (!armed || !workersTracker) return null;
+    return Promise.resolve().then(() => publishWorkers())
+      .catch(error => {
+        // outcome: a workers publish that could not run is kept in state(); the bus burst it came
+        // from is already in the tracker and the next trigger writes it.
+        record(error, 'workers-publish');
+      });
+  }
+
+  // §7.6 + AC2.7. Every channel gets the same shape: feed the tracker (synchronous, pure state),
+  // schedule the publish, then let the retained ctx carry the automatic pass exactly as L1 did. A
+  // throw from the feed is the workers footer's source error (미표시가 아니라 '원천 오류') and is never
+  // rethrown into the host's event dispatch.
+  function attachWorkersBus() {
+    const offs = [];
+    const subscribe = (channel, feed) => {
+      const off = pi?.events?.on?.(channel, payload => {
+        if (!armed) return;
+        try { feed(payload); }
+        catch (error) {
+          // outcome: a payload the tracker could not absorb becomes the workers source error; the
+          // host event dispatch never sees the throw (AC2.7, LT-1).
+          workersTracker?.fail(error, 'bus');
+        }
+        scheduleWorkersPublish();
+        if (!latestCtx) return;
+        runAutoPass(latestCtx, 'bus');
+      });
+      if (typeof off === 'function') offs.push(off);
+    };
+    subscribe('task:subagent:lifecycle', payload => workersTracker?.onLifecycle(payload));
+    subscribe('task:subagent:progress', payload => workersTracker?.onProgress(payload));
+    // `task:subagent:event` carries raw child events and is deliberately NOT consumed (§7.6); it is
+    // subscribed so the trigger set matches the measured host surface.
+    subscribe('task:subagent:event', () => {});
+    busUnsubscribe = offs;
+  }
+
+  function detachWorkersBus() {
+    for (const off of busUnsubscribe ?? []) {
+      try { off(); }
+      catch (error) {
+        // outcome: a subscription the host refuses to release is recorded; the instance is being
+        // torn down either way and nothing else depends on the release succeeding.
+        record(error, 'bus-unsubscribe');
+      }
+    }
+    busUnsubscribe = null;
   }
 
   function disablePoll(error) {
@@ -535,6 +613,11 @@ export function createInstance(pi, deps = {}) {
       record(error, 'rebind');
       return { ok: false, code: 'failed:internal' };
     }
+    // A scope change starts the workers projection over: the cards, the source error and the ignore
+    // counter describe the scope that just ended and none of them may leak into the next one.
+    if (outcome?.ok === true && text(outcome.scopeKey) && outcome.scopeKey !== scopeKey) {
+      workersTracker?.reset?.();
+    }
     if (outcome?.ok === true && text(outcome.scopeKey)) scopeKey = outcome.scopeKey;
     return outcome ?? { ok: false, code: 'failed:internal' };
   }
@@ -542,8 +625,9 @@ export function createInstance(pi, deps = {}) {
   // §7.1 item 5: data files exist only while the slot carries a non-closed record for the role.
   // This function is that gate: it reads the slot, decides, and only then publishes. The data
   // writer itself owns no gate here (it is a dumb projection writer, plan §7.9 row
-  // `data/<scopeKey>/todo.json`), so the rule lives in one place instead of two.
-  async function publishTodo(ctx, { flush = false } = {}) {
+  // `data/<scopeKey>/todo.json`), so the rule lives in one place instead of two. The caller owns the
+  // flush (`runExplicit` drains the writer once for every role it published).
+  async function publishTodo(ctx) {
     if (!dataWriter || !stateDir || layoutKey === null) return { published: false, reason: 'no-writer' };
     let read;
     try { read = await readSlot(paths().slot); }
@@ -580,14 +664,51 @@ export function createInstance(pi, deps = {}) {
     // The promise is also handed to `flush()`; this observer only keeps a rejected publish from
     // escaping as an unhandled rejection when the auto path never flushes.
     handle.then(() => { counters.published++; }, error => record(error, 'data-write'));
-    if (flush) {
-      try { await dataWriter.flush(); }
-      catch (error) {
-        // outcome: a projection that could not be written is reported in state() and the explicit
-        // pass still notifies its own result, which is the one message the user is owed.
-        record(error, 'data-flush');
-      }
+    return { published: true, scopeKey: key };
+  }
+
+  // §7.1 item 5 for the workers role: same gate as Todo, one slot read for both projections. The
+  // tracker already holds the state the bus fed it, so this function only decides whether the slot
+  // still carries a non-closed workers record and then publishes `snapshot()`. The caller owns the
+  // flush (`runExplicit` drains the writer once for both roles).
+  async function publishWorkers({ slot: known = undefined } = {}) {
+    if (!dataWriter || !workersTracker || !stateDir || layoutKey === null) {
+      return { published: false, reason: 'no-writer' };
     }
+    let slotValue = known ?? null;
+    if (slotValue === null) {
+      let read;
+      try { read = await readSlot(paths().slot); }
+      catch (error) {
+        // outcome: an unreadable slot means the projection has no home yet; the next trigger retries.
+        record(error, 'data-slot');
+        return { published: false, reason: 'slot-read' };
+      }
+      if (read.status !== 'ok') return { published: false, reason: read.status };
+      slotValue = read.slot;
+    }
+    const key = text(slotValue?.scope?.scopeKey);
+    if (!key) return { published: false, reason: 'no-scope' };
+    scopeKey = key;
+    const workersRecord = slotValue?.roles?.workers ?? null;
+    if (!workersRecord || workersRecord.state === 'closed') return { published: false, reason: 'closed' };
+    let projection;
+    try { projection = workersTracker.snapshot(); }
+    catch (error) {
+      // outcome: the tracker is written never to throw; if it does, the stale projection stays on
+      // disk and the viewer shows its own source-error label rather than losing the pane.
+      record(error, 'project-workers');
+      return { published: false, reason: 'projection' };
+    }
+    let handle;
+    try { handle = dataWriter.publish(key, 'workers', projection); }
+    catch (error) {
+      // outcome: a publish that throws synchronously wrote nothing; the previous projection stays
+      // on disk for the viewer and the reason is kept in state().
+      record(error, 'data-publish');
+      return { published: false, reason: 'publish' };
+    }
+    handle.then(() => { counters.published++; }, error => record(error, 'data-write'));
     return { published: true, scopeKey: key };
   }
 
@@ -632,11 +753,23 @@ export function createInstance(pi, deps = {}) {
       // call itself rejected, which is reported as one `failed:internal` line (never swallowed).
       record(error, 'explicit');
       result = { ok: false, code: 'failed:internal', detail: message(error),
-        roles: { todo: { code: 'failed:internal', id: null, paneId: null, detail: message(error),
-          failure: 'failed:internal' } } };
+        roles: Object.fromEntries(ROLES.map(role => [role, { code: 'failed:internal', id: null,
+          detail: message(error), failure: 'failed:internal' }])) };
     }
     lastResultCode = result?.code ?? 'failed:internal';
-    await publishTodo(ctx, { flush: true });
+    // Every pass refreshes the background half of the workers projection before publishing, so a
+    // job the bus can never see still appears (AC2.6).
+    syncJobsFromCtx(ctx);
+    // Both projections are flushed together, so `/dashboard` never returns before its own data is
+    // on disk - for either role.
+    await publishTodo(ctx);
+    await publishWorkers();
+    try { await dataWriter?.flush(); }
+    catch (error) {
+      // outcome: a projection that could not be written is reported in state() and the explicit
+      // pass still notifies its own result, which is the one message the user is owed.
+      record(error, 'data-flush');
+    }
     notify(ctx, result ?? { code: 'failed:internal' }, result?.ok === true ? 'info' : 'warn', notice);
     return result;
   }
@@ -656,7 +789,9 @@ export function createInstance(pi, deps = {}) {
       // projection, then let the reconciler do its record work (T3/T4 discard, T13 promotion):
       // that order is plan §7.4's "data write, rebind, record cleanup" with the rebind hoisted, and
       // it means a record about to be discarded still gets its last fresh picture.
+      syncJobsFromCtx(ctx);
       await publishTodo(ctx);
+      await publishWorkers();
       return await reconciler.autoPass({ binding: local, roles: [...ROLES], trigger,
         ...(deps.failpoint === undefined ? {} : { failpoint: deps.failpoint }) });
     } catch (error) {
@@ -666,6 +801,20 @@ export function createInstance(pi, deps = {}) {
       if (strict) throw error;
       record(error, `auto:${trigger}`);
       return null;
+    }
+  }
+
+  // §7.6: `ctx.getJobs()` is the background supplement to the bus. The host surface is optional
+  // (an older build has no job manager), so an absent accessor is not an error - but a throwing one
+  // is reported and never escapes.
+  function syncJobsFromCtx(ctx) {
+    if (!workersTracker) return;
+    try { workersTracker.syncJobs(ctx?.getJobs?.()); }
+    catch (error) {
+      // outcome: a broken jobs surface is a source error for the workers footer, never a throw into
+      // the host and never a lost pass (AC2.7).
+      workersTracker.fail(error, 'jobs');
+      scheduleWorkersPublish();
     }
   }
 
@@ -680,6 +829,7 @@ export function createInstance(pi, deps = {}) {
     if (armed) superseded = true;
     stopHeartbeat();
     if (pollTimer !== null) { disarmTimer(pollTimer); pollTimer = null; }
+    detachWorkersBus();
     armed = false;
   }
 
@@ -738,6 +888,13 @@ export function createInstance(pi, deps = {}) {
 
   pi?.on?.('tool_execution_end', async (event, ctx) => {
     if (!armed) return;
+    // A finished `task` job is exactly the background card the bus cannot see (§7.6), so the jobs
+    // surface is re-read on that transition even when no dashboard pass follows it.
+    if (event?.toolName === 'task') {
+      syncJobsFromCtx(ctx);
+      scheduleWorkersPublish();
+      return;
+    }
     if (event?.toolName !== 'todo_write') return;
     await runAutoPass(ctx, 'tool_execution_end');
   });
@@ -747,15 +904,10 @@ export function createInstance(pi, deps = {}) {
     await runAutoPass(ctx, 'goal_updated');
   });
 
-  // The bus carries no ctx, so it drives the retained one (G9). L2 supplies the workers projection
-  // that consumes these channels; L1 only re-runs the automatic pass.
-  for (const channel of BUS_CHANNELS) {
-    pi?.events?.on?.(channel, () => {
-      if (!armed) return;
-      if (!latestCtx) return;
-      runAutoPass(latestCtx, 'bus');
-    });
-  }
+  // The bus carries no ctx, so it drives the retained one (G9). One subscription per measured
+  // channel: the workers tracker consumes lifecycle/progress, the retained ctx carries the
+  // automatic pass, and every handler is wrapped so a fault becomes a source error, never a throw.
+  attachWorkersBus();
 
   pi?.registerCommand?.(DASHBOARD_COMMAND, {
     description: DASHBOARD_DESCRIPTION,
@@ -850,6 +1002,12 @@ export function createInstance(pi, deps = {}) {
       delegateInstanceId: delegateTo?.instanceId ?? null, duplicateNotified,
       vector: vector ? [...vector] : null, vectorError, lastOwnerPath, heartbeatAt, lastLeaf,
       lastResultCode, lastNotify, superseded,
+      // §7.6 for a drill: the workers tracker's own counts, not a copy of the projection file. One
+      // `snapshot()` call feeds all three fields so they describe the same instant.
+      workers: workersTracker === null ? null : (() => {
+        const view = workersTracker.snapshot();
+        return { sourceError: view.sourceError, ignored: view.ignored, cards: view.cards.length };
+      })(),
       counters: { ...counters }, errors: errors.map((item) => ({ ...item })),
       pruneFailures: pruneFailures.map((item) => ({ ...item })),
     }),

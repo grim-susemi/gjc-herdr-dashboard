@@ -300,7 +300,7 @@ test("every code the reconciler can emit has its own wording, not a raw fallback
   // C). If a new one appears there, this test must grow a key rather than silently render
   // `why: x` / `code: x` at the user.
   const emitted = ["partial:size", "partial:shape", "partial:timeout",
-    "partial:ownership-unproven", "replaced:dead", "replaced:stalled", "failed:node",
+    "partial:ownership-unproven", "partial:no-anchor", "replaced:dead", "replaced:stalled", "failed:node",
     "failed:viewer", "failed:herdr", "failed:herdr-split", "failed:herdr-close",
     "failed:herdr-process-info", "failed:herdr-record", "failed:herdr-rename",
     "failed:herdr-run", "failed:lock-io", "failed:internal", "failed:failpoint",

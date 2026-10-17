@@ -253,7 +253,10 @@ const REASON_KEYS = { "session-kind": "notify.reason.session-kind", "no-ui": "no
   "mirrored-install": "notify.reason.mirrored-install", "state-dir": "notify.reason.state-dir" };
 const WHY_KEYS = { size: "notify.why.size", shape: "notify.why.shape", timeout: "notify.why.timeout",
   dead: "notify.why.dead", stalled: "notify.why.stalled",
-  "ownership-unproven": "notify.why.ownership-unproven" };
+  "ownership-unproven": "notify.why.ownership-unproven",
+  // L2: Workers reports this when the slot carries no non-closed Todo record to split (contract
+  // "Roles/ordering"), so it is a role outcome like the other why-tokens rather than free text.
+  "no-anchor": "notify.why.no-anchor" };
 const FAILURE_KEYS = { node: "notify.failure.node", viewer: "notify.failure.viewer",
   herdr: "notify.failure.herdr", "herdr-split": "notify.failure.herdr-split",
   "herdr-close": "notify.failure.herdr-close", "herdr-process-info": "notify.failure.herdr-process-info",

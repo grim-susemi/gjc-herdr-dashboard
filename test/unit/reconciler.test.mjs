@@ -634,14 +634,22 @@ test('LT-3: three explicit /dashboard passes while pending keep exactly one role
 
 // ---------------------------------------------------------------- LT-5 no waiting state ----
 test('LT-5: a foreign pane, a corrupt slot, an unknown schema and a small parent never wait', async t => {
-  // (1) a foreign pane in the same tab is ignored; our pane is created next to it.
+  // (1) a foreign pane in the same tab is reported as partial:shape (AC2.8) while our pane is still
+  // created next to it and the foreign pane is left byte-identical.
   const foreign = await createWorld(t);
   foreign.fake.addPane('w1:p9', { label: 'DAG · x', shell: 6060 });
   const opened = await foreign.explicit();
-  assert.equal(opened.roles.todo.code, 'opened');
+  assert.equal(opened.roles.todo.code, 'partial:shape');
+  assert.equal(opened.roles.todo.id, 'T1');
+  assert.match(opened.roles.todo.detail, /shape:foreign:w1:p9/);
+  assert.equal(foreign.fake.paneIds().filter(paneId => paneId !== 'w1:p1' && paneId !== 'w1:p9').length, 1,
+    'the Todo pane is still created');
   assert.equal(foreign.fake.labelOf('w1:p9'), 'DAG · x');
   assert.equal(foreign.fake.commandOf('w1:p9'), null);
   assert.equal(foreign.fake.shellOf('w1:p9'), 6060);
+  assert.deepEqual(foreign.tracer.mutations('explicit')
+    .filter(entry => entry.argv[2] === 'w1:p9').map(entry => entry.argv[1]), [],
+  'a foreign sibling is never closed, renamed, run or focused');
 
   // (2) a corrupt slot is quarantined and the pass continues into T1.
   const corrupt = await createWorld(t);
@@ -679,18 +687,24 @@ test('LT-5: a foreign pane, a corrupt slot, an unknown schema and a small parent
   const shrunk = await narrow.explicit();
   assert.equal(shrunk.roles.todo.id, 'T13');
 
-  // (5) reconfiguration with foreign siblings: nothing foreign is closed or renamed, and the pass
-  // still reports a usable outcome instead of a waiting state.
+  // (5) reconfiguration with foreign siblings: nothing foreign is closed or renamed, the pass still
+  // creates what the floors allow and reports partial:shape instead of a waiting state (AC2.8).
   const siblings = await createWorld(t);
   siblings.fake.addPane('w1:p8', { label: 'OmO DAG', shell: 6061 });
   siblings.fake.addPane('w1:p7', { label: 'OmO Todo · x', shell: 6062 });
   const rebuilt = await siblings.explicit();
-  assert.ok(['opened', 'partial:size', 'partial:ownership-unproven'].includes(rebuilt.roles.todo.code),
-    rebuilt.roles.todo.code);
-  assert.equal(rebuilt.roles.todo.code.startsWith('layout-waiting') ||
-    rebuilt.code.includes('waiting'), false);
+  assert.equal(rebuilt.roles.todo.code, 'partial:shape', JSON.stringify(rebuilt.roles.todo));
+  assert.equal(rebuilt.roles.todo.id, 'T1');
+  assert.equal(rebuilt.roles.todo.paneId !== null, true, 'the pane the floors allowed was created');
+  assert.deepEqual(siblings.tracer.mutations('explicit')
+    .filter(entry => ['w1:p8', 'w1:p7'].includes(entry.argv[2])), [],
+  'no foreign pane was closed, renamed, run or focused');
   assert.equal(siblings.fake.labelOf('w1:p8'), 'OmO DAG');
   assert.equal(siblings.fake.labelOf('w1:p7'), 'OmO Todo · x');
+  assert.equal(siblings.fake.shellOf('w1:p8'), 6061);
+  assert.equal(siblings.fake.shellOf('w1:p7'), 6062);
+  assert.equal(rebuilt.roles.todo.code.startsWith('layout-waiting') ||
+    rebuilt.code.includes('waiting'), false);
 });
 
 const readFileExists = async path => {
