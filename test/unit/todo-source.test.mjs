@@ -99,8 +99,9 @@ test("the replay is the fallback when the host accessor is absent or throws", ()
   // A throwing accessor must not lose the branch data, and must not throw either.
   const throwing = { getTodoState() { throw new Error("host gone"); },
     sessionManager: { getBranch: () => [toolResult(phases)] } };
-  assert.deepEqual(projectTodo(throwing), { schema: TODO_SCHEMA,
-    updatedAt: projectTodo(throwing).updatedAt, phases, empty: false, sourceError: null });
+  // `now` is injected: two wall-clock reads can straddle a millisecond and make this flaky.
+  assert.deepEqual(projectTodo(throwing, { now: 1234 }), { schema: TODO_SCHEMA,
+    updatedAt: 1234, phases, empty: false, sourceError: null });
   // A throwing accessor with no usable branch is a source error, not an exception.
   const both = { getTodoState() { throw new Error("host gone"); },
     sessionManager: { getBranch() { throw new Error("no branch"); } } };

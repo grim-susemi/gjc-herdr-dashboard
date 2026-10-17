@@ -27,8 +27,9 @@ export function targetFiles() {
   files.push(...walk(join(root, "src")), ...walk(join(root, "scripts")));
   return files
     .map((file) => ({ rel: norm(relative(root, file)), text: readFileSync(file, "utf8") }))
-    // scripts/ holds repository tooling that is not shipped; the baseline runner reads omo on purpose.
-    .filter((f) => !["scripts/test.mjs", "scripts/baseline-omo.mjs"].includes(f.rel));
+    // scripts/ holds repository tooling that is not shipped; the baseline runner and the AC-G1 hasher
+    // read omo on purpose (read-only).
+    .filter((f) => !["scripts/test.mjs", "scripts/baseline-omo.mjs", "scripts/omo-protected.mjs"].includes(f.rel));
 }
 
 // Each rule: a function (rel, text) -> array of violation strings.
