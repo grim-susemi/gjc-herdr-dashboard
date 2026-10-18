@@ -50,8 +50,13 @@ await runScript('l3-pointer (LV-8)', async () => {
     const parent = ws.rootPaneId;
     const status = () => fixture.listPanes().find((p) => p.pane_id === parent)?.agent_status ?? null;
     const idle = async (label) => {
-      for (let i = 0; i < 90 && status() !== 'idle'; i += 1) await sleep(2_000);
-      assert(status() === 'idle', `the parent returned to idle (${label})`, { status: status() });
+      // The gate is "the turn ended": this build reports `done` for a finished turn on some prompts and
+      // `idle` on others, so the helper waits until the pane is not `working` and records what it saw.
+      const samples = [];
+      for (let i = 0; i < 90 && status() === 'working'; i += 1) { samples.push(status()); await sleep(2_000); }
+      samples.push(status());
+      writeEvidenceJson(evidence, `idle-${label.replace(/[^a-z]+/gi, '-')}.json`, { label, samples: samples.slice(-6) });
+      assert(status() !== 'working', `the parent stopped working (${label})`, { status: status(), samples });
       await sleep(2_000);
     };
     await launchGjc(fixture, parent, { dir: paths.dir, herdr: [process.execPath, WRAPPER],
