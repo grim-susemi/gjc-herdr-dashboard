@@ -36,7 +36,7 @@ function notifiesOf(result) {
 
 async function createWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-rec-'));
-  t.after(() => rm(stateDir, { recursive: true, force: true }));
+  t.after(() => rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   const clock = createFakeClock(START);
   const fake = createFakeHerdr({ parentPaneId: 'w1:p1', ...options.fake });
   const processes = createFakeProcesses({ alive: [OWNER_PID, process.pid], ...options.processes });
@@ -1040,6 +1040,25 @@ test('rebind, writeOwner and markStopped never create a slot, and a blocked rebi
   assert.equal(await world.slotBytes(), null);
   release();
   await holding;
+});
+
+// Architect L4 #8: a heartbeat that read the record before `markStopped` ran used to be able to write
+// after the stamp and erase it, so the next owner had to wait for the ESRCH route. The release is
+// final: once markStopped was called, writeOwner is skipped.
+test('markStopped is final: a writeOwner that follows (or races) it cannot erase the stoppedAt stamp', async t => {
+  const world = await createWorld(t);
+  await world.reconciler.writeOwner(world.binding);
+  const racing = world.reconciler.writeOwner(world.binding);
+  const stopped = world.reconciler.markStopped();
+  const [late, stamp] = await Promise.all([racing, stopped]);
+  assert.equal(stamp.ok, true);
+  assert.equal(typeof JSON.parse(await readFile(world.paths.owner, 'utf8')).stoppedAt, 'number');
+  const after = await world.reconciler.writeOwner(world.binding);
+  assert.equal(after.skipped, true);
+  assert.equal(after.code, 'stopped');
+  assert.equal(typeof JSON.parse(await readFile(world.paths.owner, 'utf8')).stoppedAt, 'number',
+    'the stamp survived a heartbeat after the release');
+  assert.ok(late.ok === true || late.code === 'stopped', JSON.stringify(late));
 });
 
 test('FP3: a renamed-but-unstarted pane converges T9 -> T10 -> T11 with no re-entry', async t => {

@@ -171,7 +171,7 @@ async function makeWorld(t, options = {}) {
       }),
   };
   t.after(async () => {
-    await rm(stateDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
     delete globalThis[REGISTRY_KEY];
   });
   return world;
@@ -642,6 +642,9 @@ test('LT-6: reload (same session + module) replaces the entry and retires the ol
   world.clock.advance(5000);
   await world.timers.fire(5000);
   assert.equal(second.state().heartbeatAt, world.clock.now());
+  // R1 reload: the successor claimed the record (same pid, registry names it), so the file proves it.
+  assert.equal((await world.owner()).instanceId, second.state().instanceId,
+    'the cooperative handover moved owner.json to the successor');
   assert.equal(world.fake.calls.length, herdrBefore, 'no handover step talks to Herdr');
 
   // A stray `/dashboard` on the retired instance delegates to whoever owns the slot now.
@@ -901,12 +904,35 @@ test('triggers: turn_end, agent_end, goal_updated, todo_write and each bus chann
   await pi.handlers.get('goal_updated')({}, ctx);
   for (const channel of pi.channels.values()) channel({ status: 'started' });
   await settle();
-  // The bus events are fire-and-forget (`runAutoPass` is not awaited), so the count is read after
-  // the microtasks they started have drained: 4 named triggers + 3 channels.
-  assert.equal(handle.state().counters.auto, base + 7);
+  // The bus events are fire-and-forget and arrive together, so they coalesce (one running pass plus
+  // at most one trailing pass); the 4 awaited named triggers each ran their own.
+  const ran = handle.state().counters.auto - base;
+  assert.ok(ran >= 5 && ran <= 7, `4 named triggers + 1..3 coalesced bus passes, got ${ran}`);
   assert.deepEqual(world.notifications, []);
   assert.deepEqual(world.tracer.mutations(), []);
   assert.deepEqual(world.tracer.verbs().filter(verb => !['pane list', 'pane process-info', 'pane layout'].includes(verb)), []);
+});
+
+// A running subagent publishes hundreds of progress events a second. Each used to queue its own pass
+// in front of the reconciler, so a `/new` that followed waited minutes behind the backlog (measured:
+// 1,491 queued passes, `session_switch` rebound ~190 s late). A burst is folded into at most one
+// trailing pass over the newest ctx, and the last state is still the one that gets processed.
+test('auto-pass coalescing: a bus burst is folded and the session change after it still rebinds', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx, state } = world.ctx({ sessionId: 's-1' });
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const base = handle.state().counters.auto;
+  const progress = [...pi.channels.values()][0];
+  for (let i = 0; i < 300; i += 1) progress({ status: 'running', i });
+  state.sessionId = 's-2';
+  await pi.handlers.get('session_switch')({}, ctx);
+  await settle();
+  await settle();
+  const ran = handle.state().counters.auto - base;
+  assert.ok(ran <= 3, `300 bus events + a switch ran ${ran} passes (expected a running one + a trailing one)`);
+  assert.equal((await world.slot()).scope.sessionId, 's-2');
 });
 
 // LT-4 / §7.2 (as amended by stage-05 R1): "`/dashboard`는 매번 다시 평가하고, 실패하면
@@ -954,4 +980,91 @@ test("a session switch with no event after it is still picked up by the 1 s poll
   await world.timers.fire(1000);
   assert.equal(handle.state().binding.sessionId, "s-2");
   assert.equal((await world.slot()).scope.sessionId, "s-2");
+});
+
+// -------------------------------------------------------------- L4 owner gate (architect #1/#3/#4) --
+const foreignOwner = (extra = {}) => ({ schema: "gjc-herdr-dashboard/owner/1", pid: 7777,
+  instanceId: "other-instance", sessionId: "s-1", heartbeatAt: 1, ...extra });
+
+test("L4: before /dashboard adopts a stopped previous owner, no automatic trigger writes a slot or data file", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const first = createInstance(pi, world.deps());
+  const { ctx, state } = world.ctx({ sessionId: "s-1" });
+  await pi.commands.get("dashboard").handler({}, ctx);
+  const slotBefore = JSON.parse(await readFile(slotPaths(world.stateDir, world.layoutKey).slot, "utf8"));
+  // The previous process exits: it stamps stoppedAt, and a NEW process arms in the same pane.
+  await pi.handlers.get("session_shutdown")({}, ctx);
+  const ownerStopped = await world.owner();
+  assert.ok(Number.isFinite(ownerStopped.stoppedAt));
+  world.registry.clear();
+  const piNew = piOf();
+  // A restart is a different process: another pid, and the previous one is gone (ESRCH is not needed
+  // here because the stopped record is a cooperative release).
+  const second = createInstance(piNew, world.deps({ pid: HOST_PID + 1 }));
+  state.sessionId = "s-2"; // a different conversation after the restart
+  const files = async () => (await readdir(world.stateDir, { recursive: true })).sort();
+  const filesBefore = await files();
+  for (const name of ["session_start", "session_switch", "turn_end", "agent_end"]) {
+    await piNew.handlers.get(name)({}, ctx);
+  }
+  await piNew.handlers.get("tool_execution_end")({ toolName: "todo_write" }, ctx);
+  assert.deepEqual(await world.slot(), slotBefore, "the slot is untouched until /dashboard adopts it");
+  assert.deepEqual(await files(), filesBefore, "no data or prefs file was written for the new session");
+  assert.deepEqual(await world.owner(), ownerStopped, "the stopped record is left for the explicit pass");
+  assert.equal(second.state().heartbeatAt, null, "a skipped owner write is not a heartbeat");
+  // /dashboard is the adoption step: it classifies the previous owner, takes the slot and rebinds.
+  await piNew.commands.get("dashboard").handler({}, ctx);
+  assert.equal((await world.owner()).instanceId, second.state().instanceId);
+  assert.equal((await world.slot()).scope.sessionId, "s-2");
+  assert.ok(first, "first instance existed");
+});
+
+test("L4: markStopped never stamps a release on a record another instance owns", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  createInstance(pi, world.deps());
+  const { ctx } = world.ctx();
+  await pi.handlers.get("session_start")({}, ctx);
+  // Another live process now owns the record; this instance exits without ever having it.
+  await writeJson(slotPaths(world.stateDir, world.layoutKey).owner, foreignOwner());
+  await pi.handlers.get("session_shutdown")({}, ctx);
+  assert.deepEqual(await world.owner(), foreignOwner(), "the foreign record gained no stoppedAt");
+  // A corrupt record is not replaced by a forged release either.
+  const world2 = await makeWorld(t);
+  const pi2 = piOf();
+  createInstance(pi2, world2.deps());
+  const { ctx: ctx2 } = world2.ctx();
+  await pi2.handlers.get("session_start")({}, ctx2);
+  await writeFile(slotPaths(world2.stateDir, world2.layoutKey).owner, "{ not json");
+  await pi2.handlers.get("session_shutdown")({}, ctx2);
+  assert.equal(await readFile(slotPaths(world2.stateDir, world2.layoutKey).owner, "utf8"), "{ not json");
+});
+
+// The remaining L4 owner/rebind regressions are in reconciler.test.mjs (writeOwner after markStopped)
+// and below (a rebind that did not happen).
+// Architect L4 #7: `binding` used to advance before the rebind, so a rebind that lost (busy lock, failed
+// write) was never retried by the poll: the slot stayed on the old session until an unrelated event.
+test("L4: a rebind that did not happen is retried by the next trigger", async t => {
+  const world = await makeWorld(t, { processes: { alive: [HOST_PID + 3] } });
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx, state } = world.ctx({ sessionId: "s-1" });
+  await pi.commands.get("dashboard").handler({}, ctx);
+  // Another live pass holds the generation lock, so the rebind comes back `busy` and writes nothing.
+  const { lockDir } = slotPaths(world.stateDir, world.layoutKey);
+  await mkdir(lockDir, { recursive: true });
+  const held = join(lockDir, "g000000000009.lock");
+  await writeFile(held, JSON.stringify({ pid: HOST_PID + 3, instanceId: "other", passId: "p", acquiredAt: START }));
+  state.sessionId = "s-2";
+  await pi.handlers.get("session_switch")({}, ctx);
+  await settle();
+  assert.equal((await world.slot()).scope.sessionId, "s-1", "a busy rebind changed nothing");
+  // The holder finishes; the poll (no new event, no new session) must still follow the new session.
+  await rm(held);
+  world.clock.advance(1000);
+  await world.timers.fire(1000);
+  await settle();
+  assert.equal((await world.slot()).scope.sessionId, "s-2", "the next tick followed the new session");
+  assert.ok(handle.state().counters.auto >= 2);
 });

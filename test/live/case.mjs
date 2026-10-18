@@ -38,8 +38,10 @@ export function casePaths({ caseId, root = SANDBOX, state = null }) {
     shimPath: join(dir, '.gjc', 'extensions', 'gjc-herdr-dashboard.js') };
 }
 
+// A re-run for a later layer must not overwrite the evidence an earlier layer cites: set
+// GJC_LIVE_EVIDENCE_LEVEL=L4 and every script writes to .evidence/L4/<LV>/ instead of its own level.
 export function evidenceDirFor(level, lv) {
-  return join(EVIDENCE, level, lv);
+  return join(EVIDENCE, process.env.GJC_LIVE_EVIDENCE_LEVEL || level, lv);
 }
 
 // `node scripts/dev-shim.mjs --case <id> --state <abs> --herdr <json argv>` writes

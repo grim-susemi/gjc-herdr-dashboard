@@ -61,8 +61,12 @@ await runScript('l4-lock (LV-10)', async () => {
     writeEvidence(evidence, 'notify-first.txt', opened.line);
     writeEvidence(evidence, 'notify-second.txt', secondOf(first) ?? '(no second notify)');
 
-    // Give the second call time to reach the host (and to be dropped, which is the expected result).
+    // The second call must actually have reached the host: every delivered `/dashboard` owes exactly
+    // one notify (LT-4). Without two notify lines the TUI dropped a keystroke and nothing was exercised.
     await new Promise((done) => { setTimeout(done, 15_000); });
+    const delivered = notifyTexts(fixture, ws.rootPaneId).filter((line) => /Todo|Workers/.test(line));
+    writeEvidenceJson(evidence, 'delivered.json', delivered);
+    assert(delivered.length >= 2, `both /dashboard calls were delivered (${delivered.length} notify line(s))`, { delivered });
 
     const panes = viewerPanes(fixture);
     assert(panes.length <= 1, `at most one Todo viewer pane, got ${panes.length}`,
@@ -107,5 +111,15 @@ await runScript('l4-lock (LV-10)', async () => {
 async function sendTwice(fixture, paneId, name) {
   await fixture.slash(paneId, name);
   await fixture.slash(paneId, name);
+  // The TUI can swallow keystrokes typed while a turn is starting. A second send that produced no
+  // notify is retried with the same no-wait shape (a fresh back-to-back send), never with a long gap:
+  // what matters is that two DELIVERED calls produced two notifies, one split sequence and one pane
+  // per role.
+  for (let retry = 0; retry < 3; retry += 1) {
+    await new Promise((done) => { setTimeout(done, 12_000); });
+    const lines = notifyTexts(fixture, paneId).filter((line) => /Todo|Workers/.test(line));
+    if (lines.length >= 2) break;
+    await fixture.slash(paneId, name);
+  }
   return [notifyTexts(fixture, paneId), notifyTexts(fixture, paneId)];
 }

@@ -46,7 +46,7 @@ const AUTO_CODE = new Set(['none', 'closed', 'discarded', 'ready', 'pending', 'p
 
 async function harness(t) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-latch-'));
-  t.after(() => rm(stateDir, { recursive: true, force: true }));
+  t.after(() => rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   const clock = createFakeClock(START);
   const fake = createFakeHerdr({ parentPaneId: 'w1:p1' });
   const processes = createFakeProcesses({ alive: [process.pid] });

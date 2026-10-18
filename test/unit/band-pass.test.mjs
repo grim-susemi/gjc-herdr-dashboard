@@ -52,7 +52,7 @@ const readJsonFile = async path => {
 // 28 Todo rows / 52 Workers rows / 200 columns - comfortably above all three floors.
 async function bandWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-band-'));
-  t.after(() => rm(stateDir, { recursive: true, force: true }));
+  t.after(() => rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   const clock = createFakeClock(START);
   const fake = createFakeHerdr({ parentPaneId: PARENT, ...options.fake });
   const processes = createFakeProcesses({ alive: [OWNER_PID, process.pid], ...options.processes });
@@ -328,7 +328,7 @@ test('Roles/ordering: Workers without a non-closed Todo record creates nothing (
 async function instanceWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-band-inst-'));
   t.after(async () => {
-    await rm(stateDir, { recursive: true, force: true });
+    await rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
     delete globalThis[REGISTRY_KEY];
   });
   const clock = createFakeClock(START);

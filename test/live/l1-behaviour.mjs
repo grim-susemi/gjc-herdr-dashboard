@@ -189,6 +189,8 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
       }
       fixture.record('assertion', '/new attempt ' + attempt + ': scope ' + (slotAfterNew.scope?.scopeKey !== slotBeforeNew.scope?.scopeKey ? 'changed' : 'unchanged'));
     }
+    // Whether the TUI really switched session (frame) separates a swallowed keystroke from a missed switch.
+    fixture.snapshot(evidence, 'frame-after-new', parent);
     writeEvidenceJson(evidence, 'lv11.json', { before: slotBeforeNew.scope, after: slotAfterNew.scope,
       paneBefore, paneAfter: viewerPanes(fixture)[0]?.pane_id });
     assert(slotAfterNew.scope?.scopeKey !== slotBeforeNew.scope?.scopeKey, '/new changed the scopeKey',

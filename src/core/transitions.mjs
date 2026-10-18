@@ -234,8 +234,10 @@ export function decideRole({ record, observation, mode = 'explicit', ownerPhase 
 //               is attached as display information only and never decides the phase.
 export function decideOwnerPhase({ owner, instanceId, pid = process.pid, registryOwnerInstanceId,
   pidAlive, now = Date.now(), corrupt = false } = {}) {
+  // An unreadable record is reported as owner null + corrupt: it is NOT an absent record (R1 owner step 5).
+  if (corrupt) return { phase: 'prev-live', detail: 'owner-unreadable' };
   if (owner === null || owner === undefined) return { phase: 'me', detail: 'no-owner' };
-  if (corrupt || typeof owner !== 'object') return { phase: 'prev-live', detail: 'owner-unreadable' };
+  if (typeof owner !== 'object') return { phase: 'prev-live', detail: 'owner-unreadable' };
   if (owner.instanceId === instanceId) return { phase: 'me', detail: 'same-instance' };
   if (owner.pid === pid && registryOwnerInstanceId !== undefined &&
       registryOwnerInstanceId !== owner.instanceId) {

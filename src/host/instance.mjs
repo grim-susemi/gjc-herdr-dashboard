@@ -180,6 +180,10 @@ export function createInstance(pi, deps = {}) {
   let disposed = false;
   let instanceId = text(deps.instanceId);
   let binding = null;
+  // The session whose scope the slot is known to follow. `binding` moves as soon as a trigger sees a new
+  // session; this moves only when the rebind succeeded, so a busy or failed rebind is retried by the
+  // next trigger instead of being forgotten (the slot would stay on the old session).
+  let reboundSessionId = null;
   let layoutKey = null;
   let scopeKey = null;
   let entry = null;
@@ -208,6 +212,8 @@ export function createInstance(pi, deps = {}) {
   let workersTracker = null;
   let busUnsubscribe = null;
   let latestCtx = null;
+  let autoRunning = false;
+  let autoNext = null;
   let lastLeaf = null;
   let pollMode = 'event-only';
   let heartbeatTimer = null;
@@ -353,8 +359,11 @@ export function createInstance(pi, deps = {}) {
     if (!armed || !reconciler || !validBinding(binding)) return null;
     try {
       const outcome = await reconciler.writeOwner(binding);
-      heartbeatAt = clock();
-      lastOwnerPath = outcome?.path ?? null;
+      // A skipped write (the record belongs to another instance) is not a heartbeat.
+      if (outcome?.ok === true) {
+        heartbeatAt = clock();
+        lastOwnerPath = outcome.path ?? null;
+      }
       return outcome;
     } catch (error) {
       // outcome: the owner record is display + adoption information; a failed heartbeat is
@@ -467,7 +476,7 @@ export function createInstance(pi, deps = {}) {
       // A new session (`/new`, `/resume`, fork) has no leaf yet, so the leaf alone would leave the
       // scope bound to the old session until the next event; the session id is the rebind key.
       const current = bindingOfCtx()(latestCtx, envOf());
-      const sessionMoved = validBinding(current) && binding !== null && current.sessionId !== binding.sessionId;
+      const sessionMoved = validBinding(current) && reboundSessionId !== null && current.sessionId !== reboundSessionId;
       const leaf = latestCtx?.sessionManager?.getLeafId?.();
       const leafOk = typeof leaf === 'string' && leaf !== '';
       if (!sessionMoved) {
@@ -583,6 +592,7 @@ export function createInstance(pi, deps = {}) {
       vectorError = error?.code ?? message(error);
     }
     binding = { ...local };
+    reboundSessionId = local.sessionId;
     scopeKey = null;
     wire(environment);
     entry = { instanceId: idOf(), moduleUrl: deps.moduleUrl ?? null, sessionId: local.sessionId,
@@ -609,7 +619,7 @@ export function createInstance(pi, deps = {}) {
 
   // ------------------------------------------------------------------ binding + data -----------
   async function syncBinding(local) {
-    const same = binding !== null && binding.sessionId === local.sessionId;
+    const same = reboundSessionId !== null && reboundSessionId === local.sessionId;
     binding = { ...local };
     if (same) return { ok: true, code: 'unchanged' };
     let outcome;
@@ -622,6 +632,7 @@ export function createInstance(pi, deps = {}) {
     }
     // A scope change starts the workers projection over: the cards, the source error and the ignore
     // counter describe the scope that just ended and none of them may leak into the next one.
+    if (outcome?.ok === true) reboundSessionId = local.sessionId;
     if (outcome?.ok === true && text(outcome.scopeKey) && outcome.scopeKey !== scopeKey) {
       workersTracker?.reset?.();
     }
@@ -785,10 +796,43 @@ export function createInstance(pi, deps = {}) {
   // reconciler enforces that). Plan §7.4 order: data write, then rebind, then the reconciler's
   // record cleanup/promotion. Triggered by bus events, so by default it must not throw; the poll
   // passes `strict` so an exception can disable polling (see `pollTick`).
+  //
+  // Coalesced: a burst of triggers (a running subagent publishes hundreds of progress events per
+  // second) must not become a queue of hundreds of passes in front of the one that matters (a
+  // `session_switch` waited minutes behind such a backlog). One pass runs at a time; every trigger that
+  // arrives meanwhile is folded into a single trailing pass over the newest ctx, so the last state
+  // is always processed and the backlog is at most one. A folded trigger returns null at once.
   async function runAutoPass(ctx, trigger, { strict = false } = {}) {
+    if (autoRunning) {
+      latestCtx = ctx ?? latestCtx;
+      autoNext = { ctx, trigger };
+      return null;
+    }
+    autoRunning = true;
+    try {
+      let result = await runAutoPassOnce(ctx, trigger, { strict });
+      while (autoNext !== null) {
+        const next = autoNext;
+        autoNext = null;
+        result = await runAutoPassOnce(next.ctx, next.trigger, {});
+      }
+      return result;
+    } finally {
+      autoRunning = false;
+    }
+  }
+
+  async function runAutoPassOnce(ctx, trigger, { strict = false } = {}) {
     if (!armed || !reconciler || !isSelfOwner()) return null;
     latestCtx = ctx;
     try {
+      // A-11 / R1: an automatic trigger may only rebind and publish while this instance owns the slot.
+      // After a restart (prev-dead) or a reload the previous owner's last picture stays on screen
+      // until an explicit `/dashboard` adopts the slot; nothing is written for it before that.
+      const wanted = bindingOfCtx()(ctx, envOf());
+      if (!validBinding(wanted)) return null;
+      const phase = await reconciler.ownerPhase(wanted);
+      if (phase?.phase !== 'me') return null;
       const local = await currentBinding(ctx);
       if (!local) return null;
       counters.auto++;

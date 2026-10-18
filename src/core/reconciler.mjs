@@ -723,48 +723,86 @@ export function createReconciler(deps = {}) {
 
   // ---------------------------------------------------------------- public API ---------------
   let lastBinding = null;
+  // Heartbeat writes and the shutdown stamp share one small mutex that is NOT the pass queue: the
+  // stamp must not wait behind a pass that is talking to Herdr, yet it must never interleave with a
+  // heartbeat's read-decide-write (a late heartbeat would erase it).
+  let stopped = false;
+  let ownerIoTail = Promise.resolve();
+  const ownerIo = job => {
+    const started = ownerIoTail.then(job, job);
+    ownerIoTail = started.then(() => undefined, () => undefined);
+    return started;
+  };
 
   const explicitPass = input => enqueue(() => runPass('explicit', input));
   const autoPass = input => enqueue(() => runPass('auto', input));
 
+  // Phase of the current owner record as THIS instance sees it (R1 owner step, read-only). It is
+  // queued behind any running pass, so the answer never straddles a pass's own owner write.
+  // `me` (own or absent record) is the only phase in which an automatic trigger may write anything.
+  function ownerPhase(binding) {
+    return enqueue(async () => {
+      const normalized = normalizeBinding(binding);
+      const state = await readOwnerState(pathsFor(normalized));
+      return decideOwnerPhase({ owner: state.owner, instanceId, pid, pidAlive, now: now(),
+        corrupt: state.corrupt, registryOwnerInstanceId: registryValue() });
+    });
+  }
+
   // Owner record for the instance's 5 s heartbeat and for arming. The pass itself only writes the
-  // owner record during the owner step; this is the same file, so it stays one writer at a time.
-  async function writeOwner(binding, sessionId = null) {
-    const normalized = normalizeBinding(sessionId === null ? binding : { ...binding, sessionId });
-    const paths = pathsFor(normalized);
-    lastBinding = normalized;
-    // R1: taking over another instance's record is the explicit pass's owner step (it classifies
-    // the previous owner first). Arming and the 5 s heartbeat only refresh a record that is absent
-    // or already ours, so a restart is adopted by `/dashboard` and a live owner is never overwritten.
-    const ownerState = await readOwnerState(paths);
-    if (ownerState.corrupt || (ownerState.owner !== null && ownerState.owner.instanceId !== instanceId)) {
-      return { ok: false, skipped: true, code: ownerState.corrupt ? 'owner-unreadable' : 'owner-elsewhere', path: paths.owner };
-    }
-    const owner = ownerRecord({ pid, instanceId, sessionId: normalized.sessionId, now: now() });
-    await writeOwnerFile(paths.owner, owner);
-    return { ok: true, path: paths.owner, owner };
+  // owner record during the owner step; this is the same file. R1: taking over another instance's
+  // record is the explicit pass's owner step, so arming and the heartbeat refresh only a record that
+  // is absent or already ours. The one exception is `reload` (same pid, the registry already names
+  // this instance): that is the cooperative in-process handover, so the successor claims it. The
+  // read-decide-write runs on the pass queue, so it cannot interleave with a pass's owner step.
+  function writeOwner(binding, sessionId = null) {
+    return enqueue(() => ownerIo(async () => {
+      // A heartbeat that was already in flight when the instance shut down must not overwrite the
+      // `stoppedAt` stamp; `stopped` is set synchronously by markStopped, before its own read.
+      if (stopped) return { ok: false, skipped: true, code: 'stopped' };
+      const normalized = normalizeBinding(sessionId === null ? binding : { ...binding, sessionId });
+      const paths = pathsFor(normalized);
+      const state = await readOwnerState(paths);
+      const phase = decideOwnerPhase({ owner: state.owner, instanceId, pid, pidAlive, now: now(),
+        corrupt: state.corrupt, registryOwnerInstanceId: registryValue() });
+      if (phase.phase !== 'me' && phase.phase !== 'reload') {
+        return { ok: false, skipped: true, code: state.corrupt ? 'owner-unreadable' : 'owner-elsewhere',
+          phase: phase.phase, path: paths.owner };
+      }
+      lastBinding = normalized;
+      const owner = ownerRecord({ pid, instanceId, sessionId: normalized.sessionId, now: now() });
+      await writeOwnerFile(paths.owner, owner);
+      return { ok: true, path: paths.owner, owner };
+    }));
   }
 
   // R1 `session_shutdown` order: disposeLocal() first (the caller's job), then this stoppedAt
   // record, then disposed = true. Without a known binding there is nothing to mark.
-  async function markStopped() {
-    const binding = lastBinding;
-    if (!binding) return { ok: false, code: 'no-binding', detail: 'no pass or writeOwner yet' };
-    const paths = pathsFor(binding);
-    const stoppedAt = now();
-    let existing = null;
-    try { existing = await readOwner(paths.owner); }
-    catch (error) {
-      // outcome: an unreadable owner.json is replaced by the stop record; the caller's binding is
-      // the strongest identity this process has.
-      existing = null;
-      void error;
-    }
-    const owner = ownerRecord({ pid: existing?.pid ?? pid, instanceId: existing?.instanceId ?? instanceId,
-      sessionId: existing?.sessionId ?? binding.sessionId, now: existing?.heartbeatAt ?? stoppedAt,
-      stoppedAt });
-    await writeOwnerFile(paths.owner, owner);
-    return { ok: true, path: paths.owner, owner, binding };
+  // Not queued behind a running pass on purpose: `/exit` must stamp the release promptly (AC1.9: the
+  // viewer shows 연결 끊김 within 5 s), and a pass that is still talking to Herdr can take seconds. It
+  // only ever stamps a record that is ours, so racing a pass cannot forge a release for another owner.
+  function markStopped() {
+    stopped = true;
+    return ownerIo(async () => {
+      const binding = lastBinding;
+      if (!binding) return { ok: false, code: 'no-binding', detail: 'no pass or writeOwner yet' };
+      const paths = pathsFor(binding);
+      const stoppedAt = now();
+      const state = await readOwnerState(paths);
+      // R1: a cooperative release is only ever stamped on our own record. A record that belongs to
+      // another instance (or cannot be read) is left alone, so a process that never took the slot
+      // cannot forge a release for it (M4 pid reuse, M5 corrupt stay manual).
+      if (state.corrupt || (state.owner !== null && state.owner.instanceId !== instanceId)) {
+        return { ok: false, skipped: true, code: state.corrupt ? 'owner-unreadable' : 'owner-elsewhere',
+          path: paths.owner };
+      }
+      const existing = state.owner;
+      const owner = ownerRecord({ pid: existing?.pid ?? pid, instanceId: existing?.instanceId ?? instanceId,
+        sessionId: existing?.sessionId ?? binding.sessionId, now: existing?.heartbeatAt ?? stoppedAt,
+        stoppedAt });
+      await writeOwnerFile(paths.owner, owner);
+      return { ok: true, path: paths.owner, owner, binding };
+    });
   }
 
   // Plan 7.2: the public, arming-time rebind. It never creates a slot (an absent slot is T1's
@@ -797,5 +835,5 @@ export function createReconciler(deps = {}) {
     });
   }
 
-  return { explicitPass, autoPass, writeOwner, markStopped, rebind };
+  return { explicitPass, autoPass, writeOwner, markStopped, rebind, ownerPhase };
 }
