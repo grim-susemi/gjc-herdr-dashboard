@@ -55,22 +55,28 @@ await runScript('l4-lock (LV-10)', async () => {
     // re-sent AS A PAIR (both commands again, back to back) and each attempt is recorded.
     const attempts = [];
     let delivered = [];
+    let pairLines = [];
     for (let attempt = 1; attempt <= 4; attempt += 1) {
+      const seen = notifyTexts(fixture, ws.rootPaneId).filter((line) => /Todo|Workers/.test(line)).length;
       await sendTwice(fixture, ws.rootPaneId, 'dashboard');
       await new Promise((done) => { setTimeout(done, 12_000); });
       delivered = notifyTexts(fixture, ws.rootPaneId).filter((line) => /Todo|Workers/.test(line));
-      attempts.push({ attempt, notifies: delivered.length, lines: delivered });
-      if (delivered.length >= 2) break;
+      // Only the lines THIS attempt's pair produced count: a pair that lost a keystroke leaves one line
+      // behind, and that line must not be added to the next pair's two.
+      pairLines = delivered.slice(seen);
+      attempts.push({ attempt, notifiesBefore: seen, pairNotifies: pairLines.length, pairLines,
+        cumulative: delivered.length });
+      if (pairLines.length >= 2) break;
     }
     writeEvidenceJson(evidence, 'attempts.json', attempts);
     const opened = await waitForNotify(fixture, ws.rootPaneId, OPENED, { timeoutMs: 90_000 });
     writeEvidence(evidence, 'notify-first.txt', opened.line);
-    writeEvidence(evidence, 'notify-second.txt', delivered[1] ?? '(no second notify)');
+    writeEvidence(evidence, 'notify-second.txt', pairLines[1] ?? '(no second notify)');
 
     // The second call must actually have reached the host: every delivered `/dashboard` owes exactly
     // one notify (LT-4). Without two notify lines the TUI dropped a keystroke and nothing was exercised.
     writeEvidenceJson(evidence, 'delivered.json', delivered);
-    assert(delivered.length >= 2, `both /dashboard calls were delivered (${delivered.length} notify line(s))`, { delivered, attempts });
+    assert(pairLines.length >= 2, `both calls of one pair were delivered (${pairLines.length} notify line(s) from the last pair)`, { pairLines, attempts });
 
     const panes = viewerPanes(fixture);
     assert(panes.length <= 1, `at most one Todo viewer pane, got ${panes.length}`,

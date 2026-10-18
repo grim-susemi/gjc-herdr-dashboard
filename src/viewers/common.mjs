@@ -170,6 +170,7 @@ export function readyRecord({ pid, token, paneId, gen = "dev", startedAt, now, c
 export function createHeartbeat({ path, build, write = defaultWrite, clock = defaultClock,
   intervalMs = 5000, heartbeat = false, onError } = {}) {
   let timer;
+  let lastCommit = Promise.resolve();
   async function commit(extra) {
     const record = build(extra);
     await write(path, record);
@@ -180,11 +181,16 @@ export function createHeartbeat({ path, build, write = defaultWrite, clock = def
     start() {
       if (timer !== undefined || !heartbeat) return;
       timer = clock.setInterval(() => {
-        void commit().catch((cause) => onError?.(cause));
+        lastCommit = commit().then(() => undefined, (cause) => { onError?.(cause); });
       }, intervalMs);
       timer?.unref?.();
     },
-    stop() { if (timer !== undefined) { clock.clearInterval(timer); timer = undefined; } },
+    // Returns the in-flight tick write, so a caller that removes the state directory after `stop()`
+    // cannot race a heartbeat that had already started (architect LOW-4).
+    stop() {
+      if (timer !== undefined) { clock.clearInterval(timer); timer = undefined; }
+      return lastCommit;
+    },
   };
 }
 

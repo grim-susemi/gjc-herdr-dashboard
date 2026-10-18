@@ -119,7 +119,7 @@ omo를 읽기만 했고 실행하지 않았다).
 
 ### 4.8 reload는 실측하지 않았다 (G12)
 
-`/new`는 실측했다(`session_before_switch` → `session_switch`, factory 재호출 없음, 같은 프로세스). 확장은 `session_switch`를 받아 즉시 scope를 새 세션으로 옮기고, 1초 poll도 sessionId 변화를 본다(L4에서 `/new` 직후 scope가 늦게 바뀌던 간헐 실패로 발견·수정). 하위 에이전트가 진행 이벤트를 초당 수백 개 보낼 때도 자동 pass는 한 번에 하나만 돌고 그동안 온 트리거는 마지막 하나로 합쳐진다(합치지 않으면 pass 대기열이 수천 개로 쌓여 `/new`·`/exit`가 수 분 늦었다). 재시작·reload 직후에는 `/dashboard`가 슬롯을 인계하기 전까지 자동 pass가 아무것도 쓰지 않는다(이전 소유자의 마지막 화면이 그대로 남음).
+`/new`는 실측했다(`session_before_switch` → `session_switch`, factory 재호출 없음, 같은 프로세스). 확장은 `session_switch`를 받아 즉시 scope를 새 세션으로 옮기고, 1초 poll도 sessionId 변화를 본다(L4에서 `/new` 직후 scope가 늦게 바뀌던 간헐 실패로 발견·수정). 하위 에이전트가 진행 이벤트를 초당 수백 개 보낼 때도 자동 pass는 한 번에 하나만 돌고 그동안 온 트리거는 마지막 하나로 합쳐진다(합치지 않으면 pass 대기열이 수천 개로 쌓여 `/new`·`/exit`가 수 분 늦었다). 다른 프로세스에서 재시작한 직후에는 `/dashboard`가 슬롯을 인계하기 전까지 자동 pass가 아무것도 쓰지 않는다(이전 소유자의 마지막 화면이 그대로 남음). 같은 프로세스의 reload(같은 pid, registry가 이 인스턴스를 가리킴)는 arm 때의 heartbeat가 협조적 인계로 즉시 소유 기록을 가져간다(단위 LT-6; 라이브 미측정). `/dashboard`는 owner 단계 전에 슬롯을 건드리지 않으므로 `busy:other-owner` 응답은 슬롯과 데이터를 바꾸지 않는다.
 `/resume`·`/fork`·`/reload`는 이 환경에서 측정하지 못했다(persisted 세션 시작이 공용 SDK 인덱스
 락에 막힘, `/reload`는 slash 명령이 아님). 대응: 같은 sessionId + 같은 moduleUrl이면 인스턴스를
 교체하고, sessionId가 같고 moduleUrl만 다르면 교체하지 않고 delegate + `warn:duplicate-install`

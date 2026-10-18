@@ -312,6 +312,34 @@ test('LT-4 busy: a live lock holder yields one busy notify with its holder snaps
   assert.equal(world.fake.calls.filter(call => call.argv[1] === 'close').length, 0);
 });
 
+// Architect B1 (R1 owner step 5): an explicit pass answered `busy:other-owner` mutates nothing. The
+// instance used to rebind the slot to its own session BEFORE the pass classified the owner and then
+// published its projections regardless of the result, so a live foreign owner's viewers were moved to
+// this session's scope.
+test('B1: busy:other-owner leaves the slot scope and the data directory untouched', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps({ pidAlive: () => true }));
+  const { ctx, state } = world.ctx({ sessionId: 's-1' });
+  await pi.handlers.get('session_start')({}, ctx);
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const slotPath = join(world.stateDir, 'slots', world.layoutKey, 'slot.json');
+  const slotBefore = await readFile(slotPath, 'utf8');
+  const dataBefore = (await readdir(join(world.stateDir, 'data'))).sort();
+  // A live foreign owner takes the record over, then this session moves on and asks again.
+  await writeJson(join(world.stateDir, 'slots', world.layoutKey, 'owner.json'),
+    { schema: 'gjc-herdr-dashboard/owner/1', pid: HOST_PID + 7, instanceId: 'inst-foreign',
+      sessionId: 's-other', heartbeatAt: START });
+  state.sessionId = 's-2';
+  world.notifications.length = 0;
+  const result = await pi.commands.get('dashboard').handler({}, ctx);
+  assert.equal(result.code, 'busy:other-owner', JSON.stringify(result));
+  assert.equal(await readFile(slotPath, 'utf8'), slotBefore, 'the owner\'s slot scope was not rewritten');
+  assert.deepEqual((await readdir(join(world.stateDir, 'data'))).sort(), dataBefore,
+    'no projection was published for the foreign owner\'s slot');
+  assert.equal(handle.state().scopeKey, JSON.parse(slotBefore).scope.scopeKey);
+});
+
 test('LT-4 busy:other-owner: a live foreign owner yields exactly one busy notify', async t => {
   const world = await makeWorld(t);
   const pi = piOf();

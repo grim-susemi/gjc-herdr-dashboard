@@ -222,6 +222,15 @@ export function createInstance(pi, deps = {}) {
   let autoNext = null;
   let autoFlight = null;
   let ownerJob = null;
+  // Every fire-and-forget task (timer ticks, scheduled workers publishes, an explicit pass) is held here
+  // until it settles, so `drain()` can wait for all of them (architect MEDIUM-2).
+  const inFlight = new Set();
+  function track(promise) {
+    const settled = Promise.resolve(promise).then(() => undefined, () => undefined);
+    inFlight.add(settled);
+    settled.then(() => { inFlight.delete(settled); });
+    return promise;
+  }
   let lastLeaf = null;
   let pollMode = 'event-only';
   let heartbeatTimer = null;
@@ -393,10 +402,10 @@ export function createInstance(pi, deps = {}) {
     stopHeartbeat();
     heartbeatTimer = armTimer(() => {
       if (!armed) return;
-      heartbeatOnce();
+      track(heartbeatOnce());
       // R3 / LT-3: the same 5 s tick promotes a late-ready viewer (T13) without a second
       // `/dashboard`. Only a pending role needs it, so an idle dashboard makes no Herdr call.
-      tickPendingPass().catch(error => record(error, 'heartbeat-tick'));
+      track(tickPendingPass().catch(error => record(error, 'heartbeat-tick')));
     }, heartbeatMs);
     heartbeatTimer?.unref?.();
   }
@@ -430,7 +439,7 @@ export function createInstance(pi, deps = {}) {
   // explicit `/dashboard` adopts the slot.
   function scheduleWorkersPublish() {
     if (!armed || !workersTracker) return null;
-    return Promise.resolve().then(async () => {
+    return track(Promise.resolve().then(async () => {
       const wanted = bindingOfCtx()(latestCtx, envOf());
       if (validBinding(wanted) && await ownsSlot(wanted)) await publishWorkers();
     })
@@ -438,7 +447,7 @@ export function createInstance(pi, deps = {}) {
         // outcome: a workers publish that could not run is kept in state(); the bus burst it came
         // from is already in the tracker and the next trigger writes it.
         record(error, 'workers-publish');
-      });
+      }));
   }
 
   // `ownerPhase` on the reconciler's queue, reduced to the one question the data paths ask: may this
@@ -533,7 +542,7 @@ export function createInstance(pi, deps = {}) {
     pollMode = 'poll';
     pollTimer = armTimer(() => {
       if (!armed) return;
-      pollTick();
+      track(pollTick());
     }, pollMs);
     pollTimer?.unref?.();
   }
@@ -636,7 +645,7 @@ export function createInstance(pi, deps = {}) {
     scopeKey = null;
     wire(environment);
     entry = { instanceId: idOf(), moduleUrl: deps.moduleUrl ?? null, sessionId: local.sessionId,
-      disposed: false, runExplicit: (ctx, notice = null) => runExplicit(ctx, 'delegate', notice),
+      disposed: false, runExplicit: (ctx, notice = null) => track(runExplicit(ctx, 'delegate', notice)),
       disposeLocal };
     armed = true;
     disposed = false;
@@ -678,6 +687,25 @@ export function createInstance(pi, deps = {}) {
     }
     if (outcome?.ok === true && text(outcome.scopeKey)) scopeKey = outcome.scopeKey;
     return outcome ?? { ok: false, code: 'failed:internal' };
+  }
+
+  // After an explicit pass this instance owns the slot, and the pass has rebound it under the lock.
+  // Read the scope the slot now names, reset the workers projection when it moved, and advance the
+  // rebound marker (the poll and the auto passes use it to decide whether the session changed).
+  async function adoptPassScope(local) {
+    let read;
+    try { read = await readSlot(paths().slot); }
+    catch (error) {
+      // outcome: an unreadable slot leaves the marker where it was; the next trigger retries the rebind.
+      record(error, 'adopt-scope');
+      return;
+    }
+    if (read.status !== 'ok') return;
+    const key = text(read.slot?.scope?.scopeKey);
+    if (!key || read.slot?.scope?.sessionId !== local.sessionId) return;
+    if (key !== scopeKey) workersTracker?.reset?.();
+    scopeKey = key;
+    reboundSessionId = local.sessionId;
   }
 
   // §7.1 item 5: data files exist only while the slot carries a non-closed record for the role.
@@ -807,7 +835,10 @@ export function createInstance(pi, deps = {}) {
     }
     const seq = ++ctxSeq;
     installCtx(ctx, seq);
-    await syncBinding(local);
+    // R1 (architect B1): no rebind happens before the pass. `runPass` rebinds the slot AFTER its owner
+    // step and under the lock, so a pass answered `busy:other-owner` leaves the slot's scope alone.
+    // The local view of the binding follows the ctx; the rebound marker follows the pass result below.
+    binding = { ...local };
     let result;
     try {
       counters.explicit++;
@@ -828,10 +859,17 @@ export function createInstance(pi, deps = {}) {
     // Every pass refreshes the background half of the workers projection before publishing, so a
     // job the bus can never see still appears (AC2.6).
     syncJobsFromCtx(ctx);
+    // R1 (architect B1): the explicit path publishes only for a slot this instance owns after the
+    // pass (the pass adopted it, or it already was ours). `busy:other-owner` and every other result
+    // that did not make us the owner write nothing to the owner's projections.
+    const owns = await ownsSlot(local);
+    if (owns) await adoptPassScope(local);
     // Both projections are flushed together, so `/dashboard` never returns before its own data is
     // on disk - for either role.
-    await publishTodo(ctx);
-    await publishWorkers();
+    if (owns) {
+      await publishTodo(ctx);
+      await publishWorkers();
+    }
     try { await dataWriter?.flush(); }
     catch (error) {
       // outcome: a projection that could not be written is reported in state() and the explicit
@@ -857,7 +895,9 @@ export function createInstance(pi, deps = {}) {
     if (autoRunning) {
       // Folded: keep the newest trigger only (`seq` grows monotonically, so a later fold always wins)
       // and return at once. The running pass drains it with its own error policy.
-      autoNext = { ctx, trigger, strict: options.strict === true, seq };
+      // `strict` is sticky across folds: a poll fold followed by a bus fold must still disable the poll
+      // when it fails, because the poll is the only caller that owns that policy (architect LOW-3).
+      autoNext = { ctx, trigger, strict: options.strict === true || autoNext?.strict === true, seq };
       return null;
     }
     const job = runAutoPassMachine(ctx, trigger, options, seq);
@@ -905,8 +945,9 @@ export function createInstance(pi, deps = {}) {
     installCtx(ctx, seq);
     try {
       // A-11 / R1: an automatic trigger may only rebind and publish while this instance owns the slot.
-      // After a restart (prev-dead) or a reload the previous owner's last picture stays on screen
-      // until an explicit `/dashboard` adopts the slot; nothing is written for it before that.
+      // After a restart in another process (prev-dead) the previous owner's last picture stays on
+      // screen until an explicit `/dashboard` adopts the slot; nothing is written for it before that.
+      // A reload in the same process is handed over at arm time by the heartbeat (`reload` phase).
       const wanted = bindingOfCtx()(ctx, envOf());
       if (!validBinding(wanted)) return null;
       if (!(await ownsSlot(wanted))) return null;
@@ -1014,9 +1055,15 @@ export function createInstance(pi, deps = {}) {
       // The in-flight automatic pass first (it writes lock files under `slots/<layoutKey>/lock`), then
       // the owner stamp if this teardown issued one, then every projection write this instance
       // scheduled. A caller can remove the state directory only when all three are done.
-      await autoFlight;
-      await ownerJob;
-      await dataWriter?.flush?.();
+      // Loop until nothing is left: a task that finishes can schedule the next write, and a bus event
+      // that landed just before shutdown is still on the reconciler queue when the first flush runs.
+      for (let round = 0; round < 20; round += 1) {
+        await autoFlight;
+        await ownerJob;
+        if (inFlight.size > 0) await Promise.all([...inFlight]);
+        await dataWriter?.flush?.();
+        if (inFlight.size === 0 && (dataWriter?.pending?.() ?? 0) === 0) break;
+      }
       return { ok: true, pending: dataWriter?.pending?.() ?? 0 };
     } catch (error) {
       // outcome: a failed write leaves the queue drained; the error is reported in state() and the
@@ -1146,7 +1193,7 @@ export function createInstance(pi, deps = {}) {
           return result;
         }
       }
-      try { return await runExplicit(ctx); }
+      try { return await track(runExplicit(ctx)); }
       catch (error) {
         // outcome: runExplicit notifies its own result; this is the last resort for a fault in the
         // steps before it (binding, rebind) and it is still one message for this call.

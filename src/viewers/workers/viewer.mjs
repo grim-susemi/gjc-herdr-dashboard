@@ -247,6 +247,7 @@ export async function startViewer(options, {
   // focus subscription.
   let dragY, disposeInput = null, disposeFocus = null;
   let saving = Promise.resolve();
+  let heartbeatTail = Promise.resolve();
 
   // Real runs have no injected client: use the Herdr argv vector the owner recorded in slot.json
   // (plan 7.10) so `q` and a token-fence retirement can close this viewer's own pane.
@@ -341,7 +342,7 @@ export async function startViewer(options, {
     if (isInteractive) input.pause?.();
     watcher?.close?.();
     clock.clearInterval(timer);
-    heartbeat.stop();
+    heartbeatTail = heartbeat.stop();
     disposeInput?.();
     disposeInput = null;
     // AC3.3: the focus subscription is released with the screen. A subscription still in
@@ -381,7 +382,7 @@ export async function startViewer(options, {
     // The pending preference save is part of the viewer's lifetime: a caller that removes the state
     // directory after `stop()` must not race a write that was already queued (the teardown
     // `ENOTEMPTY` this used to cause).
-    return Promise.resolve(saving);
+    return Promise.all([saving, heartbeatTail]).then(() => undefined);
   }
 
   // Slot change: rebind the scope and data when the layout stayed ours, and retire

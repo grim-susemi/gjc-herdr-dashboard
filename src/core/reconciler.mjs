@@ -429,7 +429,8 @@ export function createReconciler(deps = {}) {
       if (phaseInfo.phase === 'prev-live') {
         // R1 owner step 5: another live (or unclassifiable) owner blocks every explicit pass. Plan
         // 7.4/A-11: an automatic pass additionally requires the owner to be this very instance, so
-        // `reload`/`prev-dead` are adoptable by an explicit pass but never by an automatic one.
+        // `prev-dead` (and a `reload` that the arm-time heartbeat has not claimed yet) is adoptable by
+        // an explicit pass but never by an automatic one.
         for (const role of roles) {
           rolesResult[role] = { code: 'busy:other-owner', id: 'T0', paneId: null, detail: phaseInfo.detail };
         }
