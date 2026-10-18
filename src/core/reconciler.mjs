@@ -453,8 +453,14 @@ export function createReconciler(deps = {}) {
           fillRows('busy', 'generation-superseded', 'T0');
           return finish({ code: 'busy', fence: true, detail: 'generation-superseded' });
         }
-        await writeOwnerFile(paths.owner, ownerRecord({ pid, instanceId,
-          sessionId: binding.sessionId, now: now() }));
+        // #1: the pass's own claim runs in the same short owner-IO section as the heartbeat and the
+        // shutdown stamp, so a pass suspended across `session_shutdown` cannot resurrect a record
+        // the stamp just released (and cannot overwrite the stamp with a fresh heartbeat).
+        const claim = await claimOwner(paths, binding, input?.hooks);
+        if (claim?.ok !== true) {
+          fillRows('busy', claim?.code ?? 'owner-elsewhere', 'T0');
+          return finish({ code: 'busy:other-owner', detail: claim?.code ?? 'owner-elsewhere' });
+        }
       }
       if (explicit && ownerState.owner === null) {
         if (expired()) {
@@ -465,8 +471,11 @@ export function createReconciler(deps = {}) {
           fillRows('busy', 'generation-superseded', 'T0');
           return finish({ code: 'busy', fence: true, detail: 'generation-superseded' });
         }
-        await writeOwnerFile(paths.owner, ownerRecord({ pid, instanceId,
-          sessionId: binding.sessionId, now: now() }));
+        const claim = await claimOwner(paths, binding, input?.hooks);
+        if (claim?.ok !== true) {
+          fillRows('busy', claim?.code ?? 'owner-elsewhere', 'T0');
+          return finish({ code: 'busy:other-owner', detail: claim?.code ?? 'owner-elsewhere' });
+        }
       }
 
       // ---- rebind (plan 7.2). Pane untouched.
@@ -733,6 +742,22 @@ export function createReconciler(deps = {}) {
     ownerIoTail = started.then(() => undefined, () => undefined);
     return started;
   };
+
+  // The explicit pass's owner claim (#1). It shares the short owner-IO section with the heartbeat
+  // and the shutdown stamp, and checks `stopped` inside it: a pass that was suspended across
+  // `session_shutdown` must not write a fresh owner record over the release it just stamped.
+  function claimOwner(paths, binding, hooks = {}) {
+    return ownerIo(async () => {
+      // Test seam (#1): the caller can stop the pass exactly between its classification and its
+      // claim, which is the window in which a `session_shutdown` can land.
+      if (typeof hooks.beforeOwnerWrite === 'function') await hooks.beforeOwnerWrite();
+      if (stopped) return { ok: false, skipped: true, code: 'stopped' };
+      const owner = ownerRecord({ pid, instanceId, sessionId: binding.sessionId, now: now() });
+      await writeOwnerFile(paths.owner, owner);
+      lastBinding = normalizeBinding(binding);
+      return { ok: true, path: paths.owner, owner };
+    });
+  }
 
   const explicitPass = input => enqueue(() => runPass('explicit', input));
   const autoPass = input => enqueue(() => runPass('auto', input));

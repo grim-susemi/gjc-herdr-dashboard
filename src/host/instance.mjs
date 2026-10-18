@@ -212,8 +212,16 @@ export function createInstance(pi, deps = {}) {
   let workersTracker = null;
   let busUnsubscribe = null;
   let latestCtx = null;
+  // Trigger sequence: assigned synchronously at every entry point, so it orders triggers by arrival
+  // (not by completion). `installedSeq` is the seq of the ctx currently in `latestCtx`, which lets
+  // `installCtx` refuse to put an OLDER context back (critic #5: a folded trigger captured before a
+  // newer `session_switch`/`/dashboard` ctx must never restore the obsolete session).
+  let ctxSeq = 0;
+  let installedSeq = 0;
   let autoRunning = false;
   let autoNext = null;
+  let autoFlight = null;
+  let ownerJob = null;
   let lastLeaf = null;
   let pollMode = 'event-only';
   let heartbeatTimer = null;
@@ -344,7 +352,15 @@ export function createInstance(pi, deps = {}) {
         [role, join(rootPath, 'src', 'viewers', role, 'viewer.mjs')])),
       checkNode, language: rawLanguage ?? language ?? 'ko', gen, env: environment,
       platform: platformOf(), herdrTimeoutMs,
-      registryOwnerInstanceId: () => (entry && entry.disposed !== true ? entry.instanceId : null),
+      // #2: the LIVE registry entry, not this instance's captured one. A predecessor whose heartbeat
+      // was already queued when the successor took over must not classify the successor as `reload`
+      // and overwrite it: the answer is the id of whoever the registry names NOW, and `decideOwnerPhase`
+      // only treats a record as a cooperative handover when that id is our own.
+      registryOwnerInstanceId: () => {
+        const current = registryPeek()?.get(layoutKey) ?? null;
+        if (current === null || current.disposed === true) return null;
+        return current === entry ? idOf() : (current.instanceId ?? null);
+      },
     };
     reconciler = (typeof deps.reconcilerFactory === 'function'
       ? deps.reconcilerFactory : createReconciler)(reconcilerDeps);
@@ -409,15 +425,29 @@ export function createInstance(pi, deps = {}) {
 
   // A scheduled workers publish: the bus handlers may only enqueue (AC2.7), so this is the one place
   // a payload becomes a file. It never rejects into the caller - a failed publish is recorded in
-  // state() and the next trigger retries.
+  // state() and the next trigger retries. #3: it is owner-gated exactly like the automatic pass, so
+  // a bus event after a restart cannot write over the previous owner's Workers projection before an
+  // explicit `/dashboard` adopts the slot.
   function scheduleWorkersPublish() {
     if (!armed || !workersTracker) return null;
-    return Promise.resolve().then(() => publishWorkers())
+    return Promise.resolve().then(async () => {
+      const wanted = bindingOfCtx()(latestCtx, envOf());
+      if (validBinding(wanted) && await ownsSlot(wanted)) await publishWorkers();
+    })
       .catch(error => {
         // outcome: a workers publish that could not run is kept in state(); the bus burst it came
         // from is already in the tracker and the next trigger writes it.
         record(error, 'workers-publish');
       });
+  }
+
+  // `ownerPhase` on the reconciler's queue, reduced to the one question the data paths ask: may this
+  // instance write for this binding? Anything but `me` means the slot belongs to someone else (the
+  // previous owner after a restart, or a corrupt record) and not a byte is written for it.
+  async function ownsSlot(wanted) {
+    if (!reconciler) return false;
+    const phase = await reconciler.ownerPhase(wanted);
+    return phase?.phase === 'me';
   }
 
   // §7.6 + AC2.7. Every channel gets the same shape: feed the tracker (synchronous, pure state),
@@ -476,7 +506,13 @@ export function createInstance(pi, deps = {}) {
       // A new session (`/new`, `/resume`, fork) has no leaf yet, so the leaf alone would leave the
       // scope bound to the old session until the next event; the session id is the rebind key.
       const current = bindingOfCtx()(latestCtx, envOf());
-      const sessionMoved = validBinding(current) && reboundSessionId !== null && current.sessionId !== reboundSessionId;
+      // An unconfirmed rebind (`null`) counts as "moved" while the retained ctx still reports the
+      // session we bound at arm time, so the next tick retries the rebind instead of staying blind until
+      // an unrelated event (critic #6). Once a rebind succeeds, the comparison is the plain session
+      // change. The retry is bounded by the poll period (1 s) and does no Herdr work while the owner
+      // phase is not `me`.
+      const sessionMoved = validBinding(current) && current.sessionId !== reboundSessionId
+        && (reboundSessionId !== null || binding === null || current.sessionId === binding.sessionId);
       const leaf = latestCtx?.sessionManager?.getLeafId?.();
       const leafOk = typeof leaf === 'string' && leaf !== '';
       if (!sessionMoved) {
@@ -571,6 +607,7 @@ export function createInstance(pi, deps = {}) {
     if (choice.action === 'delegate') {
       delegateTo = choice.existing;
       binding = { ...local };
+      reboundSessionId = null;
       return { kind: 'delegate', entry: choice.existing };
     }
     if (choice.existing && typeof choice.existing.disposeLocal === 'function') {
@@ -592,7 +629,10 @@ export function createInstance(pi, deps = {}) {
       vectorError = error?.code ?? message(error);
     }
     binding = { ...local };
-    reboundSessionId = local.sessionId;
+    // Critic #6: arm has NOT rebound yet (the slot may still follow another session, and the first
+    // automatic pass can be busy or fail). Leaving this null keeps the followed session "unconfirmed",
+    // so the poll retries the rebind until one really succeeded.
+    reboundSessionId = null;
     scopeKey = null;
     wire(environment);
     entry = { instanceId: idOf(), moduleUrl: deps.moduleUrl ?? null, sessionId: local.sessionId,
@@ -735,6 +775,15 @@ export function createInstance(pi, deps = {}) {
     && registryPeek()?.get(layoutKey) === entry;
   const paths = () => slotPaths(stateDir, layoutKey);
 
+  // The one place `latestCtx` moves. An older seq is ignored, so no path can regress the retained
+  // context to a stale one.
+  function installCtx(ctx, seq) {
+    if (!ctx || seq <= installedSeq) return false;
+    latestCtx = ctx;
+    installedSeq = seq;
+    return true;
+  }
+
   async function currentBinding(ctx) {
     const local = bindingOfCtx()(ctx, envOf());
     if (!validBinding(local)) return null;
@@ -756,7 +805,8 @@ export function createInstance(pi, deps = {}) {
       notify(ctx, result, 'warn', notice);
       return result;
     }
-    latestCtx = ctx;
+    const seq = ++ctxSeq;
+    installCtx(ctx, seq);
     await syncBinding(local);
     let result;
     try {
@@ -802,39 +852,72 @@ export function createInstance(pi, deps = {}) {
   // `session_switch` waited minutes behind such a backlog). One pass runs at a time; every trigger that
   // arrives meanwhile is folded into a single trailing pass over the newest ctx, so the last state
   // is always processed and the backlog is at most one. A folded trigger returns null at once.
-  async function runAutoPass(ctx, trigger, { strict = false } = {}) {
+  async function runAutoPass(ctx, trigger, options = {}) {
+    const seq = ++ctxSeq;
     if (autoRunning) {
-      latestCtx = ctx ?? latestCtx;
-      autoNext = { ctx, trigger };
+      // Folded: keep the newest trigger only (`seq` grows monotonically, so a later fold always wins)
+      // and return at once. The running pass drains it with its own error policy.
+      autoNext = { ctx, trigger, strict: options.strict === true, seq };
       return null;
     }
+    const job = runAutoPassMachine(ctx, trigger, options, seq);
+    // `drain()` awaits this, so a full teardown never removes the state directory from under a pass
+    // that is still writing its lock files (the teardown `ENOTEMPTY` this used to cause).
+    autoFlight = job.then(() => undefined, () => undefined);
+    return job;
+  }
+
+  async function runAutoPassMachine(ctx, trigger, { strict = false } = {}, seq) {
     autoRunning = true;
     try {
-      let result = await runAutoPassOnce(ctx, trigger, { strict });
+      let result = null;
+      let failure = null;
+      try { result = await runAutoPassOnce(ctx, trigger, { strict, seq }); }
+      catch (error) {
+        // Critic #4: the foreground failure is remembered, not thrown yet. The folded work is still
+        // drained below: with the poll disabled nothing else would ever process the newest state.
+        failure = error;
+      }
       while (autoNext !== null) {
         const next = autoNext;
         autoNext = null;
-        result = await runAutoPassOnce(next.ctx, next.trigger, {});
+        try {
+          // Critic #5: the trailing pass runs the newest ctx this instance actually accepted;
+          // `installCtx` ignores the folded ctx if a newer one (an explicit call) arrived meanwhile.
+          result = await runAutoPassOnce(next.ctx, next.trigger,
+            { strict: next.strict, seq: next.seq });
+        } catch (error) {
+          // Critic #4: a folded pass cannot reject into the caller that already returned. A folded
+          // POLL pass keeps poll semantics: the failure disables polling, exactly as in the foreground.
+          if (next.strict) disablePoll(error);
+          else record(error, `auto:${next.trigger}`);
+        }
       }
+      if (failure) throw failure;
       return result;
     } finally {
       autoRunning = false;
     }
   }
 
-  async function runAutoPassOnce(ctx, trigger, { strict = false } = {}) {
+  async function runAutoPassOnce(ctx, trigger, { strict = false, seq = 0 } = {}) {
     if (!armed || !reconciler || !isSelfOwner()) return null;
-    latestCtx = ctx;
+    installCtx(ctx, seq);
     try {
       // A-11 / R1: an automatic trigger may only rebind and publish while this instance owns the slot.
       // After a restart (prev-dead) or a reload the previous owner's last picture stays on screen
       // until an explicit `/dashboard` adopts the slot; nothing is written for it before that.
       const wanted = bindingOfCtx()(ctx, envOf());
       if (!validBinding(wanted)) return null;
-      const phase = await reconciler.ownerPhase(wanted);
-      if (phase?.phase !== 'me') return null;
-      const local = await currentBinding(ctx);
+      if (!(await ownsSlot(wanted))) return null;
+      // Critic #5: between the gate above and the rebind, a NEWER trigger (an explicit `/dashboard`
+      // after a `/new`, say) may have installed its own context. This pass then holds an obsolete
+      // session in `ctx`; rebinding with it would move the slot BACK. So the pass abandons, and the
+      // newer context's own pass owns the state.
+      if (seq < installedSeq) return null;
+      const local = await currentBinding(latestCtx ?? ctx);
       if (!local) return null;
+      if (seq < installedSeq) return null;
       counters.auto++;
       // Rebind first (the target scope must be the one the slot now points at), then publish the
       // projection, then let the reconciler do its record work (T3/T4 discard, T13 promotion):
@@ -895,8 +978,12 @@ export function createInstance(pi, deps = {}) {
     if (wasArmed && reconciler !== null && validBinding(binding)) {
       // The failure is recorded instead of escaping as an unhandled rejection; `session_shutdown`
       // awaits the same call so its ordering stays deterministic.
-      reconciler.markStopped().catch(error => record(error, 'shutdown'));
+      ownerJob = reconciler.markStopped().catch(error => { record(error, 'shutdown'); });
     }
+    // #7: `dispose()` is the full teardown, so it returns the drain of everything this instance may
+    // still be writing (the owner stamp above plus every scheduled projection write). A caller that
+    // removes the state directory awaits it; a caller that ignores it is no worse off than before.
+    return drain();
   }
 
   pi?.on?.('session_start', async (_event, ctx) => {
@@ -918,6 +1005,27 @@ export function createInstance(pi, deps = {}) {
     await runAutoPass(ctx, 'session_switch');
   });
 
+  // Critic #7: the state directory may only be removed after every writer this instance started has
+  // finished. Timers are released first (`disposeLocal`), then the scheduled projection writes are
+  // drained (`dataWriter.flush` loops until nothing is scheduled or active). This is the lifecycle
+  // fix the teardown `maxRetries` used to paper over.
+  async function drain() {
+    try {
+      // The in-flight automatic pass first (it writes lock files under `slots/<layoutKey>/lock`), then
+      // the owner stamp if this teardown issued one, then every projection write this instance
+      // scheduled. A caller can remove the state directory only when all three are done.
+      await autoFlight;
+      await ownerJob;
+      await dataWriter?.flush?.();
+      return { ok: true, pending: dataWriter?.pending?.() ?? 0 };
+    } catch (error) {
+      // outcome: a failed write leaves the queue drained; the error is reported in state() and the
+      // caller still gets a deterministic "nothing is pending" answer.
+      record(error, 'drain');
+      return { ok: false, pending: dataWriter?.pending?.() ?? 0, detail: message(error) };
+    }
+  }
+
   pi?.on?.('session_shutdown', async () => {
     if (!armed) return;
     // R1 order: disposeLocal() (timers and watchers only) -> the `stoppedAt` record -> `disposed`.
@@ -929,6 +1037,9 @@ export function createInstance(pi, deps = {}) {
       // documented M4 boundary; the failure is kept in state().
       record(error, 'shutdown');
     }
+    // #7: a projection write scheduled just before shutdown must not outlive the process (or the
+    // test teardown that removes the state directory).
+    await drain();
     if (entry) entry.disposed = true;
     disposed = true;
     // outcome: a second `session_shutdown` (or a later `dispose()`) finds `armed === false` and

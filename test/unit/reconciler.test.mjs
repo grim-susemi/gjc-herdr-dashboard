@@ -36,7 +36,7 @@ function notifiesOf(result) {
 
 async function createWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-rec-'));
-  t.after(() => rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
+  t.after(() => rm(stateDir, { recursive: true, force: true }));
   const clock = createFakeClock(START);
   const fake = createFakeHerdr({ parentPaneId: 'w1:p1', ...options.fake });
   const processes = createFakeProcesses({ alive: [OWNER_PID, process.pid], ...options.processes });
@@ -1045,6 +1045,32 @@ test('rebind, writeOwner and markStopped never create a slot, and a blocked rebi
 // Architect L4 #8: a heartbeat that read the record before `markStopped` ran used to be able to write
 // after the stamp and erase it, so the next owner had to wait for the ESRCH route. The release is
 // final: once markStopped was called, writeOwner is skipped.
+// Critic #1: the pass's own owner claim used to run outside the owner-IO section, so a pass that was
+// suspended across `session_shutdown` wrote a fresh record over the release it had just stamped. The
+// pass is stopped inside `claimOwner` and `markStopped()` is started from the SAME tick: the release
+// flag is set synchronously, so the suspended claim must observe it and refuse.
+test('critic #1: a pass suspended before its owner claim cannot revive a record shutdown released', async t => {
+  const world = await createWorld(t);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let reached = 0;
+  const pass = world.reconciler.explicitPass({ binding: world.binding, roles: ['todo'],
+    hooks: { beforeOwnerWrite: async () => { reached += 1; await gate; } } });
+  for (let i = 0; i < 400 && reached === 0; i += 1) await new Promise(done => { setTimeout(done, 5); });
+  assert.equal(reached, 1, 'the pass reached the claim window');
+  // Shutdown begins now: `stopped` is set synchronously, so the suspended claim sees it as soon as
+  // the hook releases, without needing the same mutex section. Both promises are awaited together
+  // because `markStopped` waits on the queue the pass is holding.
+  const stamp = world.reconciler.markStopped();
+  release();
+  const [result, stopped] = await Promise.all([pass, stamp]);
+  assert.equal(stopped.ok, true, JSON.stringify(stopped));
+  const owner = JSON.parse(await readFile(world.paths.owner, 'utf8'));
+  assert.equal(typeof owner.stoppedAt, 'number', 'the release survived the suspended claim');
+  assert.equal(result.code, 'busy:other-owner', JSON.stringify(result));
+  assert.equal(await world.slotBytes(), null, 'a claim that lost wrote no slot');
+});
+
 test('markStopped is final: a writeOwner that follows (or races) it cannot erase the stoppedAt stamp', async t => {
   const world = await createWorld(t);
   await world.reconciler.writeOwner(world.binding);

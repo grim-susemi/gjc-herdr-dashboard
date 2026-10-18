@@ -328,7 +328,10 @@ export async function startViewer(options, {
     if (disposed) return Promise.resolve();
     closing = true;
     finish("stopped");
-    return Promise.resolve();
+    // The pending preference save is part of the viewer’s lifetime: a caller that removes the state
+    // directory after `stop()` must not race a write that was already queued (the teardown
+    // `ENOTEMPTY` this used to cause), so the save chain is returned for the caller to await.
+    return Promise.resolve(saving);
   }
 
   // Slot change: rebind the scope and data when the layout stayed ours, and retire

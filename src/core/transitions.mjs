@@ -239,8 +239,11 @@ export function decideOwnerPhase({ owner, instanceId, pid = process.pid, registr
   if (owner === null || owner === undefined) return { phase: 'me', detail: 'no-owner' };
   if (typeof owner !== 'object') return { phase: 'prev-live', detail: 'owner-unreadable' };
   if (owner.instanceId === instanceId) return { phase: 'me', detail: 'same-instance' };
-  if (owner.pid === pid && registryOwnerInstanceId !== undefined &&
-      registryOwnerInstanceId !== owner.instanceId) {
+  // `reload` is the cooperative in-process handover: the record names another instance with the SAME
+  // pid (the factory ran again in this process) AND the registry's current entry is US. A predecessor
+  // whose queued heartbeat runs after the successor claimed ownership must not match here, which is
+  // why the caller passes the live registry id and it must equal ours (#2).
+  if (owner.pid === pid && registryOwnerInstanceId === instanceId) {
     return { phase: 'reload', detail: 'registry-successor', heartbeatAt: owner.heartbeatAt ?? null };
   }
   if (Number.isFinite(owner.stoppedAt)) {

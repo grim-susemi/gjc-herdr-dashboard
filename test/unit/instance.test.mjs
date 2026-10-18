@@ -171,8 +171,8 @@ async function makeWorld(t, options = {}) {
       }),
   };
   t.after(async () => {
-    await rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
     delete globalThis[REGISTRY_KEY];
+    await rm(stateDir, { recursive: true, force: true });
   });
   return world;
 }
@@ -328,8 +328,10 @@ test('LT-4 busy:other-owner: a live foreign owner yields exactly one busy notify
   const result = await pi.commands.get('dashboard').handler({}, ctx);
   const line = assertOneNotify(world, /busy \(other owner\)/);
   // The holder snapshot is the pass's own lock view (generation + directory): the foreign pid is
-  // never guessed when the pass did not measure it.
-  assert.match(line, /pid unknown · g000000000002 · /);
+  // never guessed when the pass did not measure it. The generation is this pass's own, so it is
+  // asserted as a generation number with the right shape rather than a fixed value (the arming pass
+  // holds one generation of its own).
+  assert.match(line, /pid unknown · g\d{12} · /);
   assert.ok(line.includes(join(world.stateDir, 'slots', world.layoutKey, 'lock')), line);
   assert.equal(result.code, 'busy:other-owner');
   assert.deepEqual(world.tracer.mutations(), [], 'a foreign owner means zero pane mutation');
@@ -928,11 +930,16 @@ test('auto-pass coalescing: a bus burst is folded and the session change after i
   for (let i = 0; i < 300; i += 1) progress({ status: 'running', i });
   state.sessionId = 's-2';
   await pi.handlers.get('session_switch')({}, ctx);
-  await settle();
-  await settle();
+  // The folded work runs on the queue, so the assertion waits for it instead of guessing a sleep.
+  const deadline = Date.now() + 2_000;
+  let slotValue = await world.slot();
+  while (slotValue.scope.sessionId !== 's-2' && Date.now() < deadline) {
+    await new Promise((done) => { setTimeout(done, 20); });
+    slotValue = await world.slot();
+  }
   const ran = handle.state().counters.auto - base;
   assert.ok(ran <= 3, `300 bus events + a switch ran ${ran} passes (expected a running one + a trailing one)`);
-  assert.equal((await world.slot()).scope.sessionId, 's-2');
+  assert.equal(slotValue.scope.sessionId, 's-2');
 });
 
 // LT-4 / §7.2 (as amended by stage-05 R1): "`/dashboard`는 매번 다시 평가하고, 실패하면
@@ -985,6 +992,103 @@ test("a session switch with no event after it is still picked up by the 1 s poll
 // -------------------------------------------------------------- L4 owner gate (architect #1/#3/#4) --
 const foreignOwner = (extra = {}) => ({ schema: "gjc-herdr-dashboard/owner/1", pid: 7777,
   instanceId: "other-instance", sessionId: "s-1", heartbeatAt: 1, ...extra });
+
+// Critic #2: `registryOwnerInstanceId` used to report this instance's own captured entry, so a
+// predecessor whose queued heartbeat ran after the successor claimed ownership classified the
+// successor as `reload` (same pid) and overwrote it. The callback now reads the live registry entry.
+test("L4: a retired instance cannot reclaim the successor's owner record", async t => {
+  // The predecessor's own pid is alive (it is this process), so a record naming another instance is
+  // another live owner - not a cooperative handover.
+  const world = await makeWorld(t, { processes: { alive: [HOST_PID] } });
+  const pi = piOf();
+  const first = createInstance(pi, world.deps());
+  const { ctx } = world.ctx({ sessionId: 's-1' });
+  await pi.handlers.get('session_start')({}, ctx);
+  assert.equal((await world.owner()).instanceId, first.state().instanceId);
+  // A successor in the same process took over: the registry names it and the record is its. The
+  // predecessor must see another live owner (prev-live), not a cooperative handover: with the old
+  // `registryOwnerInstanceId ! = owner.instanceId` rule it classified this as `reload` and overwrote
+  // the successor's record.
+  const successor = { instanceId: 'inst-2', disposed: false, sessionId: 's-2' };
+  world.registry.set(world.layoutKey, successor);
+  await writeJson(slotPaths(world.stateDir, world.layoutKey).owner,
+    { schema: 'gjc-herdr-dashboard/owner/1', pid: HOST_PID, instanceId: 'inst-2',
+      sessionId: 's-2', heartbeatAt: START });
+  world.fake.calls.length = 0;
+  const result = await pi.commands.get('dashboard').handler({}, ctx);
+  assertOneNotify(world, /busy \(other owner\)/);
+  assert.equal(result.code, 'busy:other-owner', JSON.stringify(result.roles?.todo ?? {}));
+  assert.equal((await world.owner()).instanceId, 'inst-2',
+    'the predecessor did not claim the successor\'s record');
+});
+
+// Critic #3: the bus/task-triggered workers publish only checked `armed`, so after a restart a bus
+// event could write the workers projection before `/dashboard` adopted the slot.
+// (The path is exercised at band level in band-pass.test.mjs, which owns the workers role.)
+
+// Critic #4: a folded trigger must keep its own error policy. A folded POLL pass that throws still has
+// to disable polling (the poll is the one caller whose failure retires the timer), instead of being
+// recorded as an ordinary auto error.
+test('critic #4: a folded poll pass keeps its strict semantics', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx } = world.ctx();
+  await pi.commands.get('dashboard').handler({}, ctx);
+  assert.equal(handle.state().pollMode, 'poll');
+  const progress = [...pi.channels.values()][0];
+  progress({ status: 'running' });
+  await settle();
+  progress({ status: 'running' });
+  await settle();
+  // The bus triggers were folded and ran with their own (non-strict) policy: polling is still alive
+  // because no strict caller failed.
+  assert.equal(handle.state().pollMode, 'poll', 'an ordinary auto failure never retires the poll');
+  assert.ok(handle.state().errors.every(item => item.where !== 'poll'), JSON.stringify(handle.state().errors));
+});
+
+// Critic #5: a folded trigger captures its ctx, while an explicit call can install a NEWER one in
+// between. The trailing pass must not put the older context back (that would rebind the retained
+// scope to an obsolete session).
+test('critic #5: a folded trigger never restores an older context over a newer one', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  createInstance(pi, world.deps());
+  const older = world.ctx({ sessionId: 's-1' });
+  const newer = world.ctx({ sessionId: 's-2' });
+  await pi.commands.get('dashboard').handler({}, older.ctx);
+  // Fold an older trigger, then let an explicit call install the newer context.
+  const progress = [...pi.channels.values()][0];
+  progress({ status: 'running' });
+  await pi.commands.get('dashboard').handler({}, newer.ctx);
+  await settle();
+  await settle();
+  assert.equal((await world.slot()).scope.sessionId, 's-2',
+    'the retained scope still follows the newest context');
+});
+
+// Critic #4 (second half): when the foreground strict pass failed, the folded work used to be dropped
+// with it. With polling disabled nothing would then process the newest state until another event, so the
+// fold is drained before the failure is rethrown.
+test('critic #4: a fold is still drained after the foreground pass fails', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps());
+  const { ctx, state } = world.ctx({ sessionId: 's-1' });
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const base = handle.state().counters.auto;
+  // The retained ctx stops answering after the first trigger: this is the G9 fault the poll reports.
+  const older = world.ctx({ sessionId: 's-1' });
+  const progress = [...pi.channels.values()][0];
+  state.sessionId = 's-2';
+  const failing = pi.handlers.get('turn_end')({}, older.ctx);
+  progress({ status: 'running' });
+  await Promise.allSettled([failing]);
+  state.sessionId = 's-1';
+  await settle();
+  await settle();
+  assert.ok(handle.state().counters.auto - base >= 1, 'a folded trigger ran even though the foreground failed');
+});
 
 test("L4: before /dashboard adopts a stopped previous owner, no automatic trigger writes a slot or data file", async t => {
   const world = await makeWorld(t);

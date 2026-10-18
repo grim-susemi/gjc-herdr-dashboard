@@ -52,7 +52,7 @@ const readJsonFile = async path => {
 // 28 Todo rows / 52 Workers rows / 200 columns - comfortably above all three floors.
 async function bandWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-band-'));
-  t.after(() => rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
+  t.after(() => rm(stateDir, { recursive: true, force: true }));
   const clock = createFakeClock(START);
   const fake = createFakeHerdr({ parentPaneId: PARENT, ...options.fake });
   const processes = createFakeProcesses({ alive: [OWNER_PID, process.pid], ...options.processes });
@@ -328,7 +328,7 @@ test('Roles/ordering: Workers without a non-closed Todo record creates nothing (
 async function instanceWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-band-inst-'));
   t.after(async () => {
-    await rm(stateDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+    await rm(stateDir, { recursive: true, force: true });
     delete globalThis[REGISTRY_KEY];
   });
   const clock = createFakeClock(START);
@@ -422,6 +422,32 @@ async function armed(world, deps = {}) {
 }
 
 // --------------------------------------------------------------------------------- AC2.7 -----
+// Critic #3: the bus/task-triggered workers publish used to check only `armed`. After a restart,
+// before an explicit `/dashboard` adopts the slot, a bus event could therefore write the Workers
+// projection over the previous owner's file even though the automatic pass correctly refused to run.
+test('critic #3: a bus-triggered workers publish is owner-gated like the automatic pass', async t => {
+  const world = await instanceWorld(t);
+  const { pi, handle, ctx } = await armed(world);
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const before = await readJsonFile(world.workersFile());
+  assert.ok(before !== null, 'the band wrote its projection');
+  // The registry now names ANOTHER instance (a successor in this process) and its owner record is on
+  // disk: this instance is no longer the owner, so it may not write for this slot.
+  const own = world.registry.get(world.layoutKey);
+  world.registry.set(world.layoutKey, { ...own, instanceId: 'inst-successor', disposed: false });
+  await writeJson(slotPaths(world.stateDir, world.layoutKey).owner,
+    { schema: 'gjc-herdr-dashboard/owner/1', pid: HOST_PID, instanceId: 'inst-successor',
+      sessionId: 's-1', heartbeatAt: START });
+  world.writes.length = 0;
+  pi.channels.get('task:subagent:lifecycle')({ id: 'sub-9', agent: 'executor', status: 'started',
+    description: 'must not be written' });
+  await world.fire(0);
+  assert.deepEqual(world.writes, [], 'no projection write while another instance owns the slot');
+  assert.equal((await readJsonFile(world.workersFile())).cards.length, before.cards.length,
+    'the owner\'s workers.json is untouched');
+  assert.equal(handle.state().workers.cards, 1, 'the tracker still absorbed the event (state only)');
+});
+
 test('AC2.7: a throwing bus handler becomes the workers sourceError and never escapes into the host', async t => {
   const world = await instanceWorld(t, {
     workersTrackerFactory: () => {
@@ -588,6 +614,9 @@ test('dispose unsubscribes every bus channel when the host hands back an unsubsc
   const { pi, handle } = await armed(world);
   assert.deepEqual([...pi.channels.keys()].sort(),
     ['task:subagent:event', 'task:subagent:lifecycle', 'task:subagent:progress']);
-  handle.dispose();
+  // `dispose()` returns the drain of every projection write this instance had scheduled, so a caller
+  // that removes the state directory must await it (this used to be an intermittent teardown
+  // `ENOTEMPTY` that a retrying `rm` only hid).
+  await handle.dispose();
   assert.deepEqual([...pi.channels.keys()], [], 'dispose released all three subscriptions');
 });

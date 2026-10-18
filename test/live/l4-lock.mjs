@@ -30,11 +30,6 @@ const WRAPPER = join(REPO, 'test', 'live', 'herdr-wrapper.mjs');
 const OPENED = /열림|opened/;
 const LOCK_ERROR = /사용 중|busy|잠금|lock|실패/;
 
-const secondOf = (observed) => {
-  const before = new Set(observed[0]);
-  return observed[1].find((line) => !before.has(line)) ?? null;
-};
-
 const notifyTexts = (fixture, paneId) =>
   notifyLines(fixture.readPane(paneId));
 
@@ -55,18 +50,27 @@ await runScript('l4-lock (LV-10)', async () => {
     await fixture.waitIdle(ws.rootPaneId, { timeoutMs: 120_000, quiet: 3 });
 
     // Two sends, no wait in between: the first Enter is pressed and the second command is typed
-    // immediately, so the second call lands inside (or right after) the first pass.
-    const first = await sendTwice(fixture, ws.rootPaneId, 'dashboard');
+    // immediately, so the second call lands inside (or right after) the first pass. The TUI can swallow
+    // keystrokes typed while a turn is starting, so a pair that produced fewer than two notify lines is
+    // re-sent AS A PAIR (both commands again, back to back) and each attempt is recorded.
+    const attempts = [];
+    let delivered = [];
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      await sendTwice(fixture, ws.rootPaneId, 'dashboard');
+      await new Promise((done) => { setTimeout(done, 12_000); });
+      delivered = notifyTexts(fixture, ws.rootPaneId).filter((line) => /Todo|Workers/.test(line));
+      attempts.push({ attempt, notifies: delivered.length, lines: delivered });
+      if (delivered.length >= 2) break;
+    }
+    writeEvidenceJson(evidence, 'attempts.json', attempts);
     const opened = await waitForNotify(fixture, ws.rootPaneId, OPENED, { timeoutMs: 90_000 });
     writeEvidence(evidence, 'notify-first.txt', opened.line);
-    writeEvidence(evidence, 'notify-second.txt', secondOf(first) ?? '(no second notify)');
+    writeEvidence(evidence, 'notify-second.txt', delivered[1] ?? '(no second notify)');
 
     // The second call must actually have reached the host: every delivered `/dashboard` owes exactly
     // one notify (LT-4). Without two notify lines the TUI dropped a keystroke and nothing was exercised.
-    await new Promise((done) => { setTimeout(done, 15_000); });
-    const delivered = notifyTexts(fixture, ws.rootPaneId).filter((line) => /Todo|Workers/.test(line));
     writeEvidenceJson(evidence, 'delivered.json', delivered);
-    assert(delivered.length >= 2, `both /dashboard calls were delivered (${delivered.length} notify line(s))`, { delivered });
+    assert(delivered.length >= 2, `both /dashboard calls were delivered (${delivered.length} notify line(s))`, { delivered, attempts });
 
     const panes = viewerPanes(fixture);
     assert(panes.length <= 1, `at most one Todo viewer pane, got ${panes.length}`,
@@ -108,18 +112,11 @@ await runScript('l4-lock (LV-10)', async () => {
 // Both sends happen without waiting for the first one's result: the second command is typed as soon
 // as the first Enter is pressed. The only gaps are the popup-settle gaps INSIDE each slash command
 // (which the input box requires), never a wait for the first call to finish.
+// One attempt = the two commands typed back to back, no wait in between (the second Enter is pressed
+// as soon as the first is sent). Callers re-send the PAIR when the TUI swallowed a keystroke, so the
+// overlap this row is about is never replaced by two sequential calls.
 async function sendTwice(fixture, paneId, name) {
   await fixture.slash(paneId, name);
   await fixture.slash(paneId, name);
-  // The TUI can swallow keystrokes typed while a turn is starting. A second send that produced no
-  // notify is retried with the same no-wait shape (a fresh back-to-back send), never with a long gap:
-  // what matters is that two DELIVERED calls produced two notifies, one split sequence and one pane
-  // per role.
-  for (let retry = 0; retry < 3; retry += 1) {
-    await new Promise((done) => { setTimeout(done, 12_000); });
-    const lines = notifyTexts(fixture, paneId).filter((line) => /Todo|Workers/.test(line));
-    if (lines.length >= 2) break;
-    await fixture.slash(paneId, name);
-  }
-  return [notifyTexts(fixture, paneId), notifyTexts(fixture, paneId)];
+  return notifyTexts(fixture, paneId);
 }
