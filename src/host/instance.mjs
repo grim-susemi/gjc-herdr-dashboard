@@ -659,6 +659,9 @@ export function createInstance(pi, deps = {}) {
       record(error, 'host-marker');
     }
     await heartbeatOnce();
+    // A shutdown or a handover that landed while the first heartbeat was awaited has already released
+    // the timers; starting them now would leave a live interval behind (architect MEDIUM-2).
+    if (!armed || disposed) return { kind: 'owner' };
     startHeartbeat();
     startPoll();
     seedLeaf(ctx);

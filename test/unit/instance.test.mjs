@@ -15,9 +15,18 @@ import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { createDataWriter } from '../../src/core/data.mjs';
 import { dataPaths, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
-import { createInstance, REGISTRY_KEY } from '../../src/host/instance.mjs';
+import { createInstance as createInstanceRaw, REGISTRY_KEY } from '../../src/host/instance.mjs';
 import { writeJson } from '../../src/storage.mjs';
 import { createFakeClock, createFakeHerdr, createFakeProcesses, createPassTracer } from './fake-herdr.mjs';
+
+// Every instance a test arms is remembered so the world's teardown can dispose it and await its drain
+// before the state directory is removed (an abandoned instance keeps writing lock files into it).
+const created = [];
+const createInstance = (...args) => {
+  const handle = createInstanceRaw(...args);
+  created.push(handle);
+  return handle;
+};
 
 const ROOT_URL = new URL('../../', import.meta.url);
 const MODULE_URL = new URL('extension.mjs', ROOT_URL).href;
@@ -171,6 +180,7 @@ async function makeWorld(t, options = {}) {
       }),
   };
   t.after(async () => {
+    for (const handle of created.splice(0)) await handle.dispose();
     delete globalThis[REGISTRY_KEY];
     await rm(stateDir, { recursive: true, force: true });
   });

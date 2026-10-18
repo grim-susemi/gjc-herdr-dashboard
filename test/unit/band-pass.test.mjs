@@ -327,7 +327,11 @@ test('Roles/ordering: Workers without a non-closed Todo record creates nothing (
 // ------------------------------------------------------------------ instance world -----------
 async function instanceWorld(t, options = {}) {
   const stateDir = await mkdtemp(join(tmpdir(), 'gjc-band-inst-'));
+  // Every instance the world arms is disposed (and its drain awaited) BEFORE the directory goes: an
+  // instance that is simply abandoned keeps writing lock files into it (the teardown ENOTEMPTY).
+  const handles = [];
   t.after(async () => {
+    for (const handle of handles) await handle.dispose();
     await rm(stateDir, { recursive: true, force: true });
     delete globalThis[REGISTRY_KEY];
   });
@@ -407,6 +411,7 @@ async function instanceWorld(t, options = {}) {
   world.workerRecord = ({ state = 'pending', paneId = 'w1:p3', token = 'tok-w' } = {}) => ({
     state, token, paneId, tabId: 'w1:t1', shellPid: 700,
     label: labelOf('workers', key8Of(world.layoutKey)), pendingSince: START, closedBy: null });
+  world.handles = handles;
   world.workersFile = () => join(stateDir, 'data', world.scopeKeyOf(), 'workers.json');
   world.scopeKeyOf = (sessionId = 's-1') =>
     scopeKeyOf({ socket: SOCKET, parentPaneId: PARENT, sessionId });
@@ -416,6 +421,7 @@ async function instanceWorld(t, options = {}) {
 async function armed(world, deps = {}) {
   const pi = world.pi();
   const handle = createInstance(pi, world.deps(deps));
+  world.handles.push(handle);
   const { ctx } = world.ctx();
   await pi.handlers.get('session_start')({}, ctx);
   return { pi, handle, ctx };
