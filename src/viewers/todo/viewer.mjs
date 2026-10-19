@@ -66,6 +66,7 @@ const SLOT_SCHEMA = "gjc-herdr-dashboard/slot/1";
 const OWNER_SCHEMA = "gjc-herdr-dashboard/owner/1";
 const PREFS_SCHEMA = "gjc-herdr-dashboard/prefs/1";
 const PROJECTION_SCHEMA = "gjc-herdr-dashboard/todo/1";
+const GOAL_SCHEMA = "gjc-herdr-dashboard/goal/1";
 
 export function parseViewerArgs(args) {
   const result = { once: false, state: null, layout: null, role: "todo", token: null,
@@ -136,6 +137,32 @@ export function readProjection(path, { read = defaultPort.read } = {}) {
     error: sourceError };
 }
 
+// L5b: the goal line is auxiliary, so a missing, corrupt or malformed file is reported here and
+// never changes the Todo pane's connection label. A `goal: null` projection is the host saying
+// "there is no goal", which is exactly the no-line state; only a shape we cannot read is an error.
+function readGoal(path, { read = defaultPort.read } = {}) {
+  let value;
+  try {
+    value = read(path);
+  } catch (cause) {
+    return cause?.code === "ENOENT"
+      ? { goal: null, error: "" }
+      : { goal: null, error: message(cause) };
+  }
+  if (!value || typeof value !== "object" || value.schema !== GOAL_SCHEMA) {
+    return { goal: null, error: "goal schema" };
+  }
+  if (value.goal === null) return { goal: null, error: "" };
+  const goal = value.goal;
+  if (!goal || typeof goal !== "object" || typeof goal.objective !== "string" ||
+    typeof goal.status !== "string" || !Number.isFinite(goal.tokensUsed) ||
+    !Number.isFinite(goal.timeUsedSeconds)) {
+    return { goal: null, error: "goal shape" };
+  }
+  return { goal: { objective: goal.objective, status: goal.status,
+    tokensUsed: goal.tokensUsed, timeUsedSeconds: goal.timeUsedSeconds }, error: "" };
+}
+
 // `follow` is never restored as OFF (AC1.3): reopening always restores follow ON,
 // while fold and selection persist. A bad file is reported, never fatal.
 export function loadPreferences(path, scopeKey, { read = defaultPort.read } = {}) {
@@ -196,6 +223,7 @@ export async function startViewer(options, {
     write: (path, value) => port.write(path, value),
     onError: (cause) => events.emit("heartbeat-error", cause) });
   let projection = null, availability = "waiting", error = "", slot = null, slotError = "",
+    goal = null, goalError = "",
     owner = null, ownerAlive = null, prefs = { ...EMPTY_PREFS, scopeKey: null }, frame = null,
     closing = false, disposed = false, closeJob = null, timer, watcher;
   // Pointer drag anchor (1-based SGR row), cleared by release and by blur (AC3.1).
@@ -239,7 +267,7 @@ export async function startViewer(options, {
     frame = renderFrame(projection, { columns: columnsOf(), rows: rowsOf(),
       language: language.language, color: isInteractive, expanded: prefs.expanded,
       scroll: prefs.scroll, selection: prefs.selection, follow: prefs.follow,
-      connection: connection(), notices, revealSelection });
+      connection: connection(), notices, revealSelection, goal });
     return frame;
   }
 
@@ -410,6 +438,8 @@ export async function startViewer(options, {
     readOwner();
     const scopeKey = prefs.scopeKey ?? slot?.scope?.scopeKey ?? null;
     if (typeof scopeKey !== "string") {
+      goal = null;
+      goalError = "";
       draw();
       events.emit("frame", frame);
       return;
@@ -422,6 +452,11 @@ export async function startViewer(options, {
       availability = result.availability;
       error = result.error;
     }
+    // L5b: the goal row is read on every refresh, so the 1 s repaint is the worst-case latency
+    // after the owner writes goal.json. A bad auxiliary file never touches the Todo availability.
+    const goalResult = readGoal(`${options.state}/data/${scopeKey}/goal.json`, { read: port.read });
+    goal = goalResult.goal;
+    goalError = goalResult.error;
     if (projection !== null && prefs.selection !== null &&
       !taskKeys(projection).includes(prefs.selection)) prefs.selection = null;
     draw();
@@ -618,7 +653,8 @@ export async function startViewer(options, {
     get text() { return (frame ?? draw()).text; },
     get state() {
       return { options, language: language.language, gen, availability, error, slotError,
-        owner: ownerLiveness(owner, { now: clock.now(), pidAlive }), prefs, notices, slot };
+        owner: ownerLiveness(owner, { now: clock.now(), pidAlive }), prefs, notices, slot,
+        goal, goalError };
     },
     setOwner(value, { alive } = {}) {
       owner = value;

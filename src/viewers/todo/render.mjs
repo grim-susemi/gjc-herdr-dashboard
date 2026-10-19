@@ -25,12 +25,14 @@
 //
 // Frame = { text, lines, bodyLines, taskRanges, phaseRanges, scroll, bodyStart,
 //           bodyRows, selectableKeys, selectionIndex, footer, footerFits,
-//           connection, selection, empty }
+//           connection, selection, empty, goal }
 // `options` = { columns, rows, language, color, expanded, scroll, selection, follow,
-//               connection, notices, revealSelection }
+//               connection, notices, revealSelection, goal }
+// `goal` = { objective, status, tokensUsed, timeUsedSeconds } | null. When it is present
+// the frame starts with exactly one goal row; when it is null there is no row and no blank.
 import { clean, fit, footerText, languageOf, t, width, wrap } from "../common.mjs";
 const style = { accent: "36", phase: "35", muted: "90", completed: "90", abandoned: "90",
-  in_progress: "36", warning: "33", error: "31", activePhase: "33" };
+  in_progress: "36", warning: "33", error: "31", activePhase: "33", goal: "35" };
 const layout = { taskInset: 5, fallbackColumns: 16, fallbackRows: 3 };
 export const marks = { pending: "[ ]", in_progress: "[•]", completed: "[✓]", abandoned: "[×]" };
 
@@ -122,6 +124,67 @@ function body(projection, { columns, expanded, color, language, selection }) {
   return { bodyLines, taskRanges, phaseRanges, selectableKeys };
 }
 
+// L5b: one compact goal row. The four required fields are objective, status, tokens and
+// elapsed time; the objective is the only field that may truncate. The token word is dropped
+// first when a narrow pane would leave no room for an objective, and the marker is the last
+// thing to go, so 34 columns still shows all four values.
+const goalStatuses = new Set(["active", "paused", "completed", "cancelled", "abandoned", "failed"]);
+
+function goalStatusText(language, status) {
+  const code = String(status ?? "").trim().toLowerCase();
+  if (goalStatuses.has(code)) return t(language, `goal.status.${code}`);
+  // outcome: a status this build does not know is shown verbatim instead of blanking the row.
+  try { return t(language, "goal.status.unknown", { status: clean(status) }); }
+  catch { return clean(status); }
+}
+
+function compactTokens(value) {
+  const count = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  if (count < 1_000) return String(count);
+  if (count < 999_500) return `${Math.round(count / 1_000)}K`;
+  if (count < 999_500_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  return `${(count / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+}
+
+function elapsedText(language, seconds) {
+  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  const hours = Math.floor(total / 3_600), minutes = Math.floor(total / 60) % 60;
+  const rest = total % 60;
+  if (hours > 0) return `${t(language, "goal.elapsedHours", { count: hours })} ` +
+    `${t(language, "goal.elapsedMinutes", { count: minutes })}`;
+  if (minutes > 0) return `${t(language, "goal.elapsedMinutes", { count: minutes })} ` +
+    `${t(language, "goal.elapsedSeconds", { count: rest })}`;
+  return t(language, "goal.elapsedSeconds", { count: rest });
+}
+
+// Exported for the render matrix tests and for a drill that wants the row without a frame.
+export function goalLine(goal, { columns = 80, language = "ko", color = true } = {}) {
+  if (!goal || typeof goal !== "object" || typeof goal.objective !== "string" ||
+    typeof goal.status !== "string" || goal.status.trim() === "") return null;
+  const languageCode = languageOf(language);
+  const status = goalStatusText(languageCode, goal.status);
+  const elapsed = elapsedText(languageCode, goal.timeUsedSeconds);
+  const compact = compactTokens(goal.tokensUsed);
+  const fullTokens = t(languageCode, "goal.tokens", { count: compact });
+  const prefix = "◎ ";
+  const suffix = (tokens) => ` · ${status} · ${tokens} · ${elapsed}`;
+  let tokens = fullTokens;
+  let head = prefix;
+  let room = columns - width(head) - width(suffix(tokens));
+  if (room < 4) {
+    tokens = compact;
+    room = columns - width(head) - width(suffix(tokens));
+  }
+  if (room < 1) {
+    head = "";
+    room = columns - width(suffix(tokens));
+  }
+  const objective = goal.objective === "" ? t(languageCode, "goal.untitled") : goal.objective;
+  let line = `${head}${fit(objective, Math.max(1, room))}${suffix(tokens)}`;
+  if (width(line) > columns) line = fit(line, columns);
+  return paint(line, "goal", color, true);
+}
+
 function defaultSelection(projection) {
   const phases = phasesOf(projection);
   for (const phase of phases) for (const task of phase?.tasks ?? []) {
@@ -160,7 +223,7 @@ function resolveSelection(projection, requested) {
 export function renderFrame(projection, {
   columns = 80, rows = 24, language = "ko", color = true, expanded = false,
   scroll = 0, selection = null, follow = true, connection,
-  notices = [], revealSelection = true,
+  notices = [], revealSelection = true, goal = null,
 } = {}) {
   const languageCode = languageOf(language);
   // Keep the terminal's final cell free: ConPTY can otherwise wrap a wide glyph.
@@ -198,24 +261,30 @@ export function renderFrame(projection, {
     ? `${paint(t(languageCode, "todo"), headStyle, color, true)} ` +
       `${paint(`[${total.closed}/${total.total}]`, "activePhase", color, true)}  ${paint(detail, "muted", color)}`
     : paint(fit(name, columns), headStyle, color, true);
+  // A goal row exists only when `goal.json` carries a goal. There is no placeholder row and no
+  // blank spacer when the host reports none, so an ordinary Todo frame is byte-identical to L4.
+  const goalRow = goalLine(goal, { columns, language: languageCode, color });
 
   // Only the footer is unconditional. Everything above it loses space in this
   // order when the pane is too short: the divider, the error row, the body.
   if (columns < layout.fallbackColumns || rows <= layout.fallbackRows) {
     const glyph = kind === "empty" ? "0" : kind === "source-error" ? "!" :
       kind === "waiting" ? "?" : kind === "disconnected" ? "~" : "*";
-    const lines = rows === 1 ? [] : [columns === 1 ? glyph : fit(header, columns)];
+    const lines = [];
+    if (goalRow !== null && rows > 2) lines.push(fit(goalRow, columns));
+    if (rows > 1) lines.push(columns === 1 ? glyph : fit(header, columns));
     while (lines.length < rows - 1) lines.push("");
     lines.push(footerLine);
     return { text: lines.join("\n"), lines, bodyLines, taskRanges, phaseRanges,
       scroll: clamp(scroll, bodyLines.length), bodyStart: lines.length - 1, bodyRows: 0,
       selectableKeys, selectionIndex: indexOf(selectableKeys, resolved),
-      footer, footerFits: width(footer) <= columns, connection: kind, selection: resolved, empty: isEmpty };
+      footer, footerFits: width(footer) <= columns, connection: kind, selection: resolved,
+      empty: isEmpty, goal: goalRow };
   }
 
   const errorLine = sourceError && rows >= 5 ? fit(t(languageCode, "readError", { error: clean(sourceError) }), columns)
     : "";
-  const bodyRows = Math.max(0, rows - 3 - (errorLine ? 1 : 0));
+  const bodyRows = Math.max(0, rows - 3 - (errorLine ? 1 : 0) - (goalRow ? 1 : 0));
   const selected = taskRanges[resolved];
   if (revealSelection && selected && bodyRows > 0 &&
     (selected.start < scroll || selected.start + Math.min(selected.end - selected.start, bodyRows) > scroll + bodyRows)) {
@@ -225,7 +294,9 @@ export function renderFrame(projection, {
   const visible = bodyLines.slice(scroll, scroll + bodyRows);
   while (visible.length < bodyRows) visible.push("");
 
-  const lines = [header];
+  const lines = [];
+  if (goalRow !== null) lines.push(goalRow);
+  lines.push(header);
   if (errorLine) lines.push(paint(errorLine, "error", color));
   lines.push(...visible,
     paint("─".repeat(columns), "muted", color),
@@ -233,7 +304,8 @@ export function renderFrame(projection, {
   return { text: lines.join("\n"), lines, bodyLines, taskRanges, phaseRanges,
     scroll, bodyStart: lines.length - bodyRows - 2, bodyRows, selectableKeys,
     selectionIndex: indexOf(selectableKeys, resolved), footer,
-    footerFits: width(footer) <= columns, connection: kind, selection: resolved, empty: isEmpty };
+    footerFits: width(footer) <= columns, connection: kind, selection: resolved, empty: isEmpty,
+    goal: goalRow };
 }
 
 const indexOf = (keys, key) => (key === null ? -1 : keys.indexOf(key));

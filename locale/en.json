@@ -94,5 +94,17 @@
   "workers.emptyBody": "No work is running.",
   "workers.errorBody": "The Workers source is unavailable.",
   "workers.readError": "Source error: {error}",
+  "goal.status.active": "active",
+  "goal.status.paused": "paused",
+  "goal.status.completed": "done",
+  "goal.status.cancelled": "cancelled",
+  "goal.status.abandoned": "abandoned",
+  "goal.status.failed": "failed",
+  "goal.status.unknown": "{status}",
+  "goal.tokens": "{count} tok",
+  "goal.elapsedHours": "{count}h",
+  "goal.elapsedMinutes": "{count}m",
+  "goal.elapsedSeconds": "{count}s",
+  "goal.untitled": "(untitled)",
   "focusSubscriptionFailed": "Focus subscription failed: {error}"
 }

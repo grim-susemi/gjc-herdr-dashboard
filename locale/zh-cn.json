@@ -94,5 +94,17 @@
   "workers.emptyBody": "当前没有运行中的任务。",
   "workers.errorBody": "无法读取 Workers 来源。",
   "workers.readError": "来源错误: {error}",
+  "goal.status.active": "进行中",
+  "goal.status.paused": "已暂停",
+  "goal.status.completed": "已完成",
+  "goal.status.cancelled": "已取消",
+  "goal.status.abandoned": "已放弃",
+  "goal.status.failed": "失败",
+  "goal.status.unknown": "{status}",
+  "goal.tokens": "{count} token",
+  "goal.elapsedHours": "{count}小时",
+  "goal.elapsedMinutes": "{count}分",
+  "goal.elapsedSeconds": "{count}秒",
+  "goal.untitled": "(无标题)",
   "focusSubscriptionFailed": "焦点订阅失败：{error}"
 }

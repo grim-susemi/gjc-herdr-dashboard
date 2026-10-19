@@ -94,5 +94,17 @@
   "workers.emptyBody": "실행 중인 작업이 없습니다.",
   "workers.errorBody": "Workers 원본을 읽을 수 없습니다.",
   "workers.readError": "원천 오류: {error}",
+  "goal.status.active": "진행",
+  "goal.status.paused": "일시정지",
+  "goal.status.completed": "완료",
+  "goal.status.cancelled": "취소",
+  "goal.status.abandoned": "취소",
+  "goal.status.failed": "실패",
+  "goal.status.unknown": "{status}",
+  "goal.tokens": "{count} 토큰",
+  "goal.elapsedHours": "{count}시간",
+  "goal.elapsedMinutes": "{count}분",
+  "goal.elapsedSeconds": "{count}초",
+  "goal.untitled": "(제목 없음)",
   "focusSubscriptionFailed": "포커스 구독 실패: {error}"
 }
