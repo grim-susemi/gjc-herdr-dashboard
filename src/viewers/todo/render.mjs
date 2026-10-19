@@ -29,7 +29,8 @@
 // `options` = { columns, rows, language, color, expanded, scroll, selection, follow,
 //               connection, notices, revealSelection, goal }
 // `goal` = { objective, status, tokensUsed, timeUsedSeconds } | null. When it is present
-// the frame starts with exactly one goal row; when it is null there is no row and no blank.
+// the frame carries exactly one goal row directly under the header divider; when it is null
+// there is no row and no blank. (Amended L5b: the goal row is no longer row 0.)
 import { clean, compactCount, fit, footerText, languageOf, t, width, wrap } from "../common.mjs";
 const style = { accent: "36", phase: "35", muted: "90", completed: "90", abandoned: "90",
   in_progress: "36", warning: "33", error: "31", activePhase: "33", goal: "35" };
@@ -150,16 +151,20 @@ function elapsedText(language, seconds) {
 }
 
 // Exported for the render matrix tests and for a drill that wants the row without a frame.
-export function goalLine(goal, { columns = 80, language = "ko", color = true } = {}) {
+// `inset` adds the pane's one-column inset and counts it inside `columns`, so a frame can
+// pass the same `edge` it uses for the header.
+export function goalLine(goal, { columns = 80, language = "ko", color = true, inset = false } = {}) {
   if (!goal || typeof goal !== "object" || typeof goal.objective !== "string" ||
     typeof goal.status !== "string" || goal.status.trim() === "") return null;
   const languageCode = languageOf(language);
+  const lead = inset ? " " : "";
+  columns = Math.max(1, columns - width(lead));
   const status = goalStatusText(languageCode, goal.status);
   const elapsed = elapsedText(languageCode, goal.timeUsedSeconds);
   const compact = compactCount(goal.tokensUsed);
   const fullTokens = t(languageCode, "goal.tokens", { count: compact });
   const prefix = "◎ ";
-  const suffix = (tokens) => ` · ${status} · ${tokens} · ${elapsed}`;
+  const suffix = (tokens) => ` · ${status} · ${tokens} · ⧖ ${elapsed}`;
   let tokens = fullTokens;
   let head = prefix;
   let room = columns - width(head) - width(suffix(tokens));
@@ -174,7 +179,7 @@ export function goalLine(goal, { columns = 80, language = "ko", color = true } =
   const objective = goal.objective === "" ? t(languageCode, "goal.untitled") : goal.objective;
   let line = `${head}${fit(objective, Math.max(1, room))}${suffix(tokens)}`;
   if (width(line) > columns) line = fit(line, columns);
-  return paint(line, "goal", color, true);
+  return paint(`${lead}${line}`, "goal", color, true);
 }
 
 function defaultSelection(projection) {
@@ -235,8 +240,10 @@ export function renderFrame(projection, {
   // The footer is never truncated, at any width: the follow token and the
   // connection label are contractual (AC-F1, AC-F3), so a pane too narrow for them
   // overflows this one row instead of silently dropping them. `footerFits` reports
-  // whether that happened so a test can assert it precisely.
-  const footerLine = paint(footer, kind === "live" ? "accent" : "warning", color);
+  // whether that happened so a test can assert it precisely. The one-column inset is
+  // used only when the whole row, inset included, fits.
+  const footerLine = (width(footer) + 1 <= columns ? " " : "") +
+    paint(footer, kind === "live" ? "accent" : "warning", color);
 
   const drawn = body(projection, { columns, expanded, color, language: languageCode, selection: resolved });
   const { bodyLines, taskRanges, phaseRanges, selectableKeys } = drawn;
@@ -247,18 +254,28 @@ export function renderFrame(projection, {
   }
   const detail = `${t(languageCode, "completed")}:${total.completed} · ${t(languageCode, "dropped")}:${total.dropped}`;
   const name = `${t(languageCode, "todo")} [${total.closed}/${total.total}]`;
-  const headStyle = ["disconnected", "source-error"].includes(kind) ? "warning"
-    : kind === "empty" || kind === "waiting" ? "muted" : "accent";
-  const header = width(`${name}  ${detail}`) <= columns
+  // Header-first grammar mirrors OMO packages/todo/src/render.mjs:202 at 3242ad4:
+  // accent (cyan) for live/waiting/empty, warning (yellow) for disconnected,
+  // error (red) for a source error.
+  const headStyle = kind === "source-error" ? "error" : kind === "disconnected" ? "warning" : "accent";
+  const inset = columns > 1 ? " " : "", edge = columns - inset.length;
+  const headerCore = width(`${name}  ${detail}`) <= edge
     ? `${paint(t(languageCode, "todo"), headStyle, color, true)} ` +
       `${paint(`[${total.closed}/${total.total}]`, "activePhase", color, true)}  ${paint(detail, "muted", color)}`
-    : paint(fit(name, columns), headStyle, color, true);
+    : paint(fit(name, edge), headStyle, color, true);
+  const header = inset + headerCore;
+  // The Todo divider mirrors OMO packages/todo/src/render.mjs:207 at 3242ad4:
+  // paint('─'.repeat(columns), 'muted', color), where muted is '90' (:24).
+  const divider = paint("─".repeat(columns), "muted", color);
   // A goal row exists only when `goal.json` carries a goal. There is no placeholder row and no
-  // blank spacer when the host reports none, so an ordinary Todo frame is byte-identical to L4.
-  const goalRow = goalLine(goal, { columns, language: languageCode, color });
+  // blank spacer when the host reports none, so an ordinary Todo frame keeps its header and divider.
+  const goalRow = goalLine(goal, { columns: inset ? edge : columns, inset: Boolean(inset),
+    language: languageCode, color });
+  const errorLine = sourceError
+    ? paint(fit(t(languageCode, "readError", { error: clean(sourceError) }), columns), "error", color) : "";
 
   // Only the footer is unconditional. Everything above it loses space in this
-  // order when the pane is too short: the divider, the error row, the body.
+  // order when the pane is too short: the divider, the error row, the goal row.
   if (columns < layout.fallbackColumns || rows <= layout.fallbackRows) {
     const glyph = kind === "empty" ? "0" : kind === "source-error" ? "!" :
       kind === "waiting" ? "?" : kind === "disconnected" ? "~" : "*";
@@ -274,9 +291,21 @@ export function renderFrame(projection, {
       empty: isEmpty, goal: goalRow };
   }
 
-  const errorLine = sourceError && rows >= 5 ? fit(t(languageCode, "readError", { error: clean(sourceError) }), columns)
-    : "";
-  const bodyRows = Math.max(0, rows - 3 - (errorLine ? 1 : 0) - (goalRow ? 1 : 0));
+  // Priority when rows run out: keep as many PRESENT optional rows as the room above
+  // the body permits, in the order goal, error, header divider. Ranks are not
+  // capacity: an absent optional row must not consume a slot and leave a gap. The
+  // footer and the bottom divider are never dropped (AC-F1); the body gives up rows first.
+  const extraRoom = Math.max(0, rows - 3);
+  const present = [];
+  if (goalRow !== null) present.push("goal");
+  if (errorLine) present.push("error");
+  present.push("divider");
+  const kept = new Set(present.slice(0, extraRoom));
+  const top = [header];
+  if (kept.has("divider")) top.push(divider);
+  if (kept.has("goal")) top.push(goalRow);
+  if (kept.has("error")) top.push(errorLine);
+  const bodyRows = Math.max(0, extraRoom - kept.size);
   const selected = taskRanges[resolved];
   if (revealSelection && selected && bodyRows > 0 &&
     (selected.start < scroll || selected.start + Math.min(selected.end - selected.start, bodyRows) > scroll + bodyRows)) {
@@ -286,15 +315,9 @@ export function renderFrame(projection, {
   const visible = bodyLines.slice(scroll, scroll + bodyRows);
   while (visible.length < bodyRows) visible.push("");
 
-  const lines = [];
-  if (goalRow !== null) lines.push(goalRow);
-  lines.push(header);
-  if (errorLine) lines.push(paint(errorLine, "error", color));
-  lines.push(...visible,
-    paint("─".repeat(columns), "muted", color),
-    footerLine);
+  const lines = [...top, ...visible, divider, footerLine];
   return { text: lines.join("\n"), lines, bodyLines, taskRanges, phaseRanges,
-    scroll, bodyStart: lines.length - bodyRows - 2, bodyRows, selectableKeys,
+    scroll, bodyStart: top.length, bodyRows, selectableKeys,
     selectionIndex: indexOf(selectableKeys, resolved), footer,
     footerFits: width(footer) <= columns, connection: kind, selection: resolved, empty: isEmpty,
     goal: goalRow };

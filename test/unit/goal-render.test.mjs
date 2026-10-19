@@ -1,6 +1,7 @@
-// L5b goal row tests: one row at the top of the Todo pane, only while a goal exists, at the two
-// contractual widths and in all three languages. The footer is asserted by content (AC-F1/F3):
-// the goal row may never push the follow token or the connection label off the pane.
+// L5b goal row tests: one row directly under the Todo header divider (row 2), only while a
+// goal exists, at the two contractual widths and in all three languages. The footer is asserted
+// by content (AC-F1/F3): the goal row may never push the follow token or the connection label off
+// the pane. L5b is amended: the row moved from row 0 to row 2 when the header divider landed.
 import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
 import { test } from "node:test";
@@ -30,12 +31,14 @@ for (const entry of matrix) {
         language: entry.language, goal });
       const lines = plain(frame).split("\n");
       assert.equal(lines.length, 12);
-      const row = lines[0];
-      assert.match(row, /^◎ /, "the goal row is the first row");
-      assert.match(row, /repl/, "the objective is present and fitted");
+      const row = lines[2];
+      assert.match(row, /^ ◎ /, "the goal row sits under the header divider");
+      assert.match(lines[0], /^ Todo \[0\/1\]/, "row 0 is the inset header");
+      assert.match(lines[1], /^─+$/, "row 1 is the header divider");
+      assert.match(row, /rep/, "the objective is present and fitted");
       assert.ok(row.includes(entry.status), row);
       assert.ok(row.includes("214K"), row);
-      assert.ok(row.includes(entry.seconds), row);
+      assert.ok(row.includes(`⧖ ${entry.seconds}`), row);
       assert.ok(width(row) <= columns, JSON.stringify(row));
       const footer = lines.at(-1);
       assert.ok(footer.includes(entry.followOn), footer);
@@ -59,7 +62,9 @@ for (const entry of matrix) {
 test("no goal means no row and no blank row", () => {
   const frame = renderFrame(projection(), { columns: 34, rows: 12, color: false, language: "ko" });
   const lines = plain(frame).split("\n");
-  assert.match(lines[0], /^Todo \[/);
+  assert.match(lines[0], /^ Todo \[/);
+  assert.match(lines[1], /^─+$/, "the divider is the only row between the header and the body");
+  assert.equal(frame.bodyStart, 2, "the header and its divider are above the body");
   assert.doesNotMatch(plain(frame), /◎/);
   assert.equal(frame.goal, null);
   assert.equal(lines.length, 12);
@@ -80,9 +85,13 @@ test("the objective is fitted with the shared ellipsis and never pushes the metr
   assert.match(narrow, /~/, narrow);
   assert.ok(narrow.includes("active"), narrow);
   assert.ok(narrow.includes("214K"), narrow);
-  assert.ok(narrow.includes("14s"), narrow);
+  assert.ok(narrow.includes("⧖ 14s"), narrow);
   const wide = goalLine(long, { columns: 300, language: "en", color: false });
   assert.doesNotMatch(wide, /~/, wide);
+  // The frame passes its edge and asks for the one-column inset; the marker keeps it.
+  const inset = goalLine(goal, { columns: 34, language: "en", color: false, inset: true });
+  assert.match(inset, /^ ◎ /, inset);
+  assert.ok(width(inset) <= 34, inset);
 });
 
 test("status, token compaction and elapsed time cover the native and long-running values", () => {
