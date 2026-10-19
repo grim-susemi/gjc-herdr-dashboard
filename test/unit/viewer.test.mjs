@@ -15,8 +15,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { test } from "node:test";
-import { EMPTY_PREFS, loadPreferences, main, parseViewerArgs, readProjection, savePreferences,
-  startViewer } from "../../src/viewers/todo/viewer.mjs";
+import { EMPTY_PREFS, loadPreferences, main, parseViewerArgs, readProjection,
+  savePreferences, startViewer } from "../../src/viewers/todo/viewer.mjs";
 import { viewerArgs } from "../../src/core/launch.mjs";
 
 const slotFor = ({ layoutKey = "a".repeat(24), scopeKey = "b".repeat(24), role = "todo",
@@ -84,6 +84,10 @@ function fixture(t, { role = "todo", env = {}, interactive = false } = {}) {
     writeProjection: (value, scope = scopeKey) => {
       mkdirSync(join(state, "data", scope), { recursive: true });
       writeFileSync(join(state, "data", scope, "todo.json"), JSON.stringify(value));
+    },
+    writeGoal: (value, scope = scopeKey) => {
+      mkdirSync(join(state, "data", scope), { recursive: true });
+      writeFileSync(join(state, "data", scope, "goal.json"), JSON.stringify(value));
     },
     writePrefs: (value, scope = scopeKey, name = role) => {
       mkdirSync(join(state, "prefs", scope), { recursive: true });
@@ -586,6 +590,41 @@ test("a non-TTY process defaults to one-shot output even without --once", async 
   assert.equal(f.clock.intervalCount(1000), 0, "no repaint timer without a TTY");
   assert.equal(f.clock.intervalCount(5000), 0, "no heartbeat timer without a TTY");
   assert.equal(f.output.writes.filter((text) => text.includes("plain")).length, 1);
+});
+
+test("L5b: the viewer paints the goal row on refresh and removes it when the host clears it", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([{ name: "P", tasks: [{ content: "work", status: "pending" }] }]));
+  const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
+    output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
+  t.after(() => viewer.stop());
+  assert.doesNotMatch(stripVTControlCharacters(viewer.text), /◎/);
+  assert.equal(viewer.state.goal, null);
+  const goal = { objective: "ship the goal row", status: "active", tokensUsed: 214181,
+    timeUsedSeconds: 14 };
+  f.writeGoal({ schema: "gjc-herdr-dashboard/goal/1", updatedAt: 1, goal, sourceError: null });
+  viewer.refresh();
+  assert.match(stripVTControlCharacters(viewer.text), /◎ ship the goal row · 진행 · 214K 토큰 · 14초/);
+  assert.deepEqual(viewer.state.goal, goal);
+  // A corrupt auxiliary file removes the row but never turns the Todo pane into a source error.
+  writeFileSync(join(f.state, "data", f.scopeKey, "goal.json"), "{oops");
+  viewer.refresh();
+  assert.doesNotMatch(stripVTControlCharacters(viewer.text), /◎/);
+  assert.equal(viewer.state.availability, "live");
+  assert.notEqual(viewer.state.goalError, "");
+  // A well-formed file whose goal fields do not validate is treated the same way.
+  f.writeGoal({ schema: "gjc-herdr-dashboard/goal/1", updatedAt: 2,
+    goal: { objective: "x", status: "active", tokensUsed: "many", timeUsedSeconds: 2 } });
+  viewer.refresh();
+  assert.doesNotMatch(stripVTControlCharacters(viewer.text), /◎/);
+  assert.equal(viewer.state.goalError, "goal shape");
+  assert.equal(viewer.state.availability, "live");
+  // The host can clear the goal explicitly; the row disappears with it.
+  f.writeGoal({ schema: "gjc-herdr-dashboard/goal/1", updatedAt: 2, goal: null, sourceError: null });
+  viewer.refresh();
+  assert.doesNotMatch(stripVTControlCharacters(viewer.text), /◎/);
+  assert.equal(viewer.state.goal, null);
 });
 
 test("a usage error is reported on stderr and returns 2 without starting a viewer", async () => {

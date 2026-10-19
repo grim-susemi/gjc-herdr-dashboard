@@ -152,6 +152,7 @@ async function makeWorld(t, options = {}) {
             getBranch: () => state.branch ?? [] },
           ui: { notify: (line, level) => notifications.push({ line, level }) },
           getTodoState: () => value('todo'),
+          getGoalState: () => value('goal'),
         } };
     },
     deps: (overrides = {}) => ({
@@ -842,19 +843,22 @@ test('AC1.2: todo_write publishes a Todo projection in one call; a non-todo tool
   await pi.handlers.get('tool_execution_end')({ toolName: 'read' }, ctx);
   assert.deepEqual(writes, [], 'a non-todo tool publishes nothing');
   // L2: the explicit pass published BOTH projections - its own todo.json and the workers.json of
-  // the band it just opened.
-  assert.equal(handle.state().counters.published, 2, 'the explicit pass published todo + workers');
+  // the band it just opened. L5b adds goal.json on the same owner-gated path.
+  assert.equal(handle.state().counters.published, 3, 'the explicit pass published todo + workers + goal');
   const workersFile = dataPaths(world.stateDir, scopeKey).workers;
+  const goalFile = dataPaths(world.stateDir, scopeKey).goal;
   await pi.handlers.get('tool_execution_end')({ toolName: 'todo_write' }, ctx);
-  assert.deepEqual(writes, [file, workersFile],
-    'todo_write publishes one projection per live role, for this scope');
+  assert.deepEqual(writes, [file, workersFile, goalFile],
+    'todo_write publishes one projection per live file, for this scope');
   const stored = JSON.parse(await readFile(file, 'utf8'));
   assert.equal(stored.schema, 'gjc-herdr-dashboard/todo/1');
   assert.deepEqual(stored.phases,
     [{ name: '오늘', tasks: [{ content: '문서 쓰기', status: 'in_progress' }] }]);
   assert.equal(JSON.parse(await readFile(workersFile, 'utf8')).schema,
     'gjc-herdr-dashboard/workers/1');
-  assert.equal(handle.state().counters.published, 4);
+  assert.equal(JSON.parse(await readFile(goalFile, 'utf8')).schema,
+    'gjc-herdr-dashboard/goal/1');
+  assert.equal(handle.state().counters.published, 6);
 });
 
 test('§7.1 item 5: no projection is published while the slot carries no live todo record', async t => {
@@ -881,8 +885,9 @@ test('§7.1 item 5: no projection is published while the slot carries no live to
   state.leafId = 'leaf-gate';
   await world.writeSlot({ state: 'pending', sessionId, scopeKey: 'pre-scope' });
   await pi.handlers.get('goal_updated')({}, ctx);
-  assert.deepEqual(writes, [join(world.stateDir, 'data', 'pre-scope', 'todo.json')]);
-  assert.equal(handle.state().counters.published, 1);
+  assert.deepEqual(writes, [join(world.stateDir, 'data', 'pre-scope', 'todo.json'),
+    join(world.stateDir, 'data', 'pre-scope', 'goal.json')]);
+  assert.equal(handle.state().counters.published, 2);
   assert.equal(handle.state().scopeKey, 'pre-scope');
 });
 
@@ -1209,4 +1214,106 @@ test("L4: a rebind that did not happen is retried by the next trigger", async t 
   await settle();
   assert.equal((await world.slot()).scope.sessionId, "s-2", "the next tick followed the new session");
   assert.ok(handle.state().counters.auto >= 2);
+});
+
+// -------------------------------------------------------------- L5b goal projection ----------
+const goalState = (tokensUsed = 214181) => ({ enabled: true, mode: "goal",
+  goal: { id: "goal-1", objective: "reply with the single word ok and stop", status: "active",
+    tokensUsed, timeUsedSeconds: 14, createdAt: 1, updatedAt: 2,
+    provenance: { internal: "do-not-copy" } } });
+
+test("L5b: the explicit pass writes goal.json; goal_updated publishes only the four fields", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const writes = [];
+  const writer = createDataWriter({ stateDir: world.stateDir, now: () => world.clock.now(), delayMs: 0,
+    io: { writeJson: async (path, value) => { writes.push(path); return writeJson(path, value); } } });
+  const handle = createInstance(pi, world.deps({ dataWriterFactory: () => writer }));
+  const { ctx, state } = world.ctx();
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const scopeKey = handle.state().scopeKey;
+  const file = dataPaths(world.stateDir, scopeKey).goal;
+  assert.ok(writes.includes(file), "the explicit pass published goal.json");
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).goal, null, 'no goal is an explicit null');
+
+  state.goal = goalState();
+  const event = { type: 'goal_updated', goal: state.goal.goal, state: state.goal };
+  await pi.handlers.get('goal_updated')(event, ctx);
+  await writer.flush();
+  const stored = JSON.parse(await readFile(file, 'utf8'));
+  assert.equal(stored.schema, 'gjc-herdr-dashboard/goal/1');
+  assert.deepEqual(stored.goal, { objective: "reply with the single word ok and stop",
+    status: "active", tokensUsed: 214181, timeUsedSeconds: 14 });
+  const serialized = JSON.stringify(stored);
+  for (const forbidden of ['goal-1', 'provenance', 'do-not-copy', 'createdAt']) {
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+test("L5b: the event payload is the fallback when the ctx has no getGoalState surface", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const writer = createDataWriter({ stateDir: world.stateDir, now: () => world.clock.now(), delayMs: 0 });
+  const handle = createInstance(pi, world.deps({ dataWriterFactory: () => writer }));
+  const { ctx } = world.ctx();
+  delete ctx.getGoalState;
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const file = dataPaths(world.stateDir, handle.state().scopeKey).goal;
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).goal, null);
+  const goal = goalState(4242);
+  await pi.handlers.get('goal_updated')({ type: 'goal_updated', goal: goal.goal, state: goal }, ctx);
+  await writer.flush();
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).goal, { objective: goal.goal.objective,
+    status: 'active', tokensUsed: 4242, timeUsedSeconds: 14 });
+});
+
+test("L5b: no automatic pass writes goal.json while another owner holds the slot", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const writer = createDataWriter({ stateDir: world.stateDir, now: () => world.clock.now(), delayMs: 0 });
+  const first = createInstance(pi, world.deps({ dataWriterFactory: () => writer }));
+  const { ctx, state } = world.ctx({ sessionId: 's-1' });
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const file = dataPaths(world.stateDir, first.state().scopeKey).goal;
+  const before = await readFile(file, 'utf8');
+  // The previous process exits cooperatively; a NEW process arms in the same pane. Until the
+  // explicit `/dashboard` adopts the slot, every automatic trigger is owner-gated.
+  await pi.handlers.get('session_shutdown')({}, ctx);
+  world.registry.clear();
+  const piNew = piOf();
+  const second = createInstance(piNew, world.deps({ pid: HOST_PID + 1,
+    dataWriterFactory: () => writer }));
+  state.sessionId = 's-2';
+  await piNew.handlers.get('session_start')({}, ctx);
+  state.goal = goalState(777);
+  await piNew.handlers.get('goal_updated')({ type: 'goal_updated', goal: state.goal.goal,
+    state: state.goal }, ctx);
+  await settle();
+  await writer.flush();
+  assert.equal(await readFile(file, 'utf8'), before, 'the previous owner\'s goal.json is untouched');
+  assert.equal(second.state().counters.auto, 0, 'the automatic pass never ran without ownership');
+});
+
+test("L5b: a goal_updated burst folds into at most one running and one trailing pass", async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const writer = createDataWriter({ stateDir: world.stateDir, now: () => world.clock.now(), delayMs: 0 });
+  const handle = createInstance(pi, world.deps({ dataWriterFactory: () => writer }));
+  const { ctx, state } = world.ctx();
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const file = dataPaths(world.stateDir, handle.state().scopeKey).goal;
+  const before = handle.state().counters.auto;
+  const jobs = [];
+  for (let index = 1; index <= 30; index += 1) {
+    state.goal = goalState(index);
+    jobs.push(pi.handlers.get('goal_updated')({ type: 'goal_updated', goal: state.goal.goal,
+      state: state.goal }, ctx));
+  }
+  await Promise.all(jobs);
+  await settle();
+  await writer.flush();
+  const ran = handle.state().counters.auto - before;
+  assert.ok(ran >= 1 && ran <= 2, `30 goal events ran ${ran} passes`);
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).goal.tokensUsed, 30,
+    'the newest goal wins the fold');
 });

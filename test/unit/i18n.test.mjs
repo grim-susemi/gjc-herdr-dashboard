@@ -36,7 +36,9 @@ test("the default language is ko and unsupported values are reported, not thrown
 });
 
 test("locale files resolve against a ROOT URL, one directory above the module", () => {
-  assert.ok(fileURLToPath(ROOT_URL).replaceAll("\\", "/").endsWith("/gjc-herdr-dashboard/"));
+  // A git worktree is not named after the install root (`gjc-herdr-dashboard`); the contract is
+  // that the locale URL is ROOT/locale/<lang>.json, not the directory's basename.
+  assert.ok(localeUrl(ROOT_URL, "ko").href.startsWith(ROOT_URL.href));
   assert.ok(fileURLToPath(localeUrl(ROOT_URL, "ko")).endsWith(join("locale", "ko.json")));
   const i18n = createI18n(ROOT_URL);
   assert.equal(i18n.messages("ko").todo, "Todo");
