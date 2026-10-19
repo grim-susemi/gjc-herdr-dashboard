@@ -174,7 +174,7 @@ test("a wheel turns follow off and persists scroll without persisting follow", a
   const written = f.lastPrefs();
   assert.equal(written.scroll, 3);
   assert.equal("follow" in written, false, "follow is never persisted off");
-  assert.match(stripVTControlCharacters(viewer.text), /자동 추적 OFF/);
+  assert.match(stripVTControlCharacters(viewer.text), /Follow OFF/);
 });
 
 test("a click selects the task under the cursor and turns follow off", async (t) => {
@@ -297,9 +297,9 @@ test("a rejected focus subscription shows exactly one notice and the viewer keep
   const { f, viewer, fake } = await open(t);
   fake.reject(new Error("no socket"));
   await tick();
-  const notice = "포커스 구독 실패: no socket";
+  const notice = "Focus subscription failed: no socket";
   assert.deepEqual(viewer.state.notices, [notice]);
-  assert.match(stripVTControlCharacters(viewer.text), /포커스 구독 실패: no socket/);
+  assert.match(stripVTControlCharacters(viewer.text), /Focus subscription failed: no socket/);
   // A second failure never repeats the line, and nothing throws out of the view.
   fake.calls[0].failed(new Error("again"));
   await tick();
@@ -308,7 +308,7 @@ test("a rejected focus subscription shows exactly one notice and the viewer keep
   f.input.emit("data", "f");
   assert.equal(viewer.state.prefs.follow, false);
   f.clock.tick(1000);
-  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /포커스 구독 실패/);
+  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /Focus subscription failed/);
 });
 
 test("a failed() report alone shows the notice once, and the dispose lands on stop", async (t) => {
@@ -324,7 +324,7 @@ test("a failed() report alone shows the notice once, and the dispose lands on st
   await tick();
   calls[0].failed(new Error("subscribe denied"));
   await tick();
-  assert.deepEqual(viewer.state.notices, ["포커스 구독 실패: subscribe denied"]);
+  assert.deepEqual(viewer.state.notices, ["Focus subscription failed: subscribe denied"]);
   fake.resolve(() => dispose.dispose());
   await tick();
   const writes = f.writes.length;

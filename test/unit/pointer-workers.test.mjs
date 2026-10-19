@@ -181,7 +181,7 @@ test("a wheel turns follow off and persists the scroll it landed on", async (t) 
   const written = f.lastPrefs();
   assert.equal(written.scroll, 3);
   assert.equal("follow" in written, false, "follow is never persisted off");
-  assert.match(lastFooter(viewer), /자동 추적 OFF/);
+  assert.match(lastFooter(viewer), /Follow OFF/);
   // The viewer writes its own prefs file and its ready file, and nothing else: pointer
   // input never reaches slot.json or owner.json (contract item 7).
   assert.deepEqual([...new Set(f.writes.map((entry) => entry.path.split(/[\\/]/).pop()))].sort(),
@@ -325,9 +325,9 @@ test("a rejected focus subscription shows exactly one notice and the viewer keep
   const { f, viewer, fake } = await open(t);
   fake.reject(new Error("no socket"));
   await tick();
-  const notice = "포커스 구독 실패: no socket";
+  const notice = "Focus subscription failed: no socket";
   assert.deepEqual(viewer.state.notices, [notice]);
-  assert.match(stripVTControlCharacters(viewer.text), /포커스 구독 실패: no socket/);
+  assert.match(stripVTControlCharacters(viewer.text), /Focus subscription failed: no socket/);
   // A second failure never repeats the line, and nothing throws out of the view.
   fake.calls[0].failed(new Error("again"));
   await tick();
@@ -336,7 +336,7 @@ test("a rejected focus subscription shows exactly one notice and the viewer keep
   f.input.emit("data", "f");
   assert.equal(viewer.state.prefs.follow, false);
   f.clock.tick(1000);
-  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /포커스 구독 실패/);
+  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /Focus subscription failed/);
 });
 
 test("a failed() report alone shows the notice once, and the dispose lands on finish", async (t) => {
@@ -350,7 +350,7 @@ test("a failed() report alone shows the notice once, and the dispose lands on fi
   const dispose = { count: 0, dispose() { this.count++; } };
   calls[0].failed(new Error("subscribe denied"));
   await tick();
-  assert.deepEqual(viewer.state.notices, ["포커스 구독 실패: subscribe denied"]);
+  assert.deepEqual(viewer.state.notices, ["Focus subscription failed: subscribe denied"]);
   fake.resolve(() => dispose.dispose());
   await tick();
   const writes = f.writes.length;
@@ -377,7 +377,7 @@ test("a watcher that throws synchronously is reported, not propagated", async (t
     watchFocus: (pane, onBlur, onFailed) => { calls.push({ pane, onBlur, onFailed }); throw thrown; } } });
   await tick();
   assert.equal(calls.length, 1);
-  assert.deepEqual(viewer.state.notices, ["포커스 구독 실패: socket path rejected"]);
+  assert.deepEqual(viewer.state.notices, ["Focus subscription failed: socket path rejected"]);
 });
 
 test("a non-interactive viewer never subscribes to the Herdr focus stream", async (t) => {

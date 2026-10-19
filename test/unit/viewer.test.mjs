@@ -192,8 +192,8 @@ test("startViewer writes its ready file, renders the projection and shows the fo
   assert.equal(typeof ready.gen, "string");
   const text = stripVTControlCharacters(viewer.text);
   assert.match(text, /ship it/);
-  assert.match(text, /자동 추적 ON/);
-  assert.match(text, /실시간/);
+  assert.match(text, /Follow ON/);
+  assert.match(text, /LIVE/);
   assert.equal(viewer.state.availability, "live");
   assert.deepEqual(f.calls, [], "opening the viewer never calls Herdr");
 });
@@ -208,10 +208,10 @@ test("'f', 'c' and 'j' change only this role's view and persist it", async (t) =
   const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
     output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
   t.after(() => viewer.stop());
-  assert.match(stripVTControlCharacters(viewer.text), /자동 추적 ON/);
+  assert.match(stripVTControlCharacters(viewer.text), /Follow ON/);
   await viewer.key("f");
   assert.equal(viewer.state.prefs.follow, false);
-  assert.match(stripVTControlCharacters(viewer.text), /자동 추적 OFF/);
+  assert.match(stripVTControlCharacters(viewer.text), /Follow OFF/);
   // 'c' expands closed phases and pauses follow, as in omo.
   await viewer.key("c");
   assert.equal(viewer.state.prefs.expanded, true);
@@ -258,7 +258,7 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with fold and select
   assert.equal(second.state.prefs.follow, true, "follow is never restored OFF");
   assert.equal(second.state.prefs.expanded, true, "the fold toggle is restored");
   assert.equal(second.state.prefs.selection, wantSelection, "the selection is restored");
-  assert.match(stripVTControlCharacters(second.text), /자동 추적 ON/);
+  assert.match(stripVTControlCharacters(second.text), /Follow ON/);
   assert.match(stripVTControlCharacters(second.text), /done one/);
 });
 
@@ -292,8 +292,8 @@ test("a bad --lang value falls back to Korean with a one-time footer notice", as
   assert.equal(viewer.state.language, "ko");
   assert.equal(viewer.state.notices.length, 1);
   const text = stripVTControlCharacters(viewer.text);
-  assert.match(text, /자동 추적 ON/);
-  assert.match(text, /언어 값이 올바르지 않아/);
+  assert.match(text, /Follow ON/);
+  assert.match(text, /Invalid language value, showing ko/);
   // A valid value produces no notice.
   const clean = await startViewer(options(f, { lang: "zh-cn" }), { port: f.port, clock: f.clock,
     env: f.env, output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
@@ -346,7 +346,7 @@ test("token fence: a missing role or a closed record retires, an unreadable slot
   viewer.refresh();
   assert.equal(viewer.state.availability, "live");
   assert.notEqual(viewer.state.slotError, "");
-  assert.match(stripVTControlCharacters(viewer.text), /원천 오류/);
+  assert.match(stripVTControlCharacters(viewer.text), /SOURCE ERROR/);
   // A corrupt slot is likewise not a retire reason.
   writeFileSync(join(f.slots, "slot.json"), "{not json");
   viewer.refresh();
@@ -395,7 +395,7 @@ test("a bad prefs file shows a notice but never crashes the viewer", async (t) =
   const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
     output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
   t.after(() => viewer.stop());
-  assert.match(stripVTControlCharacters(viewer.text), /화면 설정/);
+  assert.match(stripVTControlCharacters(viewer.text), /View settings/);
   assert.deepEqual(viewer.state.prefs, { ...EMPTY_PREFS, scopeKey: f.scopeKey });
   assert.equal(viewer.state.availability, "live");
 });
@@ -407,20 +407,20 @@ test("owner liveness labels: cooperative exit within 5s and a kill within 20s (1
   const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
     output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
   t.after(() => viewer.stop());
-  assert.match(stripVTControlCharacters(viewer.text), /실시간/);
+  assert.match(stripVTControlCharacters(viewer.text), /LIVE/);
   // A cooperative exit that just recorded stoppedAt is already disconnected.
   viewer.setOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 4321,
     heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
-  assert.match(stripVTControlCharacters(viewer.text), /연결 끊김/);
+  assert.match(stripVTControlCharacters(viewer.text), /OFFLINE/);
   // A killed owner keeps the live label until its heartbeat is 10s old.
   const killed = { schema: "gjc-herdr-dashboard/owner/1", pid: 4321, heartbeatAt: f.clock.now() };
   viewer.setOwner(killed, { alive: () => false });
   f.clock.advance(5000);
   viewer.refresh();
-  assert.match(stripVTControlCharacters(viewer.text), /실시간/);
+  assert.match(stripVTControlCharacters(viewer.text), /LIVE/);
   f.clock.advance(10000);
   viewer.refresh();
-  assert.match(stripVTControlCharacters(viewer.text), /연결 끊깁니다|연결 끊김/);
+  assert.match(stripVTControlCharacters(viewer.text), /OFFLINE/);
   // The pane stays: no Herdr call, and the viewer is still open.
   assert.deepEqual(f.calls, []);
   assert.equal(viewer.frame.connection, "disconnected");
@@ -477,7 +477,7 @@ test("the default owner probe reports a dead owner pid as disconnected once its 
   f.clock.advance(10000);
   assert.equal(viewer.state.owner, "disconnected");
   viewer.refresh();
-  assert.match(stripVTControlCharacters(viewer.text), /연결 끊김/);
+  assert.match(stripVTControlCharacters(viewer.text), /OFFLINE/);
 });
 
 test("a q during the failpoint delay retires the viewer and nothing starts afterwards", async (t) => {
@@ -563,7 +563,7 @@ test("interactive mode: pointer modes, raw mode, a repaint timer and the slot wa
   const before = f.output.writes.length;
   f.clock.tick(1000);
   assert.ok(f.output.writes.length > before);
-  assert.ok(f.output.writes.at(-1).includes("자동 추적 OFF"));
+  assert.ok(f.output.writes.at(-1).includes("Follow OFF"));
   // q writes closing, closes the pane, restores the terminal and releases the watcher.
   f.input.emit("data", "q");
   const closed = await viewer.closed;
@@ -605,7 +605,7 @@ test("L5b: the viewer paints the goal row on refresh and removes it when the hos
     timeUsedSeconds: 14 };
   f.writeGoal({ schema: "gjc-herdr-dashboard/goal/1", updatedAt: 1, goal, sourceError: null });
   viewer.refresh();
-  assert.match(stripVTControlCharacters(viewer.text), /◎ ship the goal row · 진행 · 214K 토큰 · 14초/);
+  assert.match(stripVTControlCharacters(viewer.text), /◎ ship the goal row · active · 214K tok · 14s/);
   assert.deepEqual(viewer.state.goal, goal);
   // A corrupt auxiliary file removes the row but never turns the Todo pane into a source error.
   writeFileSync(join(f.state, "data", f.scopeKey, "goal.json"), "{oops");

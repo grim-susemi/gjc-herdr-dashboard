@@ -211,8 +211,8 @@ test("startViewer writes its ready file, renders the cards and shows the footer"
   const text = plain(viewer);
   assert.match(text, /ship it/);
   assert.match(text, /queued/);
-  assert.match(footerOf(viewer), /자동 추적 ON/);
-  assert.match(footerOf(viewer), /실시간/);
+  assert.match(footerOf(viewer), /Follow ON/);
+  assert.match(footerOf(viewer), /LIVE/);
   assert.equal(viewer.state.availability, "live");
   assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
   assert.deepEqual(f.calls, [], "opening the viewer never calls Herdr");
@@ -225,7 +225,7 @@ test("startViewer writes its ready file, renders the cards and shows the footer"
 });
 
 test("AC-F3: the footer keeps follow and the connection label at 34 and 52 columns in all three languages", async () => {
-  const languages = [["ko", /자동 추적 ON/, /실시간/], ["en", /Follow ON/, /Live/],
+  const languages = [["ko", /Follow ON/, /LIVE/], ["en", /Follow ON/, /LIVE/],
     ["zh-cn", /自动跟随 ON/, /实时/]];
   for (const [lang, follow, live] of languages) {
     for (const columns of [34, 52]) {
@@ -262,27 +262,30 @@ test("AC-F4: a 24-column card still shows its title and its status word", async 
   t.after(() => viewer.stop());
   const text = plain(viewer);
   assert.match(text, /ship it/);
-  assert.match(text, /실행 중/);
+  assert.match(text, /running/);
   assert.match(text, /broke/);
-  assert.match(text, /실패/);
+  assert.match(text, /failed/);
   for (const line of viewer.frame.lines) assert.ok(width(line) <= 24, `row too wide: ${line}`);
-  assert.match(footerOf(viewer), /자동 추적 ON/);
+  assert.match(footerOf(viewer), /Follow ON/);
 });
 
 test("AC2.2: a failed card and an aborted card differ in glyph and in word", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
-  f.writeProjection(projectionFor([card("c1", { title: "failed one", status: "failed" }),
-    card("c2", { title: "aborted one", status: "aborted" })]));
+  // Neutral titles, so only the status suffix can satisfy the word assertions.
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "failed" }),
+    card("c2", { title: "beta", status: "aborted" })]));
   const viewer = await startViewer(options(f, { width: "40" }), deps(f));
   t.after(() => viewer.stop());
-  const failedRow = viewer.frame.lines.find((line) => line.includes("failed one"));
-  const abortedRow = viewer.frame.lines.find((line) => line.includes("aborted one"));
-  assert.match(failedRow, /✗/);
-  assert.match(failedRow, /실패/);
-  assert.match(abortedRow, /⊘/);
-  assert.match(abortedRow, /중단/);
-  assert.ok(!failedRow.includes("중단") && !abortedRow.includes("실패"),
+  const failedRow = viewer.frame.lines.find((line) => line.includes("alpha"));
+  const abortedRow = viewer.frame.lines.find((line) => line.includes("beta"));
+  const failedPlain = stripVTControlCharacters(failedRow);
+  const abortedPlain = stripVTControlCharacters(abortedRow);
+  assert.match(failedPlain, /✗/);
+  assert.match(failedPlain, / failed$/);
+  assert.match(abortedPlain, /⊘/);
+  assert.match(abortedPlain, / aborted$/);
+  assert.ok(!failedRow.includes("aborted") && !abortedRow.includes("failed"),
     "neither word leaks into the other card's row");
 });
 
@@ -349,7 +352,7 @@ test("c toggles completed cards and persists the filter; f toggles follow", asyn
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
   assert.equal(viewer.state.prefs.showCompleted, false);
-  assert.match(footerOf(viewer), /자동 추적 ON/);
+  assert.match(footerOf(viewer), /Follow ON/);
   const folded = plain(viewer);
   await viewer.key("c");
   assert.equal(viewer.state.prefs.showCompleted, true);
@@ -358,9 +361,9 @@ test("c toggles completed cards and persists the filter; f toggles follow", asyn
   assert.match(plain(viewer), /done one/);
   await viewer.key("f");
   assert.equal(viewer.state.prefs.follow, true);
-  assert.match(footerOf(viewer), /자동 추적 ON/);
+  assert.match(footerOf(viewer), /Follow ON/);
   await viewer.key("f");
-  assert.match(footerOf(viewer), /자동 추적 OFF/);
+  assert.match(footerOf(viewer), /Follow OFF/);
   assert.notEqual(plain(viewer), folded, "the completed filter changes the frame");
   // An unhandled key changes nothing at all.
   const saved = f.prefsText();
@@ -453,7 +456,7 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with folds and selec
   assert.equal(second.state.prefs.showCompleted, true, "the completed filter is restored");
   assert.equal(second.state.prefs.selection, wantSelection, "the selection is restored");
   assert.deepEqual(second.state.prefs.expanded, { c2: true }, "the per-card fold is restored");
-  assert.match(footerOf(second), /자동 추적 ON/);
+  assert.match(footerOf(second), /Follow ON/);
   assert.match(plain(second), /done one/);
   assert.match(plain(second), /beta intent/, "the restored fold still shows the card's content row");
 });
@@ -507,24 +510,24 @@ test("connection labels: live, disconnected, source-error and empty are pairwise
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
   const live = footerOf(viewer);
-  assert.match(live, /실시간/);
+  assert.match(live, /LIVE/);
   // A cooperative exit that just recorded stoppedAt is already disconnected.
   viewer.setOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 4321,
     heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
   const disconnected = footerOf(viewer);
-  assert.match(disconnected, /연결 끊김/);
+  assert.match(disconnected, /OFFLINE/);
   // A source error reported by the host is the source-error label (AC2.7); the owner
   // evidence is cleared first so each label is read on its own.
   viewer.setOwner(null);
   f.writeProjection(projectionFor([card("c1")], { sourceError: "bus handler exploded" }));
   viewer.refresh();
   const sourceError = footerOf(viewer);
-  assert.match(sourceError, /원천 오류/);
+  assert.match(sourceError, /SOURCE ERROR/);
   // An empty projection is its own label.
   f.writeProjection(projectionFor([], { empty: true }));
   viewer.refresh();
   const empty = footerOf(viewer);
-  assert.match(empty, /원본 비어 있음/);
+  assert.match(empty, /EMPTY/);
   assert.equal(new Set([live, disconnected, sourceError, empty]).size, 4);
 });
 
@@ -537,13 +540,13 @@ test("owner.json is read as liveness evidence on the first refresh", async (t) =
     heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
-  assert.match(footerOf(viewer), /연결 끊김/, "owner.json is picked up on the first refresh");
+  assert.match(footerOf(viewer), /OFFLINE/, "owner.json is picked up on the first refresh");
   assert.equal(viewer.state.owner, "disconnected");
   assert.match(plain(viewer), /c1/, "a disconnected owner still shows the last published cards");
   // A foreign schema in owner.json is ignored rather than trusted as liveness evidence.
   f.writeOwner({ schema: "someone-else/1", pid: 1, stoppedAt: f.clock.now() });
   viewer.refresh();
-  assert.match(footerOf(viewer), /연결 끊김/, "the last valid record still stands");
+  assert.match(footerOf(viewer), /OFFLINE/, "the last valid record still stands");
 });
 
 test("owner liveness keeps the live label until the killed heartbeat is 10 s old", async (t) => {
@@ -556,10 +559,10 @@ test("owner liveness keeps the live label until the killed heartbeat is 10 s old
     { alive: () => false });
   f.clock.advance(5000);
   viewer.refresh();
-  assert.match(footerOf(viewer), /실시간/);
+  assert.match(footerOf(viewer), /LIVE/);
   f.clock.advance(10000);
   viewer.refresh();
-  assert.match(footerOf(viewer), /연결 끊김/);
+  assert.match(footerOf(viewer), /OFFLINE/);
   assert.deepEqual(f.calls, []);
   assert.equal(viewer.frame.connection, "disconnected");
   assert.equal(viewer.state.owner, "disconnected");
@@ -607,7 +610,7 @@ test("token fence: a missing role retires, an unreadable slot does not", async (
   viewer.refresh();
   assert.equal(viewer.state.availability, "live");
   assert.notEqual(viewer.state.slotError, "");
-  assert.match(footerOf(viewer), /원천 오류/);
+  assert.match(footerOf(viewer), /SOURCE ERROR/);
   // A corrupt slot is likewise not a retire reason.
   writeFileSync(join(f.slots, "slot.json"), "{not json");
   viewer.refresh();
@@ -669,7 +672,7 @@ test("a bad prefs file shows a notice but never crashes the viewer", async (t) =
   writeFileSync(join(f.state, "prefs", f.scopeKey, "workers.json"), "{broken prefs");
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
-  assert.match(plain(viewer), /화면 설정/);
+  assert.match(plain(viewer), /View settings/);
   assert.deepEqual(viewer.state.prefs, { ...EMPTY_PREFS, expanded: {}, scopeKey: f.scopeKey });
   assert.equal(viewer.state.availability, "live");
 });
@@ -702,8 +705,8 @@ test("a bad --lang value falls back to Korean with a one-time footer notice", as
   t.after(() => viewer.stop());
   assert.equal(viewer.state.language, "ko");
   assert.equal(viewer.state.notices.length, 1);
-  assert.match(plain(viewer), /자동 추적 ON/);
-  assert.match(plain(viewer), /언어 값이 올바르지 않아/);
+  assert.match(plain(viewer), /Follow ON/);
+  assert.match(plain(viewer), /Invalid language value, showing ko/);
   // A valid value produces no notice.
   const clean = await startViewer(options(f, { lang: "zh-cn" }), deps(f));
   t.after(() => clean.stop());
@@ -767,7 +770,7 @@ test("interactive mode: pointer modes, raw mode, a repaint timer and the slot wa
   const before = f.output.writes.length;
   f.clock.tick(1000);
   assert.ok(f.output.writes.length > before);
-  assert.ok(f.output.writes.at(-1).includes("자동 추적 OFF"));
+  assert.ok(f.output.writes.at(-1).includes("Follow OFF"));
   // q writes closing, closes the pane, restores the terminal and releases the watcher.
   f.input.emit("data", "q");
   const closed = await viewer.closed;

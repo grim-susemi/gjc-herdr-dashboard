@@ -30,7 +30,7 @@
 //               connection, notices, revealSelection, goal }
 // `goal` = { objective, status, tokensUsed, timeUsedSeconds } | null. When it is present
 // the frame starts with exactly one goal row; when it is null there is no row and no blank.
-import { clean, fit, footerText, languageOf, t, width, wrap } from "../common.mjs";
+import { clean, compactCount, fit, footerText, languageOf, t, width, wrap } from "../common.mjs";
 const style = { accent: "36", phase: "35", muted: "90", completed: "90", abandoned: "90",
   in_progress: "36", warning: "33", error: "31", activePhase: "33", goal: "35" };
 const layout = { taskInset: 5, fallbackColumns: 16, fallbackRows: 3 };
@@ -138,14 +138,6 @@ function goalStatusText(language, status) {
   catch { return clean(status); }
 }
 
-function compactTokens(value) {
-  const count = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
-  if (count < 1_000) return String(count);
-  if (count < 999_500) return `${Math.round(count / 1_000)}K`;
-  if (count < 999_500_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  return `${(count / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
-}
-
 function elapsedText(language, seconds) {
   const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
   const hours = Math.floor(total / 3_600), minutes = Math.floor(total / 60) % 60;
@@ -164,7 +156,7 @@ export function goalLine(goal, { columns = 80, language = "ko", color = true } =
   const languageCode = languageOf(language);
   const status = goalStatusText(languageCode, goal.status);
   const elapsed = elapsedText(languageCode, goal.timeUsedSeconds);
-  const compact = compactTokens(goal.tokensUsed);
+  const compact = compactCount(goal.tokensUsed);
   const fullTokens = t(languageCode, "goal.tokens", { count: compact });
   const prefix = "◎ ";
   const suffix = (tokens) => ` · ${status} · ${tokens} · ${elapsed}`;

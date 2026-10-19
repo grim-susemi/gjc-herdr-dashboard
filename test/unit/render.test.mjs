@@ -62,8 +62,8 @@ for (const [columns, rows] of [[80, 24], [52, 23], [40, 16], [34, 18], [24, 8], 
     // tokens (AC-F1/F3 is a content assertion). From the 24-column width upward it
     // also fits untruncated; below that it is the only row allowed to overflow.
     const footer = stripVTControlCharacters(frame.lines.at(-1));
-    assert.match(footer, /자동 추적 ON/);
-    assert.match(footer, /실시간/);
+    assert.match(footer, /Follow ON/);
+    assert.match(footer, /LIVE/);
     if (columns >= 24) assert.ok(frame.footerFits, `footer fits at ${columns}`);
     for (const line of frame.lines.slice(0, -1)) assert.ok(cells(line) <= columns, JSON.stringify(line));
     assert.doesNotMatch(frame.text, /j\/k|a\/z|c q|q 닫기|^f /m);
@@ -140,10 +140,10 @@ test("waiting, empty, disconnected and source error have distinct labels", () =>
   const labels = [waiting, empty, disconnected, failed].map((frame) =>
     stripVTControlCharacters(frame.lines.at(-1)).split(" · ").at(-1));
   assert.equal(new Set(labels).size, 4, labels.join(" | "));
-  assert.match(labels[0], /연결 대기/);
-  assert.match(labels[1], /원본 비어 있음/);
-  assert.match(labels[2], /연결 끊김 09:05/);
-  assert.match(labels[3], /원천 오류/);
+  assert.match(labels[0], /WAITING/);
+  assert.match(labels[1], /EMPTY/);
+  assert.match(labels[2], /OFFLINE 09:05/);
+  assert.match(labels[3], /SOURCE ERROR/);
 });
 
 test("a read error is pinned above the footer and still leaves the footer intact", () => {
@@ -151,7 +151,7 @@ test("a read error is pinned above the footer and still leaves the footer intact
     connection: { kind: "source-error" }, notices: [] ,
     selection: taskKeys(mixed())[0] });
   const plain = stripVTControlCharacters(frame.text);
-  assert.match(plain, /실시간|원천 오류/);
+  assert.match(plain, /LIVE|SOURCE ERROR/);
   assert.equal(frame.lines.length, 18);
   for (const line of frame.lines) assert.ok(cells(line) <= 34);
 });
@@ -192,8 +192,8 @@ test("truncation shortens a task row before it can touch the footer", () => {
   for (const columns of [34, 52]) {
     const frame = renderFrame(long, { columns, rows: 20, color: false, language: "ko", follow: false });
     const footer = stripVTControlCharacters(frame.lines.at(-1));
-    assert.match(footer, /자동 추적 OFF/);
-    assert.match(footer, /실시간/);
+    assert.match(footer, /Follow OFF/);
+    assert.match(footer, /LIVE/);
     assert.ok(cells(footer) <= columns);
     // A long body row wraps instead of being cut, and no wrapped row may overflow.
     const rows = frame.bodyLines.filter((line) => line.includes("긴내용"));
@@ -205,8 +205,8 @@ test("truncation shortens a task row before it can touch the footer", () => {
 });
 
 test("the footer carries follow and connection but no keyboard legend in every language", () => {
-  for (const [language, followOn, followOff, live] of [["ko", "자동 추적 ON", "자동 추적 OFF", "실시간"],
-    ["en", "Follow ON", "Follow OFF", "Live"], ["zh-cn", "自动跟随 ON", "自动跟随 OFF", "实时"]]) {
+  for (const [language, followOn, followOff, live] of [["ko", "Follow ON", "Follow OFF", "LIVE"],
+    ["en", "Follow ON", "Follow OFF", "LIVE"], ["zh-cn", "自动跟随 ON", "自动跟随 OFF", "实时"]]) {
     for (const columns of [34, 52]) {
       for (const follow of [true, false]) {
         const frame = renderFrame(mixed(), { columns, rows: 20, color: false, language, follow });

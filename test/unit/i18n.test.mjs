@@ -65,7 +65,7 @@ test("every language covers the same keys and the same interpolation parameters"
         `${language}.${key}`);
     }
   }
-  assert.equal(t("ko", "readError", { error: "EACCES" }), "읽기 오류: EACCES");
+  assert.equal(t("ko", "readError", { error: "EACCES" }), "Read error: EACCES");
   assert.equal(t("en", "readError", { error: "EACCES" }), "Read error: EACCES");
   assert.equal(t("zh-cn", "invalidLanguage", { value: "de" }), "语言值无效，改用韩语显示: de");
   // An unknown placeholder is left untouched rather than replaced by undefined.
@@ -107,8 +107,8 @@ test("each catalogue is read once and shared by every caller", () => {
 
 test("the footer is a content assertion: follow plus connection in three languages", () => {
   const rows = [
-    ["ko", "자동 추적 ON", "자동 추적 OFF", "실시간", "연결 대기", "연결 끊김 09:05", "원천 오류"],
-    ["en", "Follow ON", "Follow OFF", "Live", "Waiting", "Disconnected 09:05", "Source error"],
+    ["ko", "Follow ON", "Follow OFF", "LIVE", "WAITING", "OFFLINE 09:05", "SOURCE ERROR"],
+    ["en", "Follow ON", "Follow OFF", "LIVE", "WAITING", "OFFLINE 09:05", "SOURCE ERROR"],
     ["zh-cn", "自动跟随 ON", "自动跟随 OFF", "实时", "等待中", "连接断开 09:05", "来源错误"],
   ];
   for (const [language, on, off, live, waiting, disconnected, failure] of rows) {
@@ -125,6 +125,6 @@ test("the footer is a content assertion: follow plus connection in three languag
   }
   // Required tokens precede any notice so a narrow pane truncates a notice first.
   const noticed = footerText("ko", { connection: { kind: "live" }, notices: ["A".repeat(200)] });
-  assert.ok(noticed.indexOf("자동 추적 ON") < noticed.indexOf("AAAA"));
-  assert.ok(noticed.indexOf("실시간") < noticed.indexOf("AAAA"));
+  assert.ok(noticed.indexOf("Follow ON") < noticed.indexOf("AAAA"));
+  assert.ok(noticed.indexOf("LIVE") < noticed.indexOf("AAAA"));
 });

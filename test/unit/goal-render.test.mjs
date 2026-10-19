@@ -15,10 +15,10 @@ const goal = { objective: "reply with the single word ok and stop", status: "act
 const plain = (frame) => stripVTControlCharacters(frame.text);
 
 const matrix = [
-  { language: "ko", status: "진행", seconds: "14초", followOn: "자동 추적 ON",
-    followOff: "자동 추적 OFF", live: "실시간" },
+  { language: "ko", status: "active", seconds: "14s", followOn: "Follow ON",
+    followOff: "Follow OFF", live: "LIVE" },
   { language: "en", status: "active", seconds: "14s", followOn: "Follow ON",
-    followOff: "Follow OFF", live: "Live" },
+    followOff: "Follow OFF", live: "LIVE" },
   { language: "zh-cn", status: "进行中", seconds: "14秒", followOn: "自动跟随 ON",
     followOff: "自动跟随 OFF", live: "实时" },
 ];
@@ -88,16 +88,16 @@ test("the objective is fitted with the shared ellipsis and never pushes the metr
 test("status, token compaction and elapsed time cover the native and long-running values", () => {
   const at = (extra, language = "ko") => goalLine({ ...goal, ...extra },
     { columns: 80, language, color: false });
-  assert.match(at({ status: "paused" }), /일시정지/);
-  assert.match(at({ status: "completed" }), /완료/);
-  assert.match(at({ status: "cancelled" }), /취소/);
-  assert.match(at({ status: "failed" }), /실패/);
+  assert.match(at({ status: "paused" }), /paused/);
+  assert.match(at({ status: "completed" }), /done/);
+  assert.match(at({ status: "cancelled" }), /cancelled/);
+  assert.match(at({ status: "failed" }), /failed/);
   assert.match(at({ status: "future-state" }), /future-state/);
   assert.match(at({ tokensUsed: 999 }), /999/);
   assert.match(at({ tokensUsed: 1_500_000 }), /1\.5M/);
-  assert.match(at({ timeUsedSeconds: 125 }), /2분 5초/);
-  assert.match(at({ timeUsedSeconds: 3_725 }), /1시간 2분/);
-  assert.match(at({ objective: "" }), /\(제목 없음\)/);
+  assert.match(at({ timeUsedSeconds: 125 }), /2m 5s/);
+  assert.match(at({ timeUsedSeconds: 3_725 }), /1h 2m/);
+  assert.match(at({ objective: "" }), /\(untitled\)/);
   assert.equal(goalLine(null), null);
   assert.equal(goalLine({ objective: "x" }), null);
 });

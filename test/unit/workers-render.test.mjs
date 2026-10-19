@@ -31,10 +31,10 @@ const STATUSES = ["pending", "running", "completed", "failed", "aborted", "pause
 const cells = (line) => Array.from(stripVTControlCharacters(line))
   .reduce((total, point) => total + (/[\u1100-\u115f\uac00-\ud7a3]/u.test(point) ? 2 : 1), 0);
 const WORDS = {
-  ko: { pending: "대기", running: "실행 중", completed: "완료", failed: "실패",
-    aborted: "중단", paused: "일시정지" },
-  en: { pending: "Pending", running: "Running", completed: "Done", failed: "Failed",
-    aborted: "Aborted", paused: "Paused" },
+  ko: { pending: "pending", running: "running", completed: "done", failed: "failed",
+    aborted: "aborted", paused: "paused" },
+  en: { pending: "pending", running: "running", completed: "done", failed: "failed",
+    aborted: "aborted", paused: "paused" },
   "zh-cn": { pending: "待处理", running: "运行中", completed: "已完成", failed: "失败",
     aborted: "已中止", paused: "已暂停" },
 };
@@ -63,8 +63,8 @@ test("status glyphs are one cell each and keep the six states apart", () => {
   assert.equal(line("failed")[1], "✗");
   assert.equal(line("aborted")[1], "⊘");
   assert.notEqual(line("failed")[1], line("aborted")[1]);
-  assert.match(line("failed"), /실패|Failed|失败/);
-  assert.match(line("aborted"), /중단|Aborted|已中止/);
+  assert.match(line("failed"), /failed|失败/);
+  assert.match(line("aborted"), /aborted|已中止/);
   assert.notEqual(WORDS.ko.failed, WORDS.ko.aborted);
   assert.notEqual(WORDS.en.failed, WORDS.en.aborted);
 });
@@ -86,11 +86,14 @@ for (const columns of [24, 40, 54]) {
   for (const language of ["ko", "en"]) {
     test(`${columns} columns in ${language}: every status shows its title, glyph and word`, () => {
       for (const status of STATUSES) {
-        const title = `${status}-card`;
+        // The fixture title cannot contain a status word, so only the emitted suffix
+        // can satisfy the status assertion below (AC-F4).
+        const title = "item one";
         const frame = frameOf([card("c1", { title, status })], { columns, language });
-        const line = frame.lines[1];
-        assert.match(line, new RegExp(title), `${columns}/${language}/${status}: title: ${line}`);
-        assert.match(line, new RegExp(WORDS[language][status]), `${columns}/${language}/${status}: ${line}`);
+        const line = stripVTControlCharacters(frame.lines[1]);
+        assert.ok(line.includes(title), `${columns}/${language}/${status}: title: ${line}`);
+        assert.ok(line.endsWith(` ${WORDS[language][status]}`),
+          `${columns}/${language}/${status}: status suffix: ${line}`);
         assert.equal(stripVTControlCharacters(line)[1], stripVTControlCharacters(frame.lines[1])[1]);
         assert.ok(width(line) <= columns - 1, `${columns}/${language}/${status}: ${width(line)} cells`);
       }
@@ -137,10 +140,10 @@ test("the empty, waiting and source-error states are three different sentences",
   const labelOf = (proj, language) => renderWorkers(proj,
     { columns: 40, rows: 5, color: false, language, footer: ["F"] }).bodyLines.join(" | ");
   const expected = {
-    ko: { empty: "실행 중인 작업이 없습니다.", waiting: "Workers 원본을 기다립니다.",
-      error: "Workers 원본을 읽을 수 없습니다." },
-    en: { empty: "No work is running.", waiting: "Waiting for the Workers source.",
-      error: "The Workers source is unavailable." },
+    ko: { empty: "No workers yet", waiting: "Waiting for the Workers source.",
+      error: "Cannot read the Workers source." },
+    en: { empty: "No workers yet", waiting: "Waiting for the Workers source.",
+      error: "Cannot read the Workers source." },
     "zh-cn": { empty: "当前没有运行中的任务。", waiting: "等待 Workers 来源。",
       error: "无法读取 Workers 来源。" },
   };
@@ -153,7 +156,12 @@ test("the empty, waiting and source-error states are three different sentences",
     assert.equal(new Set(Object.values(words)).size, 3, language);
   }
   const all = Object.values(expected).flatMap((words) => Object.values(words));
-  assert.equal(new Set(all).size, all.length, "no two labels share a sentence");
+  // ko and en now share the English pane chrome; only zh-cn keeps its translations.
+  assert.deepEqual(expected.ko, expected.en);
+  for (const key of Object.keys(expected.ko)) {
+    assert.notEqual(expected["zh-cn"][key], expected.ko[key], key);
+  }
+  assert.equal(new Set(all).size, 6, "three shared ko/en sentences plus three zh-cn ones");
 });
 
 test("connection is derived from the projection and a source error keeps its cards", () => {
@@ -248,9 +256,8 @@ test("the metrics row is tools, tokens, context, cost, duration in that order", 
   const metrics = (language, columns = 80) => frameOf([card("c1", { title: "t", status: "running",
     toolCount: 7, tokens: 1234, contextPercent: 41.6, cost: 0.01234, durationMs: 65000 })],
   { language, columns }).bodyLines[2].trim();
-  assert.equal(metrics("en"), "7 tools · 1234 tok · ctx 42% · $0.0123 · 1m 5s");
-  assert.equal(metrics("ko"), "도구 7 · 토큰 1234 · 컨텍스트 42% · 비용 $0.0123 · 1m 5s"
-    .replace("1m 5s", "1분 5초").replace("7 tools".slice(0, 0), ""));
+  assert.equal(metrics("en"), "7 tools · 1234 tok · ctx 42% · cost $0.0123 · 1m 5s");
+  assert.equal(metrics("ko"), "7 tools · 1234 tok · ctx 42% · cost $0.0123 · 1m 5s");
   assert.equal(metrics("zh-cn"), "工具 7 · token 1234 · 上下文 42% · 费用 $0.0123 · 1分 5秒");
   // The order is stable, so a narrow pane drops the tail (cost, then duration) and the
   // counts a reader scans first survive.
@@ -264,15 +271,15 @@ test("the metrics row is tools, tokens, context, cost, duration in that order", 
 test("an unknown cost and an unknown context render the localized unknown label", () => {
   const row = (cost, contextPercent, language = "en") => frameOf([card("c1", { title: "t",
     status: "running", cost, contextPercent })], { language }).bodyLines[2].trim();
-  assert.equal(row(null, null), "0 tools · 0 tok · ctx ?% · ? · 0s");
-  assert.equal(row(0, 0), "0 tools · 0 tok · ctx 0% · ? · 0s", "K1: a reported 0 cost is unknown");
-  assert.equal(row(undefined, undefined), "0 tools · 0 tok · ctx ?% · ? · 0s");
-  assert.equal(row(-1, -1), "0 tools · 0 tok · ctx ?% · ? · 0s", "a negative cost is not a number");
-  assert.equal(row(NaN, NaN), "0 tools · 0 tok · ctx ?% · ? · 0s");
-  assert.equal(row("0.5", "50"), "0 tools · 0 tok · ctx ?% · ? · 0s", "a string is not a measurement");
-  assert.equal(row(0.0123, 99.4), "0 tools · 0 tok · ctx 99% · $0.0123 · 0s");
-  assert.equal(row(1000000, 100), "0 tools · 0 tok · ctx 100% · $1000000.0000 · 0s");
-  assert.equal(row(null, null, "ko"), "도구 0 · 토큰 0 · 컨텍스트 ?% · 비용 ? · 0초");
+  assert.equal(row(null, null), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
+  assert.equal(row(0, 0), "0 tools · 0 tok · ctx 0% · cost ? · 0s", "K1: a reported 0 cost is unknown");
+  assert.equal(row(undefined, undefined), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
+  assert.equal(row(-1, -1), "0 tools · 0 tok · ctx ?% · cost ? · 0s", "a negative cost is not a number");
+  assert.equal(row(NaN, NaN), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
+  assert.equal(row("0.5", "50"), "0 tools · 0 tok · ctx ?% · cost ? · 0s", "a string is not a measurement");
+  assert.equal(row(0.0123, 99.4), "0 tools · 0 tok · ctx 99% · cost $0.0123 · 0s");
+  assert.equal(row(1000000, 100), "0 tools · 0 tok · ctx 100% · cost $1000000.0000 · 0s");
+  assert.equal(row(null, null, "ko"), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
   assert.equal(row(null, null, "zh-cn"), "工具 0 · token 0 · 上下文 ?% · 费用 ? · 0秒");
   // A 41.6% context rounds, it never prints a fraction.
   assert.match(row(1, 41.6), /ctx 42%/);
@@ -294,7 +301,7 @@ test("a running card's duration follows startedAt; a finished card keeps its own
   const long = { status: "running", durationMs: 3 * 3600 * 1000 + 61_000 };
   assert.match(tail(long), /3h 1m 1s$/);
   assert.match(frameOf([card("c1", { title: "t", ...long })],
-    { language: "ko", columns: 60, view: { follow: false, expanded: { c1: true } } }).bodyLines[2], /3시간 1분 1초/);
+    { language: "ko", columns: 60, view: { follow: false, expanded: { c1: true } } }).bodyLines[2], /3h 1m 1s/);
   assert.match(frameOf([card("c1", { title: "t", ...long })],
     { language: "zh-cn", columns: 60, view: { follow: false, expanded: { c1: true } } }).bodyLines[2], /3小时 1分 1秒/);
 });
@@ -310,7 +317,7 @@ test("`d` expands only the selected card's record and never changes the selectio
   assert.deepEqual(detail.selectable, list.selectable);
   assert.equal(detail.selection, "c1");
   const joined = detail.bodyLines.join("\n");
-  for (const field of ["id: c1", "agent: subagent", "status: Running", "tool: read",
+  for (const field of ["id: c1", "agent: subagent", "status: running", "tool: read",
     "intent: reading", "last output: ok", "retry: 2 (3s)"]) {
     assert.ok(joined.includes(field), `detail shows ${field}: ${joined}`);
   }
@@ -446,7 +453,7 @@ test("stepSelection scrolls the newly selected card into the visible window", ()
 });
 
 test("the caller's footer rows are appended verbatim and are the only rows allowed to overflow", () => {
-  const footer = ["자동 추적 ON · 실시간", "second footer row"];
+  const footer = ["Follow ON · LIVE", "second footer row"];
   const frame = frameOf([card("c1")], { language: "ko", rows: 8, footer });
   assert.deepEqual(frame.lines.slice(-2), footer);
   assert.equal(frame.bodyStart, 1);
@@ -476,18 +483,19 @@ test("the header tallies the cards and the background marker rides on the card",
   // The failed and aborted tallies stay apart (AC2.2), and a status with no card is
   // not tallied at all.
   const ko = frameOf(cards, { language: "ko", columns: 100, rows: 20, view: { follow: false, showCompleted: true } });
-  assert.equal(ko.lines[0], "Workers [5]  실행 중 2 · 실패 1 · 중단 1 · 완료 1");
+  assert.equal(ko.lines[0], "Workers [5]  running 2 · failed 1 · aborted 1 · done 1");
   const en = frameOf(cards, { language: "en", columns: 100, rows: 20, view: { follow: false, showCompleted: true } });
-  assert.equal(en.lines[0], "Workers [5]  Running 2 · Failed 1 · Aborted 1 · Done 1");
+  assert.equal(en.lines[0], "Workers [5]  running 2 · failed 1 · aborted 1 · done 1");
   const zh = frameOf(cards, { language: "zh-cn", columns: 100, rows: 20, view: { follow: false, showCompleted: true } });
   assert.equal(zh.lines[0], "Workers [5]  Running 2 · Failed 1 · Aborted 1 · Done 1"
     .replace("Running", "运行中").replace("Failed", "失败").replace("Aborted", "已中止").replace("Done", "已完成"));
   // A single-card projection says so, without an empty tally tail.
-  assert.equal(frameOf([card("c1", { status: "paused" })]).lines[0], "Workers [1]  Paused 1");
+  assert.equal(frameOf([card("c1", { status: "paused" })]).lines[0], "Workers [1]  paused 1");
   assert.equal(frameOf([], { rows: 4 }).lines[0], "Workers [0]");
   // The background marker rides on the card that has it (AC2.6).
-  assert.match(ko.bodyLines[3], /\[백그라운드\]/);
-  assert.doesNotMatch(ko.bodyLines[0], /백그라운드/);
+  assert.match(ko.bodyLines[3], /\[background\]/);
+  // A bare background label (or any form) must never leak onto a foreground row.
+  assert.doesNotMatch(ko.bodyLines[0], /background/);
   assert.match(en.bodyLines[3], /\[background\]/);
   assert.match(zh.bodyLines[3], /\[后台\]/);
   // A card with no title falls back to its agent and then to its id, never a blank row.
@@ -501,7 +509,7 @@ test("color only wraps already-sized runs, so it never changes a row width", () 
   const cards = STATUSES.map((status) => card(status, { title: `${status} card`, status,
     durationMs: 61000, toolCount: 2, tokens: 40, contextPercent: 12.5, cost: 0.5 }));
   const options = { columns: 54, rows: 20, language: "ko", view: { follow: false, detail: true },
-    footer: ["자동 추적 ON · 실시간"] };
+    footer: ["Follow ON · LIVE"] };
   const plain = renderWorkers(projection(cards), { ...options, color: false });
   const colored = renderWorkers(projection(cards), { ...options, color: true });
   assert.equal(plain.lines.length, colored.lines.length);
@@ -546,8 +554,8 @@ test("the narrow fallback keeps the caller's footer and never claims an unknown 
   // An unknown status is a localized word, never a blank or a crash.
   const wide = renderWorkers(odd, { columns: 60, rows: 5, color: false, language: "en",
     view: { detail: true, follow: false }, footer: ["F"] });
-  assert.match(wide.bodyLines[0], /Unknown/);
-  assert.match(wide.bodyLines.join("\n"), /status: Unknown/);
+  assert.match(wide.bodyLines[0], /unknown/);
+  assert.match(wide.bodyLines.join("\n"), /status: unknown/);
   assert.equal(width(wide.bodyLines[0]), width(stripVTControlCharacters(wide.bodyLines[0])));
   // The renderer leans on the shared primitives rather than its own copies.
   assert.equal(fit("한글A", 4), "한~");

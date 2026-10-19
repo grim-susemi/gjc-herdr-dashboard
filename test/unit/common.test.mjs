@@ -9,8 +9,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { clockTime, closeOwnPane, connectionLabel, createHeartbeat, createSlotWatcher,
-  fenceDecision, footerText, generationOf, ownerLiveness, readyRecord } from "../../src/viewers/common.mjs";
+import { clockTime, closeOwnPane, compactCount, connectionLabel, createHeartbeat, createSlotWatcher,
+  fenceDecision, fit, footerText, generationOf, ownerLiveness, readyRecord } from "../../src/viewers/common.mjs";
 
 const fakeClock = () => {
   let now = 0, id = 0;
@@ -34,6 +34,22 @@ test("clockTime is a zero-padded local HH:MM and survives a bad value", () => {
   assert.match(clockTime(Number.NaN), /^\d{2}:\d{2}$/);
 });
 
+test("fit truncates with the caller's mark and keeps the default tilde", () => {
+  assert.equal(fit("abcdef", 4), "abc~");
+  assert.equal(fit("abcdef", 4, false, "…"), "abc…");
+  assert.equal(fit("abcdef", 4, true, "…"), "abc…");
+  assert.equal(fit("abc", 4, false, "…"), "abc");
+  assert.equal(fit("abcdef", 0), "");
+});
+
+test("compactCount compacts tokens for the goal row and the worker cards", () => {
+  assert.equal(compactCount(999), "999");
+  assert.equal(compactCount(1500), "2K");
+  assert.equal(compactCount(1_500_000), "1.5M");
+  assert.equal(compactCount(2_000_000_000), "2B");
+  assert.equal(compactCount(Number.NaN), "0");
+});
+
 test("the five connection labels are pairwise distinct in every language", () => {
   const at = new Date(2026, 0, 2, 9, 5).getTime();
   for (const language of ["ko", "en", "zh-cn"]) {
@@ -45,18 +61,18 @@ test("the five connection labels are pairwise distinct in every language", () =>
     assert.equal(connectionLabel(language, {}), labels[0]);
     assert.equal(connectionLabel(language), labels[0]);
     // An unsupported language is the ko catalogue, per policy.
-    assert.equal(connectionLabel("de", { kind: "live" }), "실시간");
+    assert.equal(connectionLabel("de", { kind: "live" }), "LIVE");
   }
 });
 
 test("the footer always leads with follow then connection, notices last", () => {
-  assert.equal(footerText("en", { follow: true, connection: { kind: "live" } }), "Follow ON · Live");
-  assert.equal(footerText("en", { follow: false, connection: { kind: "empty" } }), "Follow OFF · Empty");
+  assert.equal(footerText("en", { follow: true, connection: { kind: "live" } }), "Follow ON · LIVE");
+  assert.equal(footerText("en", { follow: false, connection: { kind: "empty" } }), "Follow OFF · EMPTY");
   assert.equal(footerText("en", { connection: { kind: "live" }, notices: ["a", "b"] }),
-    "Follow ON · Live · a · b");
+    "Follow ON · LIVE · a · b");
   // Empty and non-string notices are dropped rather than printed as separators.
   assert.equal(footerText("en", { connection: { kind: "live" }, notices: ["", null, undefined, 7] }),
-    "Follow ON · Live");
+    "Follow ON · LIVE");
   // No keyboard legend may appear in any footer (AC-F1).
   for (const language of ["ko", "en", "zh-cn"]) {
     assert.doesNotMatch(footerText(language, { connection: { kind: "live" } }), /j\/k|q |Tab|Space|↑|↓/);

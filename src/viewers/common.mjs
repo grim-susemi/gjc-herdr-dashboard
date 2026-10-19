@@ -28,8 +28,9 @@
 // Exported signatures
 //   clean(value): string
 //   width(text): number
-//   fit(text, columns, pad?): string
+//   fit(text, columns, pad?, mark?): string
 //   wrap(text, columns): string[]
+//   compactCount(value): string                // 999 / 1K / 1.5M / 2B
 //   languageOf(value) / t(language, key, values?)                    // re-exported
 //   clockTime(ms): string                       // local HH:MM
 //   connectionLabel(language, connection): string
@@ -73,7 +74,7 @@ export function width(text) {
   return result;
 }
 
-export function fit(text, columns, pad = false) {
+export function fit(text, columns, pad = false, mark = "~") {
   text = clean(text).replaceAll("\n", " ");
   if (columns < 1) return "";
   let out = "", used = 0;
@@ -83,8 +84,18 @@ export function fit(text, columns, pad = false) {
     if (used + size > columns - (truncated ? 1 : 0)) break;
     out += segment; used += size;
   }
-  if (truncated) { out += "~"; used++; }
+  if (truncated) { out += mark; used += width(mark); }
   return out + (pad ? " ".repeat(Math.max(0, columns - used)) : "");
+}
+
+// Shared token compaction for the goal row and the worker cards: <1000 as is, then K, M, B.
+// A missing or non-finite value is 0, never "NaN".
+export function compactCount(value) {
+  const count = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  if (count < 1_000) return String(count);
+  if (count < 999_500) return `${Math.round(count / 1_000)}K`;
+  if (count < 999_500_000) return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  return `${(count / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
 }
 
 export function wrap(text, columns) {
