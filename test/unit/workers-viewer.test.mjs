@@ -253,7 +253,7 @@ test("AC-F3: the footer keeps follow and the connection label at 34 and 52 colum
   }
 });
 
-test("AC-F4: a 24-column card still shows its title and its status word", async (t) => {
+test("AC-F4 (amended): a 24-column card keeps its title and the Q3=A status indicator", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
   f.writeProjection(projectionFor([card("c1", { title: "ship it", status: "running" }),
@@ -261,11 +261,21 @@ test("AC-F4: a 24-column card still shows its title and its status word", async 
   const viewer = await startViewer(options(f, { width: "24" }), deps(f));
   t.after(() => viewer.stop());
   const text = plain(viewer);
+  const runningRow = stripVTControlCharacters(viewer.frame.lines.find((line) => line.includes("ship it")));
+  const failedRow = stripVTControlCharacters(viewer.frame.lines.find((line) => line.includes("broke")));
   assert.match(text, /ship it/);
-  assert.match(text, /running/);
   assert.match(text, /broke/);
-  assert.match(text, /failed/);
-  for (const line of viewer.frame.lines) assert.ok(width(line) <= 24, `row too wide: ${line}`);
+  // Q3=A: a running card shows the spinner glyph only, a failed card keeps glyph and word.
+  assert.match(runningRow, /⠋/);
+  assert.doesNotMatch(runningRow, / · running/);
+  assert.match(failedRow, /×/);
+  assert.match(failedRow, / · failed/);
+  // Every renderer-owned row stays inside columns-1; the never-truncated footer may use
+  // the full pane.
+  for (const [index, line] of viewer.frame.lines.entries()) {
+    const limit = index === viewer.frame.lines.length - 1 ? 24 : 23;
+    assert.ok(width(line) <= limit, `row ${index} too wide: ${line}`);
+  }
   assert.match(footerOf(viewer), /Follow ON/);
 });
 
@@ -281,10 +291,10 @@ test("AC2.2: a failed card and an aborted card differ in glyph and in word", asy
   const abortedRow = viewer.frame.lines.find((line) => line.includes("beta"));
   const failedPlain = stripVTControlCharacters(failedRow);
   const abortedPlain = stripVTControlCharacters(abortedRow);
-  assert.match(failedPlain, /✗/);
-  assert.match(failedPlain, / failed$/);
+  assert.match(failedPlain, /×/);
+  assert.match(failedPlain, / · failed/);
   assert.match(abortedPlain, /⊘/);
-  assert.match(abortedPlain, / aborted$/);
+  assert.match(abortedPlain, / · aborted/);
   assert.ok(!failedRow.includes("aborted") && !abortedRow.includes("failed"),
     "neither word leaks into the other card's row");
 });
@@ -311,26 +321,35 @@ test("Tab/n/p move the card selection by card id in projection order and persist
   assert.equal(viewer.frame.selection, "c2");
 });
 
-test("Space/Enter fold the selected card into a per-card map and persist it", async (t) => {
+test("Space/Enter fold the selected completed card into a per-card map and persist it", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
   f.writeProjection(projectionFor([card("c1", { title: "running one", lastIntent: "alpha intent" }),
-    card("c2", { title: "done one", status: "completed", lastIntent: "beta intent" })]));
+    card("c2", { title: "done one", status: "completed", agent: "beta-agent",
+      lastIntent: "beta intent" })]));
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
-  // The completed card starts folded to one row (auto-fold), so its content is not shown.
+  // The completed card is hidden behind the header count, so it is not a step target yet.
   const listFrame = plain(viewer);
-  assert.ok(!listFrame.includes("beta intent"), "a completed card is folded to one row");
+  assert.ok(!listFrame.includes("done one"), "a completed card is hidden");
+  assert.deepEqual(viewer.frame.selectable, ["c1"]);
+  await viewer.key("n");
+  assert.equal(viewer.state.prefs.selection, "c1", "a hidden completed card is not stepped onto");
+  // `c` shows the group folded to one row; only then can the selection step onto it.
+  await viewer.key("c");
+  assert.equal(viewer.state.prefs.showCompleted, true);
+  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
   await viewer.key("n");
   assert.equal(viewer.state.prefs.selection, "c2");
-  // Freeze the frame with c2 selected: `n` paused follow, so nothing else moves below.
+  assert.equal(viewer.state.prefs.follow, false, "c and n both pause follow");
   const selectedFrame = plain(viewer);
-  assert.ok(!selectedFrame.includes("beta intent"), "still folded to one row");
+  assert.match(selectedFrame, /done one/);
+  assert.ok(!selectedFrame.includes("beta-agent"), "still folded to one row");
   await viewer.key(" ");
   assert.equal(viewer.state.prefs.expanded.c2, true, "Space unfolds the selected card");
   assert.equal(viewer.state.prefs.follow, false,
     "the fold is a content toggle: it leaves follow exactly as stepping left it");
-  assert.match(plain(viewer), /beta intent/, "the unfolded card shows its content row");
+  assert.match(plain(viewer), /beta-agent/, "the unfolded card shows its role row");
   assert.equal(f.readPrefs().expanded.c2, true);
   await viewer.key("\r");
   assert.equal(viewer.state.prefs.expanded.c2, false, "Enter folds it again");
@@ -342,6 +361,29 @@ test("Space/Enter fold the selected card into a per-card map and persist it", as
   viewer.refresh();
   await viewer.key(" ");
   assert.deepEqual(viewer.frame.selectable, []);
+});
+
+test("a selected card that completes stays drawn, and Space expands that same id", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha" }), card("c2", { title: "beta" })]));
+  const viewer = await startViewer(options(f), deps(f));
+  t.after(() => viewer.stop());
+  // Persist the selection explicitly: only the first card's implicit resolution would
+  // otherwise be forgotten when it leaves the running set.
+  await viewer.key("p");
+  assert.equal(viewer.state.prefs.selection, "c1");
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed",
+    agent: "alpha-agent", lastIntent: "done" }), card("c2", { title: "beta" })]));
+  viewer.refresh();
+  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"], "the selected completed card stays drawn");
+  assert.equal(viewer.frame.selection, "c1");
+  const row = viewer.frame.lines.find((line) => line.includes("alpha"));
+  assert.equal(stripVTControlCharacters(row)[0], ">");
+  assert.equal(viewer.state.prefs.expanded.c1, undefined, "still folded to one row");
+  await viewer.key(" ");
+  assert.equal(viewer.state.prefs.expanded.c1, true, "Space expands the same id");
+  assert.match(plain(viewer), /alpha-agent/, "the expanded card shows its role row");
 });
 
 test("c toggles completed cards and persists the filter; f toggles follow", async (t) => {
@@ -432,7 +474,8 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with folds and selec
   const f = fixture(t, { env: { HERDR_PANE_ID: "w1:p9" } });
   f.writeSlot(slotFor());
   f.writeProjection(projectionFor([card("c1", { title: "running one" }),
-    card("c2", { title: "done one", status: "completed", lastIntent: "beta intent" })]));
+    card("c2", { title: "done one", status: "completed", agent: "beta-agent",
+      lastIntent: "beta intent" })]));
   const first = await startViewer(options(f), deps(f));
   await first.key("f");
   assert.equal(first.state.prefs.follow, false);
@@ -440,7 +483,7 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with folds and selec
   await first.key("n");
   const wantSelection = first.state.prefs.selection;
   assert.equal(wantSelection, "c2");
-  // Fold state: the completed card starts auto-folded, so Space unfolds it explicitly.
+  // Fold state: the completed card is hidden until `c`, then Space unfolds it explicitly.
   await first.key(" ");
   assert.equal(first.state.prefs.expanded.c2, true);
   await first.close();
@@ -458,7 +501,7 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with folds and selec
   assert.deepEqual(second.state.prefs.expanded, { c2: true }, "the per-card fold is restored");
   assert.match(footerOf(second), /Follow ON/);
   assert.match(plain(second), /done one/);
-  assert.match(plain(second), /beta intent/, "the restored fold still shows the card's content row");
+  assert.match(plain(second), /beta-agent/, "the restored fold still shows the role row");
 });
 
 test("q closes the own pane only when HERDR_PANE_ID matches", async (t) => {

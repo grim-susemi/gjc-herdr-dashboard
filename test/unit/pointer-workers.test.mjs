@@ -149,8 +149,8 @@ async function open(t, { fake = fakeFocus(), options = {}, deps = {} } = {}) {
 test("the body really scrolls, so the wheel clamps are observable", async (t) => {
   const { viewer } = await open(t);
   const frame = viewer.frame;
-  assert.equal(frame.bodyLines.length - frame.bodyRows, 15, "12 cards x 3 rows over 21 body rows");
-  assert.equal(frame.bodyStart, 1, "the header is the only row above the body");
+  assert.equal(frame.bodyLines.length - frame.bodyRows, 16, "12 cards x 3 rows over 20 body rows");
+  assert.equal(frame.bodyStart, 2, "the header and its divider are above the body");
   assert.deepEqual(frame.ranges.c0, { start: 0, end: 3, status: "running" });
 });
 
@@ -275,14 +275,14 @@ test("blur returns follow ON, closes the detail view and re-arms the reveal; foc
   // Drag the selected card out of the window, then leave the pane: follow ON pulls it back.
   f.input.emit("data", motion(2));
   f.input.emit("data", motion(1));
-  assert.equal(viewer.frame.scroll, 13, "the drag panned past the selected card");
+  assert.equal(viewer.frame.scroll, 14, "the drag panned past the selected card");
   assert.equal(viewer.frame.scroll > viewer.frame.ranges.c4.start, true);
   const writes = f.writes.length;
 
   f.input.emit("data", focusIn);
   assert.equal(viewer.state.prefs.follow, false, "gaining focus changes nothing");
   assert.equal(viewer.state.detail, true);
-  assert.equal(viewer.frame.scroll, 13);
+  assert.equal(viewer.frame.scroll, 14);
   assert.equal(f.writes.length, writes, "and writes nothing");
 
   f.input.emit("data", blur);
@@ -448,13 +448,13 @@ test("dispose detaches the input decoder, so post-dispose bytes are inert", asyn
 
 test("a resize repaint is the geometry a click is judged against", async (t) => {
   const { f, viewer } = await open(t);
-  assert.equal(viewer.frame.bodyRows, 21);
+  assert.equal(viewer.frame.bodyRows, 20);
   // A shorter pane: the frame drawn after the resize has a body that ends two rows above
   // the divider, so a row below it is no longer a card hit.
   f.output.rows = 10;
   f.output.emit("resize");
   await tick();
-  assert.equal(viewer.frame.bodyRows, 7, "the resize repainted with the new geometry");
+  assert.equal(viewer.frame.bodyRows, 6, "the resize repainted with the new geometry");
   const dividerY = viewer.frame.bodyStart + viewer.frame.bodyRows + 1;
   f.input.emit("data", click(dividerY));
   assert.equal(viewer.state.prefs.selection, null, "the divider is not a card row");

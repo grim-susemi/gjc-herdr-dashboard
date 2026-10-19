@@ -1,21 +1,22 @@
 // Frame renderer tests for the Workers viewer.
 //
-// Mirrors test/unit/render.test.mjs (the Todo role) so both panes are pinned by the
-// same expectations — a bounded frame whose rows never exceed the pane, a footer the
-// caller supplies and the renderer never truncates, content asserted (never width
-// alone) across columns and languages, and colour that never changes a row width.
-// The workers-specific behaviour is asserted on its own: a card is a title row plus a
-// context row plus a metrics row, completed cards auto-fold to one row, failed and
-// aborted stay visually and textually apart (AC2.2), and an unknown context or cost
-// renders the localized unknown label instead of a confident number (K1).
-// Adapted from omo-herdr-dashboard @4082c750 `packages/dag/test/dashboard-b.test.mjs`,
-// which pinned the same card idea against the DAG renderer; the DAG graph, the run
-// selector and omo's metric vocabulary are not part of this contract.
+// Re-pinned for the OMO 3242ad4 grammar (GRAMMAR G1-G13): the pane opens with the
+// OMO header row and a dim divider, a card is the three-row OMO card (bar/spinner
+// title row, role row, metrics row), completed cards fold behind `done N ▸`, and
+// status words follow owner decision Q3=A (running and done show the glyph only;
+// failed, aborted, paused, pending and unknown keep their word). The guards that
+// matter are asserted independently: AC2.2 (failed `×`/`failed` versus aborted
+// `⊘`/`aborted`), the amended AC-F4 at 24 columns, AC2.6 (background on row 2),
+// K1 (an unknown cost is never `$0.0000`), and the caller's never-truncated footer
+// (AC-F1/AC-F3). Fixture titles are neutral so only an emitted status suffix can
+// satisfy a status-word assertion.
+//
+// Adapted from omo-herdr-dashboard @3242ad4 `packages/dag/test/dashboard-b.test.mjs`.
 import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
 import { test } from "node:test";
 import { fit, width, wrap } from "../../src/viewers/common.mjs";
-import { renderWorkers, stepSelection } from "../../src/viewers/workers/render.mjs";
+import { renderWorkers, stepSelection, SPINNER } from "../../src/viewers/workers/render.mjs";
 
 const card = (id, extra = {}) => ({ id, agent: "subagent", title: `card ${id}`, status: "running",
   background: false, currentTool: null, lastIntent: null, lastOutput: null, toolCount: 0,
@@ -38,8 +39,11 @@ const WORDS = {
   "zh-cn": { pending: "待处理", running: "运行中", completed: "已完成", failed: "失败",
     aborted: "已中止", paused: "已暂停" },
 };
+const GLYPHS = { pending: "○", running: SPINNER[0], completed: "✓", failed: "×",
+  aborted: "⊘", paused: "Ⅱ" };
 
-// One running card, so the frame is exactly header + three card rows + divider + footer.
+// One running card, so the frame is exactly header + divider + three card rows +
+// divider + footer at a tall enough pane.
 const one = (extra = {}, cards = [card("c1", { title: "ship it", status: "running",
   currentTool: "read", lastIntent: "reading the plan", lastOutput: "line 4",
   toolCount: 3, tokens: 1200, contextPercent: 41.6, cost: 0.01234, durationMs: 65000, ...extra })]) =>
@@ -49,73 +53,96 @@ const frameOf = (cards, options = {}) => renderWorkers(one({}, cards),
   { columns: 80, rows: 8, color: false, language: "en", view: { follow: false }, footer: ["F"],
     ...options });
 
+const plainLine = (line) => stripVTControlCharacters(line);
+
 test("status glyphs are one cell each and keep the six states apart", () => {
   const glyphs = new Set();
   for (const status of STATUSES) {
-    const line = frameOf([card("c1", { title: "t", status })]).lines[1];
-    const glyph = stripVTControlCharacters(line)[1];
+    const line = plainLine(frameOf([card("c1", { title: "item one", status })],
+      { view: { follow: false, showCompleted: true } }).bodyLines[0]);
+    const glyph = line[2];
     assert.equal(width(glyph), 1, `${status} glyph is one cell: ${JSON.stringify(glyph)}`);
+    assert.equal(glyph, GLYPHS[status], status);
     glyphs.add(glyph);
   }
   assert.equal(glyphs.size, STATUSES.length, `six distinct glyphs, got ${[...glyphs].join(",")}`);
   // AC2.2: failed and aborted are two different glyphs and two different words.
-  const line = (status) => stripVTControlCharacters(frameOf([card("c1", { title: "t", status })]).lines[1]);
-  assert.equal(line("failed")[1], "✗");
-  assert.equal(line("aborted")[1], "⊘");
-  assert.notEqual(line("failed")[1], line("aborted")[1]);
-  assert.match(line("failed"), /failed|失败/);
-  assert.match(line("aborted"), /aborted|已中止/);
+  const line = (status) => plainLine(frameOf([card("c1", { title: "item one", status })],
+    { view: { follow: false, showCompleted: true } }).bodyLines[0]);
+  assert.equal(line("failed")[2], "×");
+  assert.equal(line("aborted")[2], "⊘");
+  assert.notEqual(line("failed")[2], line("aborted")[2]);
+  assert.match(line("failed"), / · failed/);
+  assert.match(line("aborted"), / · aborted/);
+  assert.doesNotMatch(line("failed"), /aborted/);
+  assert.doesNotMatch(line("aborted"), /failed/);
   assert.notEqual(WORDS.ko.failed, WORDS.ko.aborted);
   assert.notEqual(WORDS.en.failed, WORDS.en.aborted);
 });
 
-test("every language names the six statuses with six distinct words", () => {
+// Q3=A: running and done carry the glyph only; every other state keeps its word.
+// The neutral title proves the word can only come from the emitted suffix.
+test("Q3=A: running and done show the glyph only, the other states keep their word", () => {
   for (const language of Object.keys(WORDS)) {
-    const words = STATUSES.map((status) => stripVTControlCharacters(
-      frameOf([card("c1", { title: "t", status })], { language }).lines[1]));
-    const tails = new Set(words.map((line) => line.trim().slice(2)));
-    assert.equal(tails.size, STATUSES.length, `${language}: ${JSON.stringify([...tails])}`);
-    for (const status of STATUSES) assert.ok(words.some((line) => line.includes(WORDS[language][status])),
-      `${language}/${status}: ${JSON.stringify(words)}`);
+    const line = (status) => plainLine(frameOf([card("c1", { title: "item one", status })],
+      { language, view: { follow: false, showCompleted: true } }).bodyLines[0]);
+    for (const status of ["running", "completed"]) {
+      assert.ok(!line(status).includes(` · ${WORDS[language][status]}`),
+        `${language}/${status}: no status word: ${line(status)}`);
+    }
+    for (const status of ["pending", "failed", "aborted", "paused"]) {
+      assert.ok(line(status).includes(` · ${WORDS[language][status]}`),
+        `${language}/${status}: status word: ${line(status)}`);
+    }
+    // The glyph always survives, in every language and state.
+    for (const status of STATUSES) assert.equal(line(status)[2], GLYPHS[status], `${language}/${status}`);
   }
 });
 
-// AC-F4: the title and the status label survive 24 columns, for every status, in both
-// languages. Content is asserted, never width alone.
+// AC-F4 (amended by Q3=A): at 24 columns the title keeps at least one cell and the
+// status indicator survives: the glyph for running and done, glyph plus word for the
+// other states. Content is asserted, never width alone.
 for (const columns of [24, 40, 54]) {
   for (const language of ["ko", "en"]) {
-    test(`${columns} columns in ${language}: every status shows its title, glyph and word`, () => {
+    test(`${columns} columns in ${language}: title, glyph and the Q3=A status indicator survive`, () => {
       for (const status of STATUSES) {
         // The fixture title cannot contain a status word, so only the emitted suffix
         // can satisfy the status assertion below (AC-F4).
         const title = "item one";
-        const frame = frameOf([card("c1", { title, status })], { columns, language });
-        const line = stripVTControlCharacters(frame.lines[1]);
+        const line = plainLine(frameOf([card("c1", { title, status })],
+          { columns, language, view: { follow: false, showCompleted: true } }).bodyLines[0]);
         assert.ok(line.includes(title), `${columns}/${language}/${status}: title: ${line}`);
-        assert.ok(line.endsWith(` ${WORDS[language][status]}`),
-          `${columns}/${language}/${status}: status suffix: ${line}`);
-        assert.equal(stripVTControlCharacters(line)[1], stripVTControlCharacters(frame.lines[1])[1]);
+        assert.equal(line[2], GLYPHS[status], `${columns}/${language}/${status}: glyph: ${line}`);
+        if (status === "running" || status === "completed") {
+          assert.ok(!line.includes(` · ${WORDS[language][status]}`),
+            `${columns}/${language}/${status}: glyph only: ${line}`);
+        } else {
+          assert.ok(line.includes(` · ${WORDS[language][status]}`),
+            `${columns}/${language}/${status}: status word: ${line}`);
+        }
         assert.ok(width(line) <= columns - 1, `${columns}/${language}/${status}: ${width(line)} cells`);
       }
     });
   }
 }
 
-// A long title at the narrow end: the title is what truncates, so the status label is
-// still whole and still readable (AC-F4 with real band widths).
-test("a long title truncates but never pushes the status label off a 24-column pane", () => {
+// A long title at the narrow end: the title is what truncates with the Workers `…`
+// mark, so the status label is still whole and still readable.
+test("a long title truncates with `…` but never pushes the status off a 24-column pane", () => {
   for (const language of ["ko", "en", "zh-cn"]) {
     const frame = frameOf([card("c1", { title: "x".repeat(80), status: "failed" })],
       { columns: 24, language });
-    assert.ok(frame.lines[1].includes(WORDS[language].failed), `${language}: ${frame.lines[1]}`);
-    assert.match(frame.lines[1], /x{4,}~/);
-    assert.ok(width(frame.lines[1]) <= 23);
+    const line = plainLine(frame.bodyLines[0]);
+    assert.equal(line[2], "×", language);
+    assert.ok(line.includes(` · ${WORDS[language].failed}`), `${language}: ${line}`);
+    assert.match(line, /x{4,}…/);
+    assert.ok(width(line) <= 23);
   }
-  // Even a pathological glyph width degrades to one coloured strip rather than a
-  // status that fell off the row.
+  // Even a pathological width degrades to one coloured strip rather than a status
+  // that fell off the row.
   const tiny = frameOf([card("c1", { title: "t", status: "aborted" })], { columns: 4 });
   assert.equal(tiny.lines.length, 8);
-  assert.ok(width(tiny.lines[1]) <= 3, tiny.lines[1]);
+  assert.ok(width(tiny.bodyLines[0]) <= 3, tiny.bodyLines[0]);
 });
 
 for (const [columns, rows] of [[80, 24], [54, 23], [40, 16], [24, 12], [12, 4], [1, 1]]) {
@@ -125,226 +152,316 @@ for (const [columns, rows] of [[80, 24], [54, 23], [40, 16], [24, 12], [12, 4], 
     assert.equal(frame.lines.length, rows);
     assert.equal(frame.text.split("\n").length, rows);
     // AC-F1/F3: the caller's footer is the last row and is never cut, at any width.
-    assert.equal(stripVTControlCharacters(frame.lines.at(-1)), "FOOTER");
+    // The one-column inset is added only when it fits.
+    const usable = Math.max(1, columns - 1);
+    const expected = width("FOOTER") + 1 <= usable ? " FOOTER" : "FOOTER";
+    assert.equal(plainLine(frame.lines.at(-1)), expected);
     // Everything this renderer sized stays inside the pane; the footer is the only row
-    // allowed to overflow, because the caller owns its content.
+    // allowed to overflow, because the caller owns its content. At one column the
+    // fallback header is empty, so the pane's own rows still fit the zero-cell budget.
+    const budget = columns === 1 ? 0 : columns - 1;
     for (const line of frame.lines.slice(0, -1)) {
-      assert.ok(width(line) <= columns - 1, `${columns}x${rows}: ${JSON.stringify(line)}`);
-      assert.ok(cells(line) <= columns - 1, `${columns}x${rows} (oracle): ${JSON.stringify(line)}`);
+      assert.ok(width(line) <= budget, `${columns}x${rows}: ${JSON.stringify(line)}`);
+      assert.ok(cells(line) <= budget, `${columns}x${rows} (oracle): ${JSON.stringify(line)}`);
     }
     assert.ok(frame.scroll >= 0 && frame.scroll <= frame.maxScroll);
   });
 }
 
-test("the empty, waiting and source-error states are three different sentences", () => {
-  const labelOf = (proj, language) => renderWorkers(proj,
-    { columns: 40, rows: 5, color: false, language, footer: ["F"] }).bodyLines.join(" | ");
+test("the empty, waiting and source-error states use the OMO empty shape", () => {
+  const body = (proj, language = "en", color = false) => renderWorkers(proj,
+    { columns: 40, rows: 9, color, language, footer: ["F"] }).bodyLines;
+  const plainBody = (proj, language = "en") => body(proj, language).map(plainLine);
   const expected = {
     ko: { empty: "No workers yet", waiting: "Waiting for the Workers source.",
-      error: "Cannot read the Workers source." },
+      error: "Cannot read the Workers source.", hint1: "Workers from this chat", hint2: "show here." },
     en: { empty: "No workers yet", waiting: "Waiting for the Workers source.",
-      error: "Cannot read the Workers source." },
+      error: "Cannot read the Workers source.", hint1: "Workers from this chat", hint2: "show here." },
     "zh-cn": { empty: "当前没有运行中的任务。", waiting: "等待 Workers 来源。",
-      error: "无法读取 Workers 来源。" },
+      error: "无法读取 Workers 来源。", hint1: "本会话启动的工作者", hint2: "会显示在这里。" },
   };
   for (const [language, words] of Object.entries(expected)) {
-    assert.equal(labelOf(projection([]), language), words.empty, language);
-    assert.equal(labelOf(null, language), words.waiting, language);
-    assert.equal(labelOf(projection([], { sourceError: "bus handler exploded" }), language), words.error,
-      language);
-    // Three distinct sentences per language, and never the same word across them.
-    assert.equal(new Set(Object.values(words)).size, 3, language);
+    assert.deepEqual(plainBody(projection([]), language),
+      ["", `  ○  ${words.empty}`, "", `  ${words.hint1}`, `  ${words.hint2}`], language);
+    assert.deepEqual(plainBody(null, language), ["", `  ○  ${words.waiting}`], language);
+    assert.deepEqual(plainBody(projection([], { sourceError: "bus handler exploded" }), language),
+      ["", `  ○  ${words.error}`], language);
+    // Three distinct sentences per language.
+    assert.equal(new Set([words.empty, words.waiting, words.error]).size, 3, language);
   }
-  const all = Object.values(expected).flatMap((words) => Object.values(words));
-  // ko and en now share the English pane chrome; only zh-cn keeps its translations.
+  // ko and en share the English pane chrome; zh-cn keeps its translations.
   assert.deepEqual(expected.ko, expected.en);
   for (const key of Object.keys(expected.ko)) {
     assert.notEqual(expected["zh-cn"][key], expected.ko[key], key);
   }
-  assert.equal(new Set(all).size, 6, "three shared ko/en sentences plus three zh-cn ones");
+  // Only the two hint rows are dim; the ○ row itself is plain (OMO :612-616).
+  const colored = body(projection([]), "en", true);
+  assert.ok(!colored[1].includes("\x1b[2m"), colored[1]);
+  assert.ok(colored[3].includes("\x1b[2m"), colored[3]);
+  assert.ok(colored[4].includes("\x1b[2m"), colored[4]);
 });
 
-test("connection is derived from the projection and a source error keeps its cards", () => {
-  const connection = (proj) => renderWorkers(proj, { columns: 40, rows: 5, footer: ["F"] }).connection;
+test("connection is derived from the projection, and the caller's link outranks it", () => {
+  const connection = (proj, options = {}) => renderWorkers(proj,
+    { columns: 40, rows: 5, footer: ["F"], ...options }).connection;
   assert.equal(connection(null), "waiting");
   assert.equal(connection(projection([])), "empty");
   assert.equal(connection(one()), "live");
+  // A disconnected owner wins even while the last projection still looks healthy.
+  assert.equal(connection(one(), { connection: { kind: "disconnected", at: 0 } }), "disconnected");
+  assert.equal(connection(projection([]), { connection: { kind: "disconnected", at: 0 } }), "disconnected");
+  assert.equal(connection(one(), { connection: { kind: "bogus" } }), "live", "unknown kinds fall back");
+  // The link decides the footer colour: live and EMPTY are connected (cyan), the
+  // other states are yellow. The inset sits outside the colour sequence.
+  const footer = (proj, link) => renderWorkers(proj, { columns: 60, rows: 6, color: true,
+    connection: link, footer: ["Follow ON · LIVE"] }).lines.at(-1);
+  assert.equal(footer(one(), { kind: "live", at: 0 }), " \x1b[36mFollow ON · LIVE\x1b[0m");
+  assert.equal(footer(projection([]), { kind: "empty", at: 0 }), " \x1b[36mFollow ON · LIVE\x1b[0m");
+  assert.equal(footer(one(), { kind: "disconnected", at: 0 }), " \x1b[33mFollow ON · LIVE\x1b[0m");
+  assert.equal(footer(one(), { kind: "source-error", at: 0 }), " \x1b[33mFollow ON · LIVE\x1b[0m");
   // A host source error outranks the cards it kept: the row says so above the body and
   // the surviving cards stay selectable and still render.
   const failed = renderWorkers(projection([card("c1", { title: "kept", status: "running" })],
     { sourceError: "handlers exploded" }),
   { columns: 60, rows: 6, color: false, language: "en", view: { follow: false }, footer: ["F"] });
   assert.equal(failed.connection, "source-error");
-  assert.match(failed.lines[1], /Source error: handlers exploded/);
+  assert.match(failed.lines[2], /Source error: handlers exploded/);
   assert.deepEqual(failed.selectable, ["c1"]);
   assert.equal(failed.empty, false);
   assert.match(failed.bodyLines[0], /kept/);
 });
 
-test("an empty projection renders one label row and reports no selection", () => {
+test("an empty projection renders the five OMO rows and reports no selection", () => {
   const frame = renderWorkers(projection([]), { columns: 40, rows: 6, color: false, language: "ko",
     view: { selection: "gone", detail: true, follow: false }, footer: ["F"] });
   assert.deepEqual(frame.selectable, []);
   assert.equal(frame.selection, null);
-  assert.equal(frame.bodyLines.length, 1);
+  assert.equal(frame.bodyLines.length, 5);
   assert.equal(frame.empty, true);
   assert.deepEqual(stepSelection(frame, 1), { selection: null, scroll: frame.scroll });
   assert.deepEqual(stepSelection(frame, -1), { selection: null, scroll: frame.scroll });
 });
 
-// A completed card is one row until `c` (showCompleted) or its own fold says otherwise.
-// Every other status is at least two rows (title plus metrics); the context row is the
-// one that stays behind a fold or a selection, because it is the card's prose.
-test("completed cards auto-fold to one row, until `c` or a per-card fold unfolds them", () => {
+// G9: completed cards are hidden behind the header count. `c` shows them folded to
+// row 1 only, an explicit expand shows the full card, and a selected completed card
+// stays drawn so Space never acts on an invisible card.
+test("completed cards hide behind `done N ▸`, show as one row under `▾`, and expand on demand", () => {
   const cards = [card("c1", { title: "done one", status: "completed", lastIntent: "finished" }),
     card("c2", { title: "failed one", status: "failed", lastOutput: "EACCES" })];
   const frame = (view) => frameOf(cards, { view: { follow: false, ...view } });
   const folded = frame({});
-  assert.equal(folded.bodyLines.length, 3, "one row for the completed card plus two for the failure");
-  assert.match(folded.bodyLines[0], /done one/);
-  assert.doesNotMatch(folded.bodyLines[0], /finished/, "a folded card shows no context row");
-  assert.equal(folded.ranges.c1.end - folded.ranges.c1.start, 1);
-  assert.equal(folded.ranges.c2.end - folded.ranges.c2.start, 2,
-    "a failed card is never auto-folded: it keeps its metrics row");
-  assert.match(folded.bodyLines[1], /failed one/);
-  assert.match(folded.bodyLines[2], /0 tools/);
-  // `expanded[{id: true}]` unfolds exactly one card, and the unfolded card gains both
-  // the context row (its reason) and the metrics row.
-  const one = frame({ expanded: { c2: true } });
-  assert.equal(one.bodyLines.length, 4);
-  assert.match(one.bodyLines[2], /EACCES/, "the failure reason is on the context row");
-  assert.equal(one.ranges.c2.end - one.ranges.c2.start, 3);
-  const unfoldedDone = frame({ expanded: { c1: true } });
-  assert.equal(unfoldedDone.bodyLines.length, 5, "the unfolded completed card is three rows");
-  assert.match(unfoldedDone.bodyLines[1], /finished/);
-  assert.match(unfoldedDone.bodyLines[2], /0 tools/, "an unfolded card keeps its metrics row");
-  // `c` (showCompleted) turns off the auto-fold, so a completed card shows its metrics
-  // row; its context row still needs an explicit expand, like every non-running card.
+  assert.doesNotMatch(folded.bodyLines.join("\n"), /done one/, "a completed card is not drawn");
+  assert.equal(folded.ranges.c1, undefined);
+  assert.deepEqual(folded.selectable, ["c2"]);
+  assert.equal(folded.bodyLines.length, 3, "the failed card keeps its title, role and metrics rows");
+  assert.match(folded.bodyLines[0], /failed one/);
+  assert.equal(folded.lines[0], " Workers [1/2]  run 0 · failed 1 · done 1 ▸");
+  // `c` unfolds the group to row 1 only and turns the mark.
   const all = frame({ showCompleted: true });
   assert.equal(all.bodyLines.length, 4);
-  assert.match(all.bodyLines[1], /0 tools/);
-  assert.doesNotMatch(all.bodyLines[1], /finished/);
-  // Folding changes rows, never the selectable card list.
-  for (const candidate of [folded, one, all, unfoldedDone]) {
-    assert.deepEqual(candidate.selectable, ["c1", "c2"]);
-  }
+  assert.equal(all.ranges.c1.end - all.ranges.c1.start, 1);
+  assert.doesNotMatch(all.bodyLines[0], /finished/, "a folded card has no detail rows");
+  assert.equal(all.lines[0], " Workers [1/2]  run 0 · failed 1 · done 1 ▾");
+  assert.deepEqual(all.selectable, ["c1", "c2"]);
+  // An explicit expand draws the full completed card.
+  const expanded = frame({ expanded: { c1: true } });
+  assert.equal(expanded.bodyLines.length, 6);
+  assert.equal(expanded.ranges.c1.end - expanded.ranges.c1.start, 3);
+  assert.match(expanded.bodyLines[1], /\[subagent\]/);
+  assert.match(expanded.bodyLines[2], /0 tok/);
+  // A selected card that completes stays drawn with the marker, and Space's expand
+  // flag then opens that same id; the header still says the group is hidden.
+  const selected = frame({ selection: "c1" });
+  assert.equal(selected.selection, "c1");
+  assert.deepEqual(selected.selectable, ["c1", "c2"]);
+  assert.equal(selected.bodyLines[0][0], ">");
+  assert.match(selected.bodyLines[0], /done one/);
+  assert.equal(selected.ranges.c1.end - selected.ranges.c1.start, 1);
+  assert.equal(selected.lines[0].endsWith("done 1 ▸"), true);
+  const opened = frame({ selection: "c1", expanded: { c1: true } });
+  assert.equal(opened.ranges.c1.end - opened.ranges.c1.start, 3);
+  // Failed and aborted never fold: both keep title, role and metrics rows.
+  const problems = frameOf([card("a", { title: "alpha", status: "failed" }),
+    card("b", { title: "beta", status: "aborted" })]);
+  assert.equal(problems.bodyLines.length, 6);
+  assert.equal(problems.ranges.a.end - problems.ranges.a.start, 3);
+  assert.equal(problems.ranges.b.end - problems.ranges.b.start, 3);
 });
 
-test("a running card shows tool, intent and last output on its second row", () => {
+// One row at completion: the title row, no bar, no role row, no metrics row.
+test("a folded completed card is one row with no bar", () => {
+  const frame = frameOf([card("c1", { title: "done one", status: "completed", tokens: 900,
+    toolCount: 2, durationMs: 12000 })], { view: { follow: false, showCompleted: true } });
+  assert.equal(frame.bodyLines.length, 1);
+  const line = plainLine(frame.bodyLines[0]);
+  assert.match(line, /done one/);
+  assert.equal(line[0], ">", "the only drawn card is the resolved selection");
+  assert.equal(line[1], " ", "a one-row card gets a space instead of the bar");
+  assert.equal(line[2], "✓");
+  assert.match(line, / · ⧖ 12s/);
+});
+
+test("a running card is the three-row OMO card; tool, intent and output are detail-only", () => {
   const frame = frameOf([card("c1", { title: "live", status: "running", currentTool: "read",
-    lastIntent: "reading the plan", lastOutput: "line 4" }), card("c2", { title: "queued", status: "pending" })]);
-  // Three rows for the running card, two for the pending one: the context row is what
-  // the pending card does not get while it is folded, and it carries its metrics anyway.
-  assert.equal(frame.bodyLines.length, 5);
-  assert.match(frame.bodyLines[1], /read · reading the plan · line 4/);
-  assert.match(frame.bodyLines[3], /queued/);
-  assert.doesNotMatch(frame.bodyLines[3], /reading/);
-  assert.match(frame.bodyLines[4], /0 tools/);
-  // The whole triple is on one row and stays inside the pane.
-  assert.ok(width(frame.bodyLines[1]) <= 79);
-  // A pending card gains its context row when it is expanded (the contract's rule).
-  const expanded = frameOf([card("c2", { title: "queued", status: "pending", currentTool: "bash",
-    lastIntent: "waiting" })], { view: { follow: false, expanded: { c2: true } } });
-  assert.match(expanded.bodyLines[1], /bash · waiting/);
-  // An absent context row is an empty row, never the word "undefined".
-  const bare = frameOf([card("c1", { status: "running" })]);
-  assert.equal(bare.bodyLines[1].trim(), "");
-  assert.doesNotMatch(bare.text, /undefined|null/);
+    lastIntent: "reading the plan", lastOutput: "line 4", tokens: 48000, toolCount: 12,
+    contextPercent: 41 })]);
+  assert.equal(frame.bodyLines.length, 3);
+  assert.match(frame.bodyLines[0], /live/);
+  assert.equal(plainLine(frame.bodyLines[1]).slice(2), "[subagent]");
+  assert.equal(plainLine(frame.bodyLines[2]).slice(2), "48K tok · 12 tools · ctx 41%");
+  const joined = plainLine(frame.bodyLines.join("\n"));
+  assert.doesNotMatch(joined, /read|reading the plan|line 4/);
+  // A bare card with nothing on rows 2 and 3 is one row and carries no bar.
+  const bare = frameOf([card("c1", { title: "bare", status: "running", agent: "",
+    tokens: null, toolCount: null, contextPercent: null })]);
+  assert.equal(bare.bodyLines.length, 1);
+  assert.equal(plainLine(bare.bodyLines[0])[1], " ");
+  assert.doesNotMatch(plainLine(bare.bodyLines[0]), /▌/);
+  // A running row always keeps its spinner glyph even without a word.
+  assert.equal(plainLine(bare.bodyLines[0])[2], "⠋");
 });
 
-test("the metrics row is tools, tokens, context, cost, duration in that order", () => {
-  const metrics = (language, columns = 80) => frameOf([card("c1", { title: "t", status: "running",
-    toolCount: 7, tokens: 1234, contextPercent: 41.6, cost: 0.01234, durationMs: 65000 })],
-  { language, columns }).bodyLines[2].trim();
-  assert.equal(metrics("en"), "7 tools · 1234 tok · ctx 42% · cost $0.0123 · 1m 5s");
-  assert.equal(metrics("ko"), "7 tools · 1234 tok · ctx 42% · cost $0.0123 · 1m 5s");
-  assert.equal(metrics("zh-cn"), "工具 7 · token 1234 · 上下文 42% · 费用 $0.0123 · 1分 5秒");
-  // The order is stable, so a narrow pane drops the tail (cost, then duration) and the
-  // counts a reader scans first survive.
-  assert.match(metrics("en", 30), /^7 tools · 1234 tok/);
-  assert.ok(!metrics("en", 30).includes("$0.0123"));
+test("the metrics row is tokens, tools, context and omits every missing value", () => {
+  const metrics = (extra, options = {}) => {
+    const frame = frameOf([card("c1", { title: "t", status: "running", ...extra })], options);
+    return frame.bodyLines[2] === undefined ? null : plainLine(frame.bodyLines[2]).slice(2);
+  };
+  assert.equal(metrics({ tokens: 48000, toolCount: 12, contextPercent: 41.6 }),
+    "48K tok · 12 tools · ctx 42%");
+  assert.equal(metrics({ tokens: 48000, toolCount: 12, contextPercent: null }),
+    "48K tok · 12 tools", "a null context is omitted");
+  assert.equal(metrics({ tokens: null, toolCount: 12, contextPercent: 41 }),
+    "12 tools · ctx 41%", "a missing token count is omitted");
+  assert.equal(metrics({ tokens: null, toolCount: null, contextPercent: null }), null,
+    "an empty metrics row is not drawn");
+  assert.equal(metrics({ tokens: 0, toolCount: 0, contextPercent: null }), "0 tok · 0 tools",
+    "a real zero is a measurement");
+  // Cost is never on the list row (K1 lives in the detail view).
+  assert.equal(metrics({ tokens: 1, toolCount: 1, contextPercent: 1, cost: 0.5 }),
+    "1 tok · 1 tools · ctx 1%");
 });
 
-// K1: the host reports 0 for subscription models, which is indistinguishable from
-// "never measured", so 0 and null both render the localized unknown label and never a
-// confident "$0.0000". A real cost keeps four decimals.
-test("an unknown cost and an unknown context render the localized unknown label", () => {
-  const row = (cost, contextPercent, language = "en") => frameOf([card("c1", { title: "t",
-    status: "running", cost, contextPercent })], { language }).bodyLines[2].trim();
-  assert.equal(row(null, null), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
-  assert.equal(row(0, 0), "0 tools · 0 tok · ctx 0% · cost ? · 0s", "K1: a reported 0 cost is unknown");
-  assert.equal(row(undefined, undefined), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
-  assert.equal(row(-1, -1), "0 tools · 0 tok · ctx ?% · cost ? · 0s", "a negative cost is not a number");
-  assert.equal(row(NaN, NaN), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
-  assert.equal(row("0.5", "50"), "0 tools · 0 tok · ctx ?% · cost ? · 0s", "a string is not a measurement");
-  assert.equal(row(0.0123, 99.4), "0 tools · 0 tok · ctx 99% · cost $0.0123 · 0s");
-  assert.equal(row(1000000, 100), "0 tools · 0 tok · ctx 100% · cost $1000000.0000 · 0s");
-  assert.equal(row(null, null, "ko"), "0 tools · 0 tok · ctx ?% · cost ? · 0s");
-  assert.equal(row(null, null, "zh-cn"), "工具 0 · token 0 · 上下文 ?% · 费用 ? · 0秒");
-  // A 41.6% context rounds, it never prints a fraction.
-  assert.match(row(1, 41.6), /ctx 42%/);
+// AC2.6: the background mark rides on row 2, never on the title row, and a neutral
+// title means only the emitted mark can satisfy the assertion.
+test("AC2.6: `background` rides on card row 2", () => {
+  const cards = [card("c1", { title: "alpha", status: "running" }),
+    card("c2", { title: "beta", status: "running", background: true })];
+  for (const [language, word] of [["ko", "background"], ["en", "background"], ["zh-cn", "后台"]]) {
+    const frame = frameOf(cards, { language });
+    assert.equal(plainLine(frame.bodyLines[1]).slice(2), "[subagent]");
+    assert.match(plainLine(frame.bodyLines[4]), new RegExp(`\\[subagent\\] ${word}`));
+    assert.doesNotMatch(plainLine(frame.bodyLines.slice(0, 3).join("\n")), new RegExp(word));
+  }
+  // A background card with no agent still names the mark.
+  const bare = frameOf([card("c1", { title: "alpha", status: "running", agent: "",
+    background: true })]);
+  assert.equal(plainLine(bare.bodyLines[1]).slice(2), "background");
+});
+
+// K1: a reported 0 is exactly the "never measured" ambiguity, so the detail view
+// prints `?`, never a confident `$0.0000`. The list has no cost row at all.
+test("K1: an unknown cost is `?` in the detail view only", () => {
+  const detail = (cost) => renderWorkers(projection([card("c1", { title: "alpha",
+    status: "running", cost })]), { columns: 60, rows: 8, color: false, language: "en",
+    view: { follow: false, detail: true }, footer: ["F"] });
+  for (const cost of [null, undefined, 0, -1, NaN, "0.5"]) {
+    const joined = detail(cost).bodyLines.join("\n");
+    assert.match(joined, /cost: \?/, `${String(cost)}: ${joined}`);
+    assert.doesNotMatch(joined, /\$0\.0000/);
+  }
+  assert.match(detail(0.0123).bodyLines.join("\n"), /cost: \$0\.0123/);
+  assert.match(detail(1000000).bodyLines.join("\n"), /cost: \$1000000\.0000/);
+  // The list never prints the cost, even when the projection carries one.
+  const list = frameOf([card("c1", { title: "alpha", cost: 0.5 })]);
+  assert.doesNotMatch(plainLine(list.bodyLines.join("\n")), /cost|\$/);
 });
 
 test("a running card's duration follows startedAt; a finished card keeps its own", () => {
-  // Every case is expanded, so the metrics row is the last row of the card either way.
-  const tail = (extra) => frameOf([card("c1", { title: "t", ...extra })],
-    { now: 70000, columns: 60, view: { follow: false, expanded: { c1: true } } }).bodyLines.at(-1).trim();
+  const title = (extra, options = {}) => plainLine(frameOf([card("c1", { title: "t", ...extra })],
+    { now: 70000, columns: 60, view: { follow: false, ...options } }).bodyLines[0]);
   // A running card's published durationMs is a floor: a stale bus value never rewinds
   // the elapsed clock, and a fresher one is kept.
-  assert.match(tail({ status: "running", durationMs: 5000, startedAt: 1000 }), /1m 9s$/);
-  assert.match(tail({ status: "running", durationMs: 90000, startedAt: 1000 }), /1m 30s$/);
-  assert.match(tail({ status: "running", durationMs: 5000 }), /5s$/);
+  assert.match(title({ status: "running", durationMs: 5000, startedAt: 1000 }), /⧖ 1m 9s$/);
+  assert.match(title({ status: "running", durationMs: 90000, startedAt: 1000 }), /⧖ 1m 30s$/);
+  assert.match(title({ status: "running", durationMs: 5000 }), /⧖ 5s$/);
   // A finished card keeps the recorded duration: now - startedAt would keep growing.
-  assert.match(tail({ status: "completed", durationMs: 5000, startedAt: 1000 }), /5s$/);
-  assert.match(tail({ status: "aborted", durationMs: 5000, startedAt: 1000 }), /5s$/);
+  assert.match(title({ status: "completed", durationMs: 5000, startedAt: 1000 },
+    { showCompleted: true }), /⧖ 5s$/);
+  assert.match(title({ status: "aborted", durationMs: 5000, startedAt: 1000 }), /⧖ 5s$/);
   // Hours are compact in every language.
   const long = { status: "running", durationMs: 3 * 3600 * 1000 + 61_000 };
-  assert.match(tail(long), /3h 1m 1s$/);
-  assert.match(frameOf([card("c1", { title: "t", ...long })],
-    { language: "ko", columns: 60, view: { follow: false, expanded: { c1: true } } }).bodyLines[2], /3h 1m 1s/);
-  assert.match(frameOf([card("c1", { title: "t", ...long })],
-    { language: "zh-cn", columns: 60, view: { follow: false, expanded: { c1: true } } }).bodyLines[2], /3小时 1分 1秒/);
+  assert.match(title(long), /⧖ 3h 1m 1s$/);
+  assert.match(plainLine(frameOf([card("c1", { title: "t", ...long })],
+    { language: "zh-cn", columns: 60, view: { follow: false } }).bodyLines[0]), /⧖ 3小时 1分 1秒$/);
+  // The time moves to the front of row 3 when the title would keep fewer than ten
+  // cells beside it (OMO :409-410).
+  const moved = frameOf([card("c1", { title: "x".repeat(80), status: "running", ...long })],
+    { columns: 24, now: 70000 });
+  assert.doesNotMatch(plainLine(moved.bodyLines[0]), /⧖/);
+  assert.match(plainLine(moved.bodyLines[2]), /⧖ 3h 1m 1s · 0 tok/);
+  assert.match(plainLine(moved.bodyLines[2]), /…$/);
+  // The time is yellow while running and grey otherwise.
+  const running = frameOf([card("c1", { title: "t", status: "running", durationMs: 61000 })],
+    { columns: 60, color: true });
+  assert.match(running.bodyLines[0], /\x1b\[33m · ⧖ 1m 1s\x1b\[0m/);
+  const finished = frameOf([card("c1", { title: "t", status: "completed", durationMs: 61000 })],
+    { columns: 60, color: true, view: { follow: false, showCompleted: true } });
+  assert.match(finished.bodyLines[0], /\x1b\[90m · ⧖ 1m 1s\x1b\[0m/);
+});
+
+test("a retry adds one alert row in yellow and the detail keeps the retry field", () => {
+  const cards = [card("c1", { title: "alpha", status: "failed", retry: { attempt: 2, delayMs: 3000 } })];
+  const list = frameOf(cards);
+  assert.equal(list.bodyLines.length, 4, "title, role, metrics, alert");
+  assert.equal(plainLine(list.bodyLines[3]).slice(2), "↻ 2 · 3s");
+  assert.match(frameOf(cards, { color: true }).bodyLines[3], /\x1b\[33m/);
+  const detail = frameOf(cards, { view: { follow: false, detail: true } });
+  assert.match(plainLine(detail.bodyLines.join("\n")), /retry: 2 \(3s\)/);
+  // No retry object, no alert row; an unknown attempt still names the row.
+  assert.equal(frameOf([card("c1", { title: "alpha", status: "failed" })]).bodyLines.length, 3);
+  const unknown = frameOf([card("c1", { title: "alpha", status: "failed",
+    retry: { attempt: null, delayMs: null } })]);
+  assert.match(plainLine(unknown.bodyLines[3]), /^ ▌↻ \? · \?$/);
 });
 
 test("`d` expands only the selected card's record and never changes the selection", () => {
   const cards = [card("c1", { title: "alpha", status: "running", currentTool: "read",
-    lastIntent: "reading", lastOutput: "ok", retry: { attempt: 2, delayMs: 3000 } }),
+    lastIntent: "reading", lastOutput: "ok", durationMs: 65000,
+    retry: { attempt: 2, delayMs: 3000 } }),
     card("c2", { title: "beta", status: "pending" })];
   const view = { follow: false, selection: "c1" };
-  const list = frameOf(cards, { view });
-  const detail = frameOf(cards, { view: { ...view, detail: true } });
+  const tall = { rows: 14 };
+  const list = frameOf(cards, { ...tall, view });
+  const detail = frameOf(cards, { ...tall, view: { ...view, detail: true } });
   assert.ok(detail.bodyLines.length > list.bodyLines.length);
   assert.deepEqual(detail.selectable, list.selectable);
   assert.equal(detail.selection, "c1");
-  const joined = detail.bodyLines.join("\n");
+  const joined = plainLine(detail.bodyLines.join("\n"));
   for (const field of ["id: c1", "agent: subagent", "status: running", "tool: read",
-    "intent: reading", "last output: ok", "retry: 2 (3s)"]) {
+    "intent: reading", "last output: ok", "cost: ?", "⧖ 1m 5s", "retry: 2 (3s)"]) {
     assert.ok(joined.includes(field), `detail shows ${field}: ${joined}`);
   }
-  // Only the selected card grows: the other card keeps its two rows.
-  assert.equal(detail.ranges.c2.end - detail.ranges.c2.start, 2);
+  // Only the selected card grows: the other card keeps its three rows.
+  assert.equal(detail.ranges.c2.end - detail.ranges.c2.start, 3);
   assert.ok(detail.ranges.c1.end - detail.ranges.c1.start > list.ranges.c1.end - list.ranges.c1.start);
   // A detail view with no explicit selection still resolves to the newest card, and `d`
   // again restores the list frame exactly (the toggle is symmetric).
-  const fallback = frameOf(cards, { view: { follow: false, detail: true } });
+  const fallback = frameOf(cards, { ...tall, view: { follow: false, detail: true } });
   assert.equal(fallback.selection, "c1");
   assert.notEqual(fallback.text, list.text);
-  assert.equal(frameOf(cards, { view: { follow: false, detail: false } }).text, list.text);
+  assert.equal(frameOf(cards, { ...tall, view: { follow: false, detail: false } }).text, list.text);
   // An absent field is the unknown label, not the string "undefined", and no retry row
   // appears when the card carries none.
-  const bare = frameOf([card("c1", { status: "failed" })], { view: { follow: false, detail: true } });
-  assert.match(bare.bodyLines.join("\n"), /intent: \?/);
-  assert.doesNotMatch(bare.bodyLines.join("\n"), /undefined/);
-  assert.doesNotMatch(bare.bodyLines.join("\n"), /retry:/);
-  // A retry with an unknown attempt still names the row.
-  const retry = frameOf([card("c1", { retry: { attempt: null, delayMs: null } })],
+  const bare = frameOf([card("c1", { title: "alpha", status: "failed" })],
     { view: { follow: false, detail: true } });
-  assert.match(retry.bodyLines.join("\n"), /retry: \?/);
+  assert.match(plainLine(bare.bodyLines.join("\n")), /intent: \?/);
+  assert.doesNotMatch(plainLine(bare.bodyLines.join("\n")), /undefined/);
+  assert.doesNotMatch(plainLine(bare.bodyLines.join("\n")), /retry:/);
 });
 
-test("a selected card is marked and the selection resolves against the newest card", () => {
+test("a selected card is marked in column 0 and the selection resolves against drawn cards", () => {
   const cards = [card("c1", { title: "newest" }), card("c2", { title: "older" })];
-  const frame = (selection) => frameOf(cards, { view: { follow: false, selection } });
+  const frame = (selection, options = {}) => frameOf(cards, { view: { follow: false, selection }, ...options });
   assert.equal(frame("c2").selection, "c2");
   // Each running card is three rows, so the second card's title is bodyLines[3].
   assert.equal(frame("c2").bodyLines[0][0], " ", "an unselected card carries no marker");
@@ -354,6 +471,11 @@ test("a selected card is marked and the selection resolves against the newest ca
   assert.equal(frame(null).selection, "c1");
   assert.equal(frame(7).selection, "c1");
   assert.equal(frame("").selection, "c1");
+  // A hidden completed card is not a selectable id until it is selected or shown.
+  const hidden = frameOf([card("c1", { status: "completed" }),
+    card("c2", { title: "newest" })], { view: { follow: false, selection: "gone" } });
+  assert.equal(hidden.selection, "c2");
+  assert.deepEqual(hidden.selectable, ["c2"]);
   // Duplicate and empty ids are collapsed so one id names exactly one card.
   const dupes = frameOf([card("c1"), card("c1"), card(""), card("c2")]);
   assert.deepEqual(dupes.selectable, ["c1", "c2"]);
@@ -382,22 +504,23 @@ test("Tab/n/p step the selection and clamp at both ends", () => {
 });
 
 test("scrolling is clamped to the body and follow ON pulls the selection back", () => {
-  // Completed cards auto-fold to one row each: ten cards, ten body rows.
+  // One-row running cards make the body math exact: ten cards, ten body rows.
   const cards = Array.from({ length: 10 }, (_, index) =>
-    card(`c${index + 1}`, { title: `card ${index + 1}`, status: "completed" }));
+    card(`c${index + 1}`, { title: `card ${index + 1}`, status: "running", agent: "",
+      tokens: null, toolCount: null, contextPercent: null }));
   const wide = { columns: 40, rows: 8, color: false, language: "en", footer: ["F"] };
-  const bodyRows = 8 - 1 - 1 - 1;
+  const bodyRows = 8 - 2 - 1 - 1;
   const far = renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: 99 } });
   assert.equal(far.bodyRows, bodyRows);
   assert.equal(far.maxScroll, 10 - bodyRows);
   assert.equal(far.scroll, far.maxScroll, "a scroll past the end is clamped");
   assert.equal(far.lines.length, 8);
-  assert.ok(far.bodyLines[far.scroll].includes("card 6"));
+  assert.ok(far.bodyLines[far.scroll].includes("card 7"));
   assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: -4 } }).scroll, 0);
   // A mistyped scroll is clamped to a number, never NaN, so the frame's own scroll can
   // be persisted straight back to disk ("9" is read as 9 and then clamped to the end).
   assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: "9" } }).scroll,
-    5);
+    6);
   for (const scroll of [NaN, {}, [], undefined]) {
     assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll } }).scroll, 0,
       JSON.stringify(scroll));
@@ -424,10 +547,11 @@ test("scrolling is clamped to the body and follow ON pulls the selection back", 
 
 test("stepSelection scrolls the newly selected card into the visible window", () => {
   const cards = Array.from({ length: 10 }, (_, index) =>
-    card(`c${index + 1}`, { title: `card ${index + 1}`, status: "completed" }));
+    card(`c${index + 1}`, { title: `card ${index + 1}`, status: "running", agent: "",
+      tokens: null, toolCount: null, contextPercent: null }));
   const options = { columns: 40, rows: 6, color: false, language: "en", footer: ["F"] };
   let current = renderWorkers(projection(cards), { ...options, view: { follow: false, selection: "c1" } });
-  assert.equal(current.bodyRows, 3);
+  assert.equal(current.bodyRows, 2);
   const seen = [];
   for (let step = 0; step < 9; step++) {
     const next = stepSelection(current, 1);
@@ -455,9 +579,10 @@ test("stepSelection scrolls the newly selected card into the visible window", ()
 test("the caller's footer rows are appended verbatim and are the only rows allowed to overflow", () => {
   const footer = ["Follow ON · LIVE", "second footer row"];
   const frame = frameOf([card("c1")], { language: "ko", rows: 8, footer });
-  assert.deepEqual(frame.lines.slice(-2), footer);
-  assert.equal(frame.bodyStart, 1);
-  assert.equal(frame.bodyRows, 8 - 1 - 1 - 2);
+  // The inset is one cell when it fits, and sits outside the colour sequence.
+  assert.deepEqual(frame.lines.slice(-2), [" Follow ON · LIVE", " second footer row"]);
+  assert.equal(frame.bodyStart, 2, "header + divider are above the body");
+  assert.equal(frame.bodyRows, 8 - 2 - 1 - 2);
   // The renderer never invents, wraps or truncates a footer row: a 200-cell row stays
   // one row, even at one column.
   const long = "F".repeat(200);
@@ -466,38 +591,39 @@ test("the caller's footer rows are appended verbatim and are the only rows allow
   assert.equal(narrow.lines.at(-1), long);
   // An explicitly empty footer is honoured; a non-string entry cannot break the frame.
   assert.equal(frameOf([card("c1")], { rows: 6, footer: [] }).lines.at(-1),
-    "─".repeat(79), "with no footer rows the divider is last");
-  const odd = frameOf([card("c1")], { rows: 6, footer: [null, "ok"] });
-  assert.equal(odd.lines.at(-1), "ok");
+    "─".repeat(79), "with no footer rows the bottom divider is last");
+  assert.equal(frameOf([card("c1")], { rows: 6, footer: [null, "ok"] }).lines.at(-1), " ok");
   // A control sequence in a caller's footer row cannot repaint the pane.
   const escaped = frameOf([card("c1")], { rows: 6, footer: ["\x1b[2Jgone"] });
-  assert.equal(escaped.lines.at(-1), "gone");
+  assert.equal(escaped.lines.at(-1), " gone");
+  // The footer divider is the OMO dim divider (ANSI 2), not the Todo grey (90).
+  const colored = frameOf([card("c1")], { rows: 6, footer: ["F"], color: true });
+  assert.equal(colored.lines[1], "\x1b[2m" + "─".repeat(79) + "\x1b[0m");
+  assert.equal(colored.lines.at(-2), "\x1b[2m" + "─".repeat(79) + "\x1b[0m");
 });
 
-test("the header tallies the cards and the background marker rides on the card", () => {
+test("the header is `Workers [done/total]` with an always-present run count and the fold mark", () => {
   const cards = [card("c1", { title: "foreground", status: "running" }),
     card("c2", { title: "detached", status: "running", background: true }),
     card("c3", { title: "broken", status: "failed" }),
     card("c4", { title: "stopped", status: "aborted" }),
-    card("c5", { title: "done", status: "completed" })];
-  // The failed and aborted tallies stay apart (AC2.2), and a status with no card is
-  // not tallied at all.
-  const ko = frameOf(cards, { language: "ko", columns: 100, rows: 20, view: { follow: false, showCompleted: true } });
-  assert.equal(ko.lines[0], "Workers [5]  running 2 · failed 1 · aborted 1 · done 1");
-  const en = frameOf(cards, { language: "en", columns: 100, rows: 20, view: { follow: false, showCompleted: true } });
-  assert.equal(en.lines[0], "Workers [5]  running 2 · failed 1 · aborted 1 · done 1");
-  const zh = frameOf(cards, { language: "zh-cn", columns: 100, rows: 20, view: { follow: false, showCompleted: true } });
-  assert.equal(zh.lines[0], "Workers [5]  Running 2 · Failed 1 · Aborted 1 · Done 1"
-    .replace("Running", "运行中").replace("Failed", "失败").replace("Aborted", "已中止").replace("Done", "已完成"));
-  // A single-card projection says so, without an empty tally tail.
-  assert.equal(frameOf([card("c1", { status: "paused" })]).lines[0], "Workers [1]  paused 1");
-  assert.equal(frameOf([], { rows: 4 }).lines[0], "Workers [0]");
-  // The background marker rides on the card that has it (AC2.6).
-  assert.match(ko.bodyLines[3], /\[background\]/);
-  // A bare background label (or any form) must never leak onto a foreground row.
-  assert.doesNotMatch(ko.bodyLines[0], /background/);
-  assert.match(en.bodyLines[3], /\[background\]/);
-  assert.match(zh.bodyLines[3], /\[后台\]/);
+    card("c5", { title: "finished", status: "completed" })];
+  // The failed and aborted tallies stay apart (AC2.2); `run` is always present.
+  const ko = frameOf(cards, { language: "ko", columns: 100, rows: 20,
+    view: { follow: false, showCompleted: true } });
+  assert.equal(ko.lines[0], " Workers [1/5]  run 2 · failed 1 · aborted 1 · done 1 ▾");
+  const en = frameOf(cards, { language: "en", columns: 100, rows: 20,
+    view: { follow: false, showCompleted: true } });
+  assert.equal(en.lines[0], ko.lines[0]);
+  const zh = frameOf(cards, { language: "zh-cn", columns: 100, rows: 20,
+    view: { follow: false, showCompleted: true } });
+  assert.equal(zh.lines[0], " Workers [1/5]  运行 2 · 失败 1 · 中止 1 · 完成 1 ▾");
+  // Fold mark off by default; a single-card projection says run 0.
+  assert.equal(frameOf(cards, { columns: 100, rows: 20 }).lines[0],
+    " Workers [1/5]  run 2 · failed 1 · aborted 1 · done 1 ▸");
+  assert.equal(frameOf([card("c1", { status: "paused" })]).lines[0],
+    " Workers [0/1]  run 0 · paused 1");
+  assert.equal(frameOf([], { rows: 6 }).lines[0], " Workers [0/0]  run 0");
   // A card with no title falls back to its agent and then to its id, never a blank row.
   const bare = frameOf([card("c9", { title: "", agent: "", status: "pending" })]);
   assert.match(bare.bodyLines[0], /c9/);
@@ -505,11 +631,30 @@ test("the header tallies the cards and the background marker rides on the card",
   assert.match(agent.bodyLines[0], /explorer/);
 });
 
+test("the header name is bold cyan in every state, the tally is bold yellow, the summary dim", () => {
+  const frame = frameOf([card("c1")], { columns: 60, color: true });
+  assert.ok(frame.lines[0].startsWith(" \x1b[1;36mWorkers\x1b[0m \x1b[1;33m["));
+  // A disconnected pane keeps the same header colours (the link colours the footer).
+  const offline = frameOf([card("c1")], { columns: 60, color: true,
+    connection: { kind: "disconnected", at: 0 } });
+  assert.ok(offline.lines[0].startsWith(" \x1b[1;36mWorkers\x1b[0m \x1b[1;33m["));
+});
+
+test("the spinner cycles the ten OMO frames and normalises a bad spin value", () => {
+  const glyph = (spin) => plainLine(frameOf([card("c1", { title: "spin", status: "running" })],
+    { spin }).bodyLines[0])[2];
+  for (let frame = 0; frame < SPINNER.length; frame++) assert.equal(glyph(frame), SPINNER[frame]);
+  assert.equal(glyph(10), SPINNER[0], "ten frames wrap");
+  assert.equal(glyph(-1), SPINNER[9], "a negative frame wraps backwards");
+  assert.equal(glyph(1.5), SPINNER[0], "a non-integer falls back to frame 0");
+  assert.deepEqual([...SPINNER], ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
+});
+
 test("color only wraps already-sized runs, so it never changes a row width", () => {
   const cards = STATUSES.map((status) => card(status, { title: `${status} card`, status,
     durationMs: 61000, toolCount: 2, tokens: 40, contextPercent: 12.5, cost: 0.5 }));
-  const options = { columns: 54, rows: 20, language: "ko", view: { follow: false, detail: true },
-    footer: ["Follow ON · LIVE"] };
+  const options = { columns: 54, rows: 20, language: "ko",
+    view: { follow: false, showCompleted: true }, footer: ["Follow ON · LIVE"] };
   const plain = renderWorkers(projection(cards), { ...options, color: false });
   const colored = renderWorkers(projection(cards), { ...options, color: true });
   assert.equal(plain.lines.length, colored.lines.length);
@@ -519,7 +664,7 @@ test("color only wraps already-sized runs, so it never changes a row width", () 
     assert.equal(width(line), width(plain.lines[index]), `row ${index} width`);
     assert.ok(line.endsWith("\x1b[0m"), `row ${index} closes its colour`);
   }
-  // `render` is exactly the frame `renderWorkers(...).text`.
+  // `text` is exactly the frame `lines`.
   assert.equal(plain.text, plain.lines.join("\n"));
   assert.ok(!plain.text.includes("\x1b["));
 });
@@ -537,7 +682,7 @@ test("a hostile title or field cannot break the frame, and every row is still si
     assert.ok(!frame.lines.some((line) => line.includes("\n")));
     for (const line of frame.lines.slice(0, -1)) assert.ok(width(line) <= columns - 1, JSON.stringify(line));
     // The cleaned title is still readable rather than dropped.
-    assert.match(frame.lines[1], /한글 제목/);
+    assert.match(frame.bodyLines[0], /한글 제목/);
   }
 });
 
@@ -546,18 +691,21 @@ test("the narrow fallback keeps the caller's footer and never claims an unknown 
   for (const [columns, rows] of [[12, 4], [1, 2], [40, 3]]) {
     const narrow = renderWorkers(odd, { columns, rows, color: false, language: "en", footer: ["F"] });
     assert.equal(narrow.lines.length, rows, `${columns}x${rows}`);
-    assert.equal(narrow.lines.at(-1), "F");
+    const expected = width("F") + 1 <= Math.max(1, columns - 1) ? " F" : "F";
+    assert.equal(narrow.lines.at(-1), expected);
     assert.equal(narrow.bodyRows, 0);
     assert.equal(narrow.maxScroll, 0);
     assert.equal(narrow.scroll, 0);
   }
-  // An unknown status is a localized word, never a blank or a crash.
-  const wide = renderWorkers(odd, { columns: 60, rows: 5, color: false, language: "en",
+  // An unknown status is a localized word and the `?` glyph, never a blank or a crash.
+  const wide = renderWorkers(odd, { columns: 60, rows: 8, color: false, language: "en",
     view: { detail: true, follow: false }, footer: ["F"] });
+  assert.equal(plainLine(wide.bodyLines[0])[2], "?");
   assert.match(wide.bodyLines[0], /unknown/);
   assert.match(wide.bodyLines.join("\n"), /status: unknown/);
   assert.equal(width(wide.bodyLines[0]), width(stripVTControlCharacters(wide.bodyLines[0])));
-  // The renderer leans on the shared primitives rather than its own copies.
+  // The renderer leans on the shared primitives rather than its own copies (Todo keeps
+  // the default `~` mark; the Workers renderer passes `…` explicitly).
   assert.equal(fit("한글A", 4), "한~");
   assert.deepEqual(wrap("가나다라마바사", 6), ["가나다", "라마바", "사"]);
 });

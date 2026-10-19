@@ -1,14 +1,16 @@
 // Workers viewer frame renderer for the GJC Herdr dashboard.
 //
-// Adapted from omo-herdr-dashboard @4082c750 `packages/dag/src/render.mjs`, which is
-// the card layout this pane mirrors; the frame skeleton (header, body, divider,
-// caller-supplied footer), the sizing primitives and the
-// scroll/selection contract follow src/viewers/todo/render.mjs so both roles are one
-// shape. Kept from omo: the card idea (a status glyph and title row, a context row,
-// a metrics row), the compact duration vocabulary and the rule that no drawn row
-// exceeds the pane width. Removed: the DAG graph and run selector, the model/effort
-// badge, the box drawing, the descendant indentation and every string that belongs
-// to omo's own projection.
+// Re-aligned with omo-herdr-dashboard @3242ad4 `packages/dag/src/render.mjs`: the
+// pane starts with the OMO header row (` Work [done/total]  summary`) and a divider
+// under it, a worker card is the OMO three-row card (bar, spinner/title row; role
+// row; metrics row), completed cards fold behind the header's `done N ▸` mark, and
+// the empty pane is the OMO empty shape (`  ○  No workers yet` plus two hint rows).
+// The GJC safety rules stay: the footer is caller-supplied and never truncated
+// (AC-F1/AC-F3), the five connection labels stay pairwise distinct (AC1.9), failed
+// and aborted stay apart in glyph, word and colour (AC2.2), the background mark
+// rides on card row 2 (AC2.6), and an unknown cost is never printed as `$0.0000`
+// (K1: the host reports 0 for subscription models, indistinguishable from "never
+// measured", so the renderer prints the localized unknown label instead).
 //
 // The input is the shared workers projection contract
 // (`gjc-herdr-dashboard/workers/1`):
@@ -18,50 +20,59 @@
 //       startedAt, endedAt }] }   // newest first, at most 50 per scope
 // with `status` exactly one of pending | running | completed | failed | aborted | paused.
 //
-// A card is at most three rows:
-//   row 1  `<marker><glyph> <title><status label>` — always, folded or not. The
-//          status suffix is reserved before the title is sized, so the title
-//          truncates first and never pushes the status off the pane (AC-F4: title
-//          and status both survive 24 columns).
-//   row 2  current tool · last intent · last output — when the card is expanded or
-//          running, because a finished card's last words are noise.
-//   row 3  metrics — tools, tokens, context%, cost, duration, in that order so the
-//          cheaper-to-earn numbers survive a narrow pane. An unknown context or an
-//          unknown cost renders the localized unknown label (K1: the host reports 0
-//          for subscription models, which is indistinguishable from "never
-//          measured", so the source maps it to null and this renderer refuses to
-//          print a confident "$0.0000").
-// A completed card auto-folds to row 1 unless `expanded[id]` is true or
-// `showCompleted` is set. A failed card and an aborted card never fold, and they
-// differ both visually (`✗` vs `⊘`) and textually (two localized words, AC2.2).
+// Card rows (GRAMMAR G7/G8):
+//   row 1  column 0 is the selection marker, then the status bar (only on a
+//          multi-row card), the glyph, the title, the Q3=A word for the non-running
+//          states and the elapsed time. The word and time are reserved before the
+//          title is sized; when the title would keep fewer than 10 cells the time
+//          moves to the front of row 3 (OMO `:409-410`).
+//   row 2  `[agent]` in magenta plus ` background` in dim, left out when empty.
+//   row 3  `48K tok · 12 tools · ctx 41%` in grey; each part is omitted when the
+//          projection has no finite value for it.
+//   row 4  the retry alert `↻ 2 · 3s` in yellow, only when `retry` is an object.
+// Cost, tool, intent, last output and the exact duration live in the `d` detail
+// view of the selected card.
+//
+// Completed cards are not drawn unless `showCompleted` is set (then row 1 only) or
+// their `expanded[id]` flag is true (then the full card). A selected card that
+// completes stays drawn while it is selected, so Space never acts on an invisible
+// card. Failed and aborted cards never fold.
 //
 // The footer rows arrive already final from the caller: this module never invents
 // footer text and never truncates it, so the follow token and the connection label
-// (AC-F1, AC-F3) are the caller's contract. `color` only wraps already-sized runs in
-// SGR sequences, so it can never change a row width.
+// (AC-F1, AC-F3) are the caller's contract. `connection` is the caller's live link
+// object `{ kind, at }`; it outranks the state derived from the projection, because
+// only the viewer knows about owner liveness and an unreadable slot. `color` only
+// wraps already-sized runs in SGR sequences, so it can never change a row width.
 //
 // MIT License, Copyright (c) 2026 omo-herdr-dag contributors (see PROVENANCE.md).
 //
 // Exported signatures
 //   renderWorkers(projection, options?): Frame
 //   stepSelection(frame, delta): { selection, scroll }
+//   SPINNER: readonly string[]                  // the ten OMO spinner frames
 //
 // Frame = { text, lines, bodyLines, ranges, selectable, selection, scroll, maxScroll,
 //           bodyStart, bodyRows, empty, connection }
-// `options` = { columns, rows, color, language, now, view, footer }
+// `options` = { columns, rows, color, language, now, spin, connection, view, footer }
 // `view`    = { scroll, follow, selection, expanded, showCompleted, detail }
-import { clean, fit, languageOf, t, width } from "../common.mjs";
+import { clean, compactCount, fit, languageOf, t, width } from "../common.mjs";
 
 const layout = { fallbackColumns: 16, fallbackRows: 3 };
-// failed is red, aborted is magenta and paused is yellow, so the three non-grey
-// non-completed states stay apart in colour as well as in glyph and in word.
+// OMO packages/dag/src/render.mjs:77-80. A running card cycles one frame per 125 ms
+// tick; every other state keeps one glyph.
+export const SPINNER = Object.freeze(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
+const marks = { pending: "○", running: SPINNER[0], completed: "✓", failed: "×",
+  aborted: "⊘", paused: "Ⅱ", unknown: "?" };
+// OMO :86-91: status colours, the magenta role badge, the yellow time (also the
+// paused/failed-to-connect warning colour) and dim for dividers and secondary rows.
 const style = { accent: "36", pending: "90", running: "36", completed: "32", failed: "31",
-  aborted: "35", paused: "33", unknown: "31", muted: "90" };
-const marks = { pending: "○", running: "◐", completed: "✓", failed: "✗",
-  aborted: "⊘", paused: "Ⅱ" };
+  aborted: "35", paused: "33", unknown: "31", muted: "90", badge: "35", time: "33", dim: "2" };
 // Header tally order: running first because it is why the pane exists, then the two
-// failure states kept apart (AC2.2), then paused, then the completed total.
-const tallied = ["running", "failed", "aborted", "paused", "completed"];
+// failure states kept apart (AC2.2), then paused, then the completed group.
+const tallied = ["running", "failed", "aborted", "paused"];
+const worded = new Set(["pending", "failed", "aborted", "paused", "unknown"]);
+const connections = new Set(["live", "waiting", "empty", "disconnected", "source-error"]);
 
 const paint = (text, token, enabled, heading = false) => enabled && style[token]
   ? `\x1b[${heading ? "1;" : ""}${style[token]}m${text}\x1b[0m` : text;
@@ -83,8 +94,16 @@ const expandedFlag = (expanded, id) => Boolean(expanded && typeof expanded === "
 // One caller-supplied footer entry stays exactly one row: control sequences are
 // stripped and an embedded newline becomes a space, but nothing is ever cut.
 const row = (line) => clean(line).replaceAll("\n", " ");
-const divider = (columns, color) => paint("─".repeat(columns), "muted", color);
-const inset = (line, columns, color) => paint(fit(`  ${line}`, columns), "muted", color);
+const divider = (columns, color) => paint("─".repeat(columns), "dim", color);
+const inset = (line, columns, color) => paint(fit(`  ${line}`, columns, false, "…"), "muted", color);
+
+// A running card cycles the ten OMO frames; a non-integer or negative value is
+// normalised instead of crashing or reaching past the table.
+const glyphOf = (status, spin) => {
+  if (status !== "running") return marks[status] ?? marks.unknown;
+  const frame = Number.isInteger(spin) ? spin : 0;
+  return SPINNER[((frame % SPINNER.length) + SPINNER.length) % SPINNER.length];
+};
 
 function compactDuration(language, ms) {
   const seconds = Math.max(0, Math.floor(ms / 1000));
@@ -105,8 +124,7 @@ function durationOf(card, now) {
 }
 
 // "$0.0123", or null for a value that is absent, negative or zero. A reported 0 is
-// exactly the K1 ambiguity (the host returns 0 for subscription models), so it must
-// never be painted as a confident "$0.0000".
+// exactly the K1 ambiguity, so it is rendered as the localized unknown label.
 const formatCost = (value) =>
   (Number.isFinite(value) && value > 0 ? `$${value.toFixed(4)}` : null);
 
@@ -129,48 +147,27 @@ const resolveSelection = (selectable, requested) =>
 const connectionOf = ({ sourceError, waiting, empty }) =>
   (sourceError ? "source-error" : waiting ? "waiting" : empty ? "empty" : "live");
 
-function metricsText(card, language, now) {
-  const percent = Number.isFinite(card?.contextPercent) && card.contextPercent >= 0
-    ? String(Math.round(card.contextPercent)) : unknown(language);
-  const cost = formatCost(card?.cost);
-  return [
-    t(language, "workers.metrics.tools", { count: count(card?.toolCount) }),
-    t(language, "workers.metrics.tokens", { count: count(card?.tokens) }),
-    t(language, "workers.metrics.context", { percent }),
-    t(language, "workers.metrics.cost", { cost: cost ?? unknown(language) }),
-    t(language, "workers.metrics.duration",
-      { duration: compactDuration(language, durationOf(card, now)) }),
-  ].join(" · ");
+// Row 3 (also reused by the detail view): tokens, tools and context only. Each part
+// is omitted when the projection has no finite value; cost and duration are not
+// repeated here because they live on their own detail rows.
+function metricsText(card, language) {
+  const parts = [];
+  if (Number.isFinite(card?.tokens)) {
+    parts.push(t(language, "workers.metrics.tokens", { count: compactCount(card.tokens) }));
+  }
+  if (Number.isFinite(card?.toolCount)) {
+    parts.push(t(language, "workers.metrics.tools", { count: count(card.toolCount) }));
+  }
+  if (Number.isFinite(card?.contextPercent) && card.contextPercent >= 0) {
+    parts.push(t(language, "workers.metrics.context",
+      { percent: Math.round(card.contextPercent) }));
+  }
+  return parts.join(" · ");
 }
-
-// Row 1. The status suffix is reserved first so the title is the only element that
-// can truncate, and when even the suffix does not fit the row degrades to a single
-// coloured strip that keeps the glyph, the status word and whatever title fits.
-function titleRow(card, { columns, color, language, selection }) {
-  const status = statusOf(card?.status);
-  const marker = String(card?.id ?? "") !== "" && String(card.id) === selection ? ">" : " ";
-  const glyph = marks[status];
-  const badge = card?.background === true ? ` [${t(language, "workers.background")}]` : "";
-  const suffix = ` ${statusLabel(language, status)}${badge}`;
-  const name = text(card?.title) || text(card?.agent) || text(card?.id);
-  const room = columns - width(`${marker}${glyph} `) - width(suffix);
-  if (room < 1) return paint(fit(`${marker}${glyph} ${name}${suffix}`, columns), status, color);
-  const head = `${marker === ">" ? paint(">", "running", color, true) : " "}` +
-    `${paint(glyph, status, color, true)} `;
-  return `${head}${paint(fit(name, room), "accent", color, true)}${paint(suffix, status, color)}`;
-}
-
-// Row 2: what the card is doing right now. It is drawn when the card is expanded or
-// running (the contract's two conditions); a card that merely never folds — failed,
-// aborted, paused, pending — gains its reason from `d` instead. Unlabelled because the
-// parts are self-describing (a tool token, then prose) and a narrow pane cannot
-// afford labels.
-const contextText = (card) =>
-  [text(card?.currentTool), text(card?.lastIntent), text(card?.lastOutput)]
-    .filter(Boolean).join(" · ");
 
 // The detail view (`d`, never persisted) is the selected card's full record, one
-// field per row. It reuses the same metric row as the list so the numbers cannot drift.
+// field per row, two cells in and muted. It is the only place cost, the current
+// tool, the intent, the last output and the exact duration are printed.
 function detailRows(card, { columns, color, language, now }) {
   const value = (raw) => text(raw) || unknown(language);
   const rows = [
@@ -180,10 +177,14 @@ function detailRows(card, { columns, color, language, now }) {
     `${t(language, "workers.field.tool")}: ${value(card?.currentTool)}`,
     `${t(language, "workers.field.intent")}: ${value(card?.lastIntent)}`,
     `${t(language, "workers.field.output")}: ${value(card?.lastOutput)}`,
-    metricsText(card, language, now),
   ];
+  const metrics = metricsText(card, language);
+  if (metrics) rows.push(metrics);
+  rows.push(`${t(language, "workers.field.cost")}: ${formatCost(card?.cost) ?? unknown(language)}`);
+  rows.push(`⧖ ${t(language, "workers.metrics.duration",
+    { duration: compactDuration(language, durationOf(card, now)) })}`);
   const retry = card?.retry;
-  if (retry && typeof retry === "object") {
+  if (retry && typeof retry === "object" && !Array.isArray(retry)) {
     const attempt = Number.isFinite(retry.attempt) ? String(retry.attempt) : unknown(language);
     const delay = Number.isFinite(retry.delayMs)
       ? ` (${compactDuration(language, Math.max(0, retry.delayMs))})` : "";
@@ -192,21 +193,101 @@ function detailRows(card, { columns, color, language, now }) {
   return rows.map((line) => inset(line, columns, color));
 }
 
-// Body rows for every card, in projection order. Each card keeps its row range so a
-// caller can scroll the selected card into view without re-deriving the fold rules.
-function body(cards, { columns, color, language, now, view, selection }) {
+// One card, in the OMO three-row grammar plus the retry alert. The bar spans every
+// drawn row of a multi-row card; a one-row card gets a space, so a folded completed
+// card has no bar (OMO `:507-511`). The marker is column 0 and the bar column 1;
+// rows after the title keep both columns so the card edge stays straight.
+function cardLines(card, { columns, color, language, now, spin, selected, expanded }) {
+  const status = statusOf(card?.status);
+  const name = text(card?.title) || text(card?.agent) || text(card?.id);
+  const oneRow = status === "completed" && !expanded;
+  const word = worded.has(status) ? ` · ${statusLabel(language, status)}` : "";
+  const elapsed = `⧖ ${compactDuration(language, durationOf(card, now))}`;
+  const timeSuffix = ` · ${elapsed}`;
+  const timeToken = status === "running" ? "time" : "muted";
+  const agent = text(card?.agent);
+  const background = card?.background === true;
+  const hasAgentRow = !oneRow && Boolean(agent || background);
+  const metrics = metricsText(card, language);
+  const retry = card?.retry && typeof card.retry === "object" && !Array.isArray(card.retry)
+    ? card.retry : null;
+  const alert = !oneRow && retry
+    ? t(language, "workers.retry", {
+      attempt: Number.isFinite(retry.attempt) ? String(retry.attempt) : unknown(language),
+      delay: Number.isFinite(retry.delayMs)
+        ? compactDuration(language, Math.max(0, retry.delayMs)) : unknown(language),
+    })
+    : "";
+  const room = columns - 2; // selection marker + status bar
+  // OMO `:409-410`: the time ends the title row only when the title keeps at least
+  // ten cells (or its whole short self); otherwise it leads row 3.
+  const titleRoomWithTime = room - 2 - width(word) - width(timeSuffix);
+  const timeInTitle = titleRoomWithTime >= Math.min(width(name), 10);
+  const titleRoom = timeInTitle ? titleRoomWithTime : room - 2 - width(word);
+  const statsRow = !oneRow && (metrics !== "" || !timeInTitle);
+  const multiRow = hasAgentRow || statsRow || Boolean(alert);
+  const bar = paint(multiRow ? "▌" : " ", status, color);
+  const marker = selected ? paint(">", "accent", color, true) : " ";
+  // Even the status word does not fit: keep the existing single coloured strip
+  // (still fitted to the pane with the Workers `…` mark).
+  if (titleRoom < 1) {
+    return [paint(fit(`${marker}${bar}${glyphOf(status, spin)} ${name}${word}`, columns, false, "…"),
+      status, color)];
+  }
+  const lines = [
+    `${marker}${bar}${paint(glyphOf(status, spin), status, color, true)} ` +
+    `${paint(fit(name, titleRoom, false, "…"), status, color, selected)}` +
+    `${paint(word, status, color)}` +
+    (timeInTitle ? paint(timeSuffix, timeToken, color) : ""),
+  ];
+  if (hasAgentRow) {
+    const rowRoom = columns - 2;
+    let content;
+    if (agent) {
+      const badge = `[${agent}]`;
+      const tail = background ? ` ${t(language, "workers.background")}` : "";
+      const badgeRoom = rowRoom - width(tail);
+      if (badgeRoom < 1) {
+        content = paint(fit(badge, rowRoom, false, "…"), "badge", color);
+      } else {
+        const fittedBadge = fit(badge, badgeRoom, false, "…");
+        const fittedTail = tail ? fit(tail, rowRoom - width(fittedBadge), false, "…") : "";
+        content = `${paint(fittedBadge, "badge", color)}${paint(fittedTail, "dim", color)}`;
+      }
+    } else {
+      content = paint(fit(t(language, "workers.background"), rowRoom, false, "…"), "dim", color);
+    }
+    lines.push(` ${bar}${content}`);
+  }
+  if (statsRow) {
+    const plain = [timeInTitle ? "" : elapsed, metrics].filter(Boolean).join(" · ");
+    const fitted = fit(plain, columns - 2, false, "…");
+    if (!timeInTitle && fitted.startsWith(elapsed)) {
+      const rest = fitted.slice(elapsed.length);
+      lines.push(` ${bar}${paint(elapsed, timeToken, color)}` +
+        `${rest ? paint(rest, "muted", color) : ""}`);
+    } else {
+      lines.push(` ${bar}${paint(fitted, "muted", color)}`);
+    }
+  }
+  if (alert) {
+    lines.push(` ${bar}${paint(fit(alert, columns - 2, false, "…"), "time", color)}`);
+  }
+  return lines;
+}
+
+// Body rows for every drawn card, in projection order. Each card keeps its row range
+// so a caller can scroll the selected card into view without re-deriving the fold
+// rules; hidden completed cards have no range and are not selectable.
+function body(cards, { columns, color, language, now, spin, view, selection }) {
   const bodyLines = [], ranges = Object.create(null);
   for (const card of cards) {
     const id = String(card?.id ?? "");
     const status = statusOf(card?.status);
     const start = bodyLines.length;
-    bodyLines.push(titleRow(card, { columns, color, language, selection }));
-    const expanded = expandedFlag(view?.expanded, id);
-    const unfolded = status !== "completed" || expanded || view?.showCompleted === true;
-    if (unfolded) {
-      if (expanded || status === "running") bodyLines.push(inset(contextText(card), columns, color));
-      bodyLines.push(inset(metricsText(card, language, now), columns, color));
-    }
+    bodyLines.push(...cardLines(card, { columns, color, language, now, spin, selection,
+      selected: id !== "" && id === selection,
+      expanded: expandedFlag(view?.expanded, id) }));
     if (view?.detail === true && id !== "" && id === selection) {
       bodyLines.push(...detailRows(card, { columns, color, language, now }));
     }
@@ -215,13 +296,25 @@ function body(cards, { columns, color, language, now, view, selection }) {
   return { bodyLines, ranges };
 }
 
-function headerPlain(cards, language) {
-  const title = `${t(language, "workers.title")} [${cards.length}]`;
-  const tally = tallied
-    .map((status) => ({ status, at: cards.filter((card) => statusOf(card?.status) === status).length }))
-    .filter((entry) => entry.at > 0)
-    .map((entry) => `${statusLabel(language, entry.status)} ${entry.at}`);
-  return tally.length ? `${title}  ${tally.join(" · ")}` : title;
+function headerSummary(cards, language, showCompleted) {
+  const at = (status) => cards.filter((card) => statusOf(card?.status) === status).length;
+  const parts = [t(language, "workers.tally.running", { count: at("running") })];
+  for (const status of tallied.slice(1)) {
+    const found = at(status);
+    if (found > 0) parts.push(t(language, `workers.tally.${status}`, { count: found }));
+  }
+  const done = at("completed");
+  if (done > 0) {
+    parts.push(`${t(language, "workers.tally.done", { count: done })} ` +
+      `${showCompleted ? "▾" : "▸"}`);
+  }
+  return parts.join(" · ");
+}
+
+function headerPlain(cards, language, showCompleted) {
+  const done = cards.filter((card) => statusOf(card?.status) === "completed").length;
+  return `${t(language, "workers.title")} [${done}/${cards.length}]  ` +
+    headerSummary(cards, language, showCompleted);
 }
 
 // The body of a projection with nothing to draw: a source error, a source that has
@@ -231,68 +324,108 @@ const emptyLabel = ({ sourceError, waiting }) =>
 
 export function renderWorkers(projection, {
   columns = 80, rows = 24, color = true, language = "ko", now = Date.now(),
-  view = {}, footer = [],
+  spin = 0, connection: link = null, view = {}, footer = [],
 } = {}) {
   const languageCode = languageOf(language);
   // Keep the terminal's final cell free: ConPTY can otherwise wrap a wide glyph.
   columns = Math.max(1, Math.floor(columns) - 1);
   rows = Math.max(1, Math.floor(rows));
   const cards = Array.isArray(projection?.cards) ? projection.cards : [];
-  const selectable = idsOf(cards);
-  const selection = resolveSelection(selectable, view?.selection);
   const sourceError = typeof projection?.sourceError === "string" && projection.sourceError !== ""
     ? projection.sourceError : "";
   const waiting = projection === null || projection === undefined;
   const empty = projection?.empty === true || (cards.length === 0 && !waiting && !sourceError);
-  const connection = connectionOf({ sourceError, waiting, empty });
-  const header = paint(fit(headerPlain(cards, languageCode), columns),
-    connection === "live" || connection === "empty" ? "accent" : "warning", color,
-    connection === "live");
+  // The caller's live link outranks the projection-derived state: only the viewer
+  // knows that the owner is gone or the slot unreadable while the last projection
+  // still looks healthy (todo 5 passes `{ kind, at }`).
+  const derived = connectionOf({ sourceError, waiting, empty });
+  const kind = link && typeof link === "object" && connections.has(link.kind) ? link.kind : derived;
+  const showCompleted = view?.showCompleted === true;
+  const requested = view?.selection;
+  // A completed card stays drawn while it is selected (OMO `:574`), so Space can
+  // always act on the card the marker points at. Failed and aborted never fold.
+  const drawn = cards.filter((card) => {
+    const id = String(card?.id ?? "");
+    const status = statusOf(card?.status);
+    if (status !== "completed") return true;
+    return showCompleted || expandedFlag(view?.expanded, id) ||
+      (typeof requested === "string" && requested !== "" && requested === id);
+  });
+  const selectable = idsOf(drawn);
+  const selection = resolveSelection(selectable, requested);
+
+  const title = t(languageCode, "workers.title");
+  const tally = `[${cards.filter((card) => statusOf(card?.status) === "completed").length}/` +
+    `${cards.length}]`;
+  const summary = headerSummary(cards, languageCode, showCompleted);
+  const edge = columns > 1 ? " " : "";
+  const room = columns - edge.length;
+  const rest = room - width(`${title} ${tally}`) - 2;
+  const header = rest < 0
+    ? `${edge}${paint(fit(`${title} ${tally}`, room, false, "…"), "accent", color, true)}`
+    : `${edge}${paint(title, "accent", color, true)} ${paint(tally, "time", color, true)}` +
+      (rest >= 2 ? `  ${paint(fit(summary, rest, false, "…"), "dim", color)}` : "");
   const errorLine = sourceError
-    ? paint(fit(t(languageCode, "workers.readError", { error: clean(sourceError) }), columns),
-      "failed", color)
+    ? paint(fit(t(languageCode, "workers.readError", { error: clean(sourceError) }),
+      columns, false, "…"), "failed", color)
     : "";
   // The footer is already final and is never truncated, at any width: the follow
   // token and the connection label are the caller's content contract (AC-F1/AC-F3).
-  const footerLines = (Array.isArray(footer) ? footer : []).map((line) =>
-    paint(row(line), connection === "live" ? "accent" : "warning", color));
-  const drawn = body(cards, { columns, color, language: languageCode, now, view, selection });
+  // The inset is added only when it fits; EMPTY is a connected state, so it shares
+  // the live colour, exactly as the OMO footer does.
+  const footerToken = kind === "live" || kind === "empty" ? "accent" : "time";
+  const footerLines = (Array.isArray(footer) ? footer : []).map((line) => {
+    const value = row(line);
+    const prefix = width(value) + 1 <= columns ? " " : "";
+    return `${prefix}${paint(value, footerToken, color)}`;
+  });
+  const drawnBody = body(drawn, { columns, color, language: languageCode, now, spin, view, selection });
   if (cards.length === 0) {
-    drawn.bodyLines.push(paint(fit(t(languageCode, emptyLabel({ sourceError, waiting })), columns),
-      "muted", color));
+    if (sourceError || waiting) {
+      drawnBody.bodyLines.push("", fit(`  ○  ${t(languageCode,
+        emptyLabel({ sourceError, waiting }))}`, columns, false, "…"));
+    } else {
+      drawnBody.bodyLines.push("",
+        fit(`  ○  ${t(languageCode, "workers.emptyBody")}`, columns, false, "…"), "",
+        paint(fit(`  ${t(languageCode, "workers.emptyHint1")}`, columns, false, "…"), "dim", color),
+        paint(fit(`  ${t(languageCode, "workers.emptyHint2")}`, columns, false, "…"), "dim", color));
+    }
   }
 
-  // Only the header, the divider and the caller's footer rows are unconditional.
-  const fixed = 1 + (errorLine ? 1 : 0) + 1 + footerLines.length;
+  // Header + divider are unconditional; the error row and the caller's footer rows
+  // follow their own contracts.
+  const fixed = 2 + (errorLine ? 1 : 0) + 1 + footerLines.length;
   if (columns < layout.fallbackColumns || rows <= layout.fallbackRows || fixed >= rows) {
-    const lead = rows === 1 ? [] : [columns === 1 ? "" : fit(headerPlain(cards, languageCode), columns)];
-    const room = Math.max(0, rows - lead.length);
-    const tail = footerLines.length <= room ? footerLines : footerLines.slice(footerLines.length - room);
+    const lead = rows === 1 ? []
+      : [columns === 1 ? "" : fit(headerPlain(cards, languageCode, showCompleted), columns, false, "…")];
+    const roomLeft = Math.max(0, rows - lead.length);
+    const tail = footerLines.length <= roomLeft ? footerLines
+      : footerLines.slice(footerLines.length - roomLeft);
     while (lead.length + tail.length < rows) lead.push("");
     const lines = [...lead, ...tail];
-    return { text: lines.join("\n"), lines, bodyLines: drawn.bodyLines, ranges: drawn.ranges,
-      selectable, selection, scroll: 0, maxScroll: 0, bodyStart: lines.length - tail.length,
-      bodyRows: 0, empty, connection };
+    return { text: lines.join("\n"), lines, bodyLines: drawnBody.bodyLines,
+      ranges: drawnBody.ranges, selectable, selection, scroll: 0, maxScroll: 0,
+      bodyStart: lines.length - tail.length, bodyRows: 0, empty, connection: kind };
   }
 
   const bodyRows = rows - fixed;
-  const maxScroll = Math.max(0, drawn.bodyLines.length - bodyRows);
+  const maxScroll = Math.max(0, drawnBody.bodyLines.length - bodyRows);
   let scroll = clamp(view?.scroll, maxScroll);
   // follow ON pulls the selected card back into the window; follow OFF (a manual j/k)
   // leaves the scroll exactly where the caller asked for it.
-  const range = drawn.ranges[selection];
+  const range = drawnBody.ranges[selection];
   if (view?.follow !== false && range && (range.start < scroll || range.start >= scroll + bodyRows)) {
     scroll = clamp(range.start, maxScroll);
   }
-  const visible = drawn.bodyLines.slice(scroll, scroll + bodyRows);
+  const visible = drawnBody.bodyLines.slice(scroll, scroll + bodyRows);
   while (visible.length < bodyRows) visible.push("");
 
-  const lines = [header];
+  const lines = [header, divider(columns, color)];
   if (errorLine) lines.push(errorLine);
   lines.push(...visible, divider(columns, color), ...footerLines);
-  return { text: lines.join("\n"), lines, bodyLines: drawn.bodyLines, ranges: drawn.ranges,
-    selectable, selection, scroll, maxScroll, bodyStart: 1 + (errorLine ? 1 : 0), bodyRows,
-    empty, connection };
+  return { text: lines.join("\n"), lines, bodyLines: drawnBody.bodyLines,
+    ranges: drawnBody.ranges, selectable, selection, scroll, maxScroll,
+    bodyStart: 2 + (errorLine ? 1 : 0), bodyRows, empty, connection: kind };
 }
 
 // Selection stepping used by the viewer: Tab/n/p walk the rendered cards, and the
