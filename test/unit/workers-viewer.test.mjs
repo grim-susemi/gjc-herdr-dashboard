@@ -773,6 +773,152 @@ test("--once prints exactly one frame to stdout and exits 0", async () => {
   rmSync(f.state, { recursive: true, force: true });
 });
 
+// The ten OMO spinner frames, in order. The tests below read the glyph out of the
+// written frame, so a tick that failed to advance `spin` (or a viewer that never
+// passed `spin` to the renderer) cannot pass on the starting glyph.
+const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+async function interactiveViewer(t, f, { options: optionExtra = {}, deps: depExtra = {} } = {}) {
+  f.input.isTTY = true;
+  f.output.isTTY = true;
+  const viewer = await startViewer(options(f, optionExtra), deps(f, { interactive: true,
+    watchFn: () => ({ close() {}, on() {} }), ...depExtra }));
+  t.after(async () => { await viewer.stop(); });
+  return viewer;
+}
+
+test("a running card arms one 125 ms spinner and each tick advances the glyph without a file read", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "running" })]));
+  // Count every data read after startup: an animation tick must not touch the slot,
+  // owner or projection files, it may only redraw the cached card list.
+  let reads = 0, rawReads = 0;
+  const port = {
+    read: (path) => { reads++; return f.port.read(path); },
+    readRaw: (path) => { rawReads++; return f.port.readRaw(path); },
+    write: f.port.write,
+  };
+  const viewer = await interactiveViewer(t, f, { deps: { port } });
+  assert.equal(f.clock.intervalCount(125), 1, "one spinner while a card runs");
+  const readBase = reads, rawBase = rawReads, before = f.output.writes.length;
+  for (let index = 1; index <= 8; index++) {
+    f.clock.tick(125);
+    assert.equal(f.output.writes.length, before + index, `tick ${index} drew exactly once`);
+    const write = f.output.writes.at(-1);
+    assert.match(stripVTControlCharacters(write), /alpha/, "a tick redraws the card");
+    assert.ok(write.includes(SPINNER[index]), `tick ${index} advances the glyph: ${JSON.stringify(write)}`);
+    assert.ok(write.startsWith("\x1b[H"), "the tick homes the cursor");
+    assert.ok(write.endsWith("\x1b[K"), "the row is erased, not the screen");
+    assert.ok(write.includes("\x1b[K\r\n"), "per-line erase instead of a full clear");
+    assert.ok(!write.includes("\x1b[2J"), "no full-screen clear on a tick");
+  }
+  assert.equal(reads, readBase, "ticks read no JSON files");
+  assert.equal(rawReads, rawBase, "ticks read no raw files");
+  assert.ok(stripVTControlCharacters(viewer.text).includes(SPINNER[8]), "the live frame keeps the advanced glyph");
+});
+
+test("a projection with no running card arms no spinner", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "pending" })]));
+  await interactiveViewer(t, f);
+  assert.equal(f.clock.intervalCount(125), 0);
+  const before = f.output.writes.length;
+  f.clock.tick(125);
+  assert.equal(f.output.writes.length, before, "no tick draw without a running card");
+});
+
+test("the next data paint after the only running card completes clears the spinner", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "running" })]));
+  await interactiveViewer(t, f);
+  assert.equal(f.clock.intervalCount(125), 1);
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed",
+    agent: "role-agent" })]));
+  f.clock.tick(1000);
+  assert.equal(f.clock.intervalCount(125), 0, "the data paint released the spinner");
+  const painted = f.output.writes.at(-1);
+  assert.ok(painted.startsWith("\x1b[H"), "the data paint homes the cursor");
+  assert.ok(!painted.includes("\x1b[2J"), "the data paint does not clear the screen either");
+  const before = f.output.writes.length;
+  f.clock.tick(125);
+  assert.equal(f.output.writes.length, before, "no spin draw after the timer is gone");
+});
+
+test("a disconnected link clears the spinner timer", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "running" })]));
+  await interactiveViewer(t, f);
+  assert.equal(f.clock.intervalCount(125), 1);
+  f.writeOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 4321,
+    heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
+  f.clock.tick(1000);
+  assert.equal(f.clock.intervalCount(125), 0, "a disconnected owner stops the animation");
+  const before = f.output.writes.length;
+  f.clock.tick(125);
+  assert.equal(f.output.writes.length, before);
+});
+
+test("an offline connection paints the Workers footer in the offline colour", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  // A neutral title means only the connection decides the footer colour.
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "pending" })]));
+  await interactiveViewer(t, f);
+  f.clock.tick(1000);
+  assert.match(f.output.writes.at(-1), /\x1b\[36mFollow ON · LIVE\x1b\[0m/, "live is cyan");
+  f.writeOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 4321,
+    heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
+  f.clock.tick(1000);
+  const footer = f.output.writes.at(-1);
+  assert.match(footer, /\x1b\[33mFollow ON · OFFLINE \d{2}:\d{2}\x1b\[0m/, "offline is yellow");
+  assert.ok(!footer.includes("\x1b[36m"), "no cyan footer while offline");
+  assert.match(stripVTControlCharacters(footer), /Follow ON · OFFLINE/);
+});
+
+test("q and stop() release the spinner timer", async (t) => {
+  const first = fixture(t);
+  first.writeSlot(slotFor());
+  first.writeProjection(projectionFor([card("c1", { title: "alpha", status: "running" })]));
+  const retiring = await interactiveViewer(t, first);
+  assert.equal(first.clock.intervalCount(125), 1);
+  await retiring.close();
+  await retiring.closed;
+  assert.equal(first.clock.intervalCount(125), 0, "q released the spinner");
+  const afterQ = first.output.writes.length;
+  first.clock.tick(125);
+  assert.equal(first.output.writes.length, afterQ, "no draw after retirement");
+
+  const second = fixture(t);
+  second.writeSlot(slotFor());
+  second.writeProjection(projectionFor([card("c1", { title: "beta", status: "running" })]));
+  const stopped = await interactiveViewer(t, second);
+  assert.equal(second.clock.intervalCount(125), 1);
+  await stopped.stop();
+  assert.equal(second.clock.intervalCount(125), 0, "stop() released the spinner");
+  const afterStop = second.output.writes.length;
+  second.clock.tick(125);
+  assert.equal(second.output.writes.length, afterStop, "no draw after stop");
+});
+
+test("--once never arms the spinner even on a TTY with a running card", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "running" })]));
+  f.input.isTTY = true;
+  f.output.isTTY = true;
+  const viewer = await startViewer(options(f, { once: true }), deps(f));
+  t.after(() => viewer.stop());
+  assert.equal(f.clock.intervalCount(125), 0, "no spinner in --once");
+  assert.equal(f.clock.intervalCount(1000), 0, "no repaint timer in --once");
+  const printed = f.output.writes.filter((text) => text.includes("alpha"));
+  assert.equal(printed.length, 1, JSON.stringify(f.output.writes));
+  assert.ok(printed[0].endsWith("\n"));
+});
+
 test("interactive mode: a projection that lands after the first paint appears on the next timer tick", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
@@ -840,6 +986,7 @@ test("a non-TTY process defaults to one-shot output even without --once", async 
   t.after(() => viewer.stop());
   assert.equal(f.clock.intervalCount(1000), 0, "no repaint timer without a TTY");
   assert.equal(f.clock.intervalCount(5000), 0, "no heartbeat timer without a TTY");
+  assert.equal(f.clock.intervalCount(125), 0, "no spinner without a TTY");
   assert.equal(f.output.writes.filter((text) => text.includes("plain")).length, 1);
 });
 

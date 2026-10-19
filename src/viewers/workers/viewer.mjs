@@ -242,6 +242,10 @@ export async function startViewer(options, {
   let projection = null, availability = "waiting", error = "", slot = null, slotError = "",
     owner = null, ownerAlive = null, prefs = { ...freshPrefs(), scopeKey: null }, frame = null,
     detail = false, closing = false, disposed = false, closeJob = null, timer, watcher;
+  // The spinner is a viewer-owned animation: `spin` advances only on its own 125 ms
+  // timer, and `paintLink` is the connection of the last data paint, so a tick can
+  // redraw without re-reading the slot, owner or projection files.
+  let spin = 0, spinTimer, paintLink = null;
   // Pointer drag anchor (1-based SGR row), cleared by release and by blur (AC3.1), plus
   // the two disposers that `finish()` has to release: the input decoder and the Herdr
   // focus subscription.
@@ -278,26 +282,68 @@ export async function startViewer(options, {
     return { kind: "live", at: clock.now() };
   }
 
-  function draw() {
-    const link = connection();
+  function draw(link = connection()) {
     // renderWorkers never resolves the connection: the footer lines are already
     // final when they arrive (AC-F1, AC-F3) and are appended verbatim.
     const drawn = renderWorkers(projection, { columns: columnsOf(), rows: rowsOf(),
-      color: isInteractive, language: language.language, now: clock.now(),
+      color: isInteractive, language: language.language, now: clock.now(), spin,
+      connection: link,
       view: { scroll: prefs.scroll, follow: prefs.follow, selection: prefs.selection,
         expanded: prefs.expanded, showCompleted: prefs.showCompleted, detail },
       footer: [footerText(language.language, { follow: prefs.follow, connection: link, notices })] });
     // The renderer resolves the connection from the projection alone; the viewer knows
     // more (owner liveness, an unreadable slot), so its own kind wins on the frame.
     frame = { ...drawn, connection: link.kind };
+    paintLink = link;
+    syncAnimation();
     return frame;
+  }
+
+  const hasRunningCard = () => (Array.isArray(projection?.cards) ? projection.cards : [])
+    .some((card) => card?.status === "running");
+
+  // The spinner exists only for an interactive viewer whose last data paint still
+  // showed a live link and a running card. Every draw re-evaluates it, so a completed
+  // card, a disconnect or a retirement clears the timer; the guard keeps `--once` and
+  // every non-TTY viewer free of it.
+  function syncAnimation() {
+    const wanted = isInteractive && !closing && !disposed && paintLink?.kind === "live" &&
+      hasRunningCard();
+    if (wanted && spinTimer === undefined) {
+      spinTimer = clock.setInterval(spinTick, 125);
+      spinTimer?.unref?.();
+    } else if (!wanted && spinTimer !== undefined) {
+      clock.clearInterval(spinTimer);
+      spinTimer = undefined;
+    }
+  }
+
+  // A tick redraws the cached inputs of the last data paint (projection, prefs, link,
+  // notices): no slot, owner or projection read happens on the animation path.
+  function spinTick() {
+    if (!isInteractive || closing || disposed) return;
+    if (paintLink?.kind !== "live" || !hasRunningCard()) {
+      syncAnimation();
+      return;
+    }
+    spin += 1;
+    draw(paintLink);
+    writeFrame();
+  }
+
+  // Both the 1 s paint and the spinner use this writer: `\x1b[H` plus per-line `\x1b[K`
+  // only. A full-screen clear (`\x1b[2J`) belongs to entering the screen, never to an
+  // eight-times-a-second redraw (it makes the pane visibly flicker).
+  function writeFrame() {
+    if (!isInteractive || closing || disposed || !frame) return;
+    output.write?.(`\x1b[H${frame.text.replaceAll("\n", "\x1b[K\r\n")}\x1b[K`);
   }
 
   // The 1s timer and resize re-read slot, owner and projection before drawing; repainting the
   // last frame alone would never show a Workers update that landed after the first paint.
   const paint = async () => {
     refresh();
-    if (isInteractive) output.write?.(`\x1b[H\x1b[2J${frame.text}`);
+    writeFrame();
     return frame;
   };
 
@@ -342,6 +388,10 @@ export async function startViewer(options, {
     if (isInteractive) input.pause?.();
     watcher?.close?.();
     clock.clearInterval(timer);
+    if (spinTimer !== undefined) {
+      clock.clearInterval(spinTimer);
+      spinTimer = undefined;
+    }
     heartbeatTail = heartbeat.stop();
     disposeInput?.();
     disposeInput = null;
