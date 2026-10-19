@@ -14,11 +14,14 @@
 //   * the 5 s owner heartbeat (`reconciler.writeOwner`) and the 1 s `getLeafId()` poll that turns a
 //     `/todo` edit into an automatic pass (G9 measured that the retained ctx keeps answering; if it
 //     ever throws, polling is disabled for good and the instance stays event-only);
-//   * the data publish: `projectTodo(ctx)` -> `data/<scopeKey>/todo.json` and the Workers tracker's
-//     `snapshot()` -> `data/<scopeKey>/workers.json`, each only while the slot still carries a
-//     non-closed record for ITS role (§7.1 item 5). The writer merges a burst of publishes into one
-//     200 ms write; the explicit path flushes so `/dashboard` never returns before its own
-//     projection is on disk.
+//   * the data publish: `projectTodo(ctx)` -> `data/<scopeKey>/todo.json`, the Workers tracker's
+//     `snapshot()` -> `data/<scopeKey>/workers.json`, and `projectGoal(ctx)` ->
+//     `data/<scopeKey>/goal.json`, each only while the slot still carries a non-closed record for
+//     the Todo role (the goal line lives in that pane, so it shares the Todo gate). The writer
+//     merges a burst of publishes into one 200 ms write; the explicit path flushes so `/dashboard`
+//     never returns before its own projection is on disk. `goal_updated` fires about once a second
+//     and rides the same coalesced automatic pass, so a burst is at most one running pass plus one
+//     trailing pass, and the writer merges the projections that land inside its window.
 //   * the workers bus subscription (L2 §7.6): `createWorkersTracker` is built at ARM time, the three
 //     BUS_CHANNELS feed it, `ctx.getJobs()` fills the background rows, and every handler is wrapped
 //     so a throw becomes `sourceError` instead of escaping into the host (AC2.7, LT-1);
@@ -66,6 +69,7 @@
 //   bindingOf           (gjc-adapter bindingOf)
 //   notifyText          (gjc-adapter notifyText)
 //   projectTodo         (sources/todo projectTodo)
+//   projectGoal         (sources/goal projectGoal)
 //   workersTrackerFactory (sources/workers createWorkersTracker)
 //   pruneScopes         (retention pruneExpiredScopes)
 //   retentionDays       (retention retentionDaysFromEnv)
@@ -89,6 +93,7 @@ import { pruneExpiredScopes, retentionDaysFromEnv } from '../retention.mjs';
 import { resolveViewerNode } from '../runtime.mjs';
 import { generationOf } from '../viewers/common.mjs';
 import { bindingOf, checkEligibility, notifyText } from './gjc-adapter.mjs';
+import { projectGoal } from './sources/goal.mjs';
 import { projectTodo } from './sources/todo.mjs';
 import { createWorkersTracker } from './sources/workers.mjs';
 
@@ -162,6 +167,7 @@ export function createInstance(pi, deps = {}) {
   const bindingOfCtx = () => (typeof deps.bindingOf === 'function' ? deps.bindingOf : bindingOf);
   const notifyTextOf = () => (typeof deps.notifyText === 'function' ? deps.notifyText : notifyText);
   const projectTodoOf = () => (typeof deps.projectTodo === 'function' ? deps.projectTodo : projectTodo);
+  const projectGoalOf = () => (typeof deps.projectGoal === 'function' ? deps.projectGoal : projectGoal);
   const workersTrackerOf = () => (typeof deps.workersTrackerFactory === 'function'
     ? deps.workersTrackerFactory : createWorkersTracker);
   // The timer seams stay LAZY functions: naming the global `setInterval` inside a closure body is
@@ -401,11 +407,13 @@ export function createInstance(pi, deps = {}) {
   function startHeartbeat() {
     stopHeartbeat();
     heartbeatTimer = armTimer(() => {
-      if (!armed) return;
-      track(heartbeatOnce());
-      // R3 / LT-3: the same 5 s tick promotes a late-ready viewer (T13) without a second
-      // `/dashboard`. Only a pending role needs it, so an idle dashboard makes no Herdr call.
-      track(tickPendingPass().catch(error => record(error, 'heartbeat-tick')));
+      if (!armed) return undefined;
+      // Returning the tracked work changes nothing for the host (`setInterval` ignores it); it lets
+      // the test rigs that await a tick observe a finished pass instead of a fixed sleep.
+      // R3 / LT-3: the same 5 s tick promotes a late-ready viewer of any role (T13) without a second
+      // `/dashboard`; only a pending role needs it, so an idle dashboard makes no Herdr call.
+      return Promise.all([track(heartbeatOnce()),
+        track(tickPendingPass().catch(error => record(error, 'heartbeat-tick')))]);
     }, heartbeatMs);
     heartbeatTimer?.unref?.();
   }
@@ -541,8 +549,9 @@ export function createInstance(pi, deps = {}) {
     if (pollTimer !== null) return;
     pollMode = 'poll';
     pollTimer = armTimer(() => {
-      if (!armed) return;
-      track(pollTick());
+      if (!armed) return undefined;
+      // Same test seam as the heartbeat: the host ignores the return value.
+      return track(pollTick());
     }, pollMs);
     pollTimer?.unref?.();
   }
@@ -756,6 +765,46 @@ export function createInstance(pi, deps = {}) {
     return { published: true, scopeKey: key };
   }
 
+  // L5b: the goal projection shares the Todo gate because its one line is drawn at the top of the
+  // Todo pane. `event` is the `goal_updated` payload; the source tries `ctx.getGoalState()` first
+  // and uses the event only when that surface is absent, throws or does not normalize. The caller
+  // may only reach this function after the owner-phase gate (`ownsSlot`), so a foreign owner's
+  // goal.json can never be overwritten by an automatic pass or a scheduled burst.
+  async function publishGoal(ctx, event = null) {
+    if (!dataWriter || !stateDir || layoutKey === null) return { published: false, reason: 'no-writer' };
+    let read;
+    try { read = await readSlot(paths().slot); }
+    catch (error) {
+      // outcome: an unreadable slot means the projection has no home yet; the next trigger retries.
+      record(error, 'data-slot');
+      return { published: false, reason: 'slot-read' };
+    }
+    if (read.status !== 'ok') return { published: false, reason: read.status };
+    const key = text(read.slot?.scope?.scopeKey);
+    if (!key) return { published: false, reason: 'no-scope' };
+    scopeKey = key;
+    const todoRecord = read.slot?.roles?.todo ?? null;
+    if (!todoRecord || todoRecord.state === 'closed') return { published: false, reason: 'closed' };
+    let projection;
+    try { projection = projectGoalOf()(ctx, { now: clock(), event }); }
+    catch (error) {
+      // outcome: the projector is written never to throw; if it does, the stale projection stays
+      // on disk and the Todo pane simply shows no goal line rather than an empty pane.
+      record(error, 'project-goal');
+      return { published: false, reason: 'projection' };
+    }
+    let handle;
+    try { handle = dataWriter.publish(key, 'goal', projection); }
+    catch (error) {
+      // outcome: a publish that throws synchronously wrote nothing; the previous projection stays
+      // on disk for the viewer and the reason is kept in state().
+      record(error, 'data-publish');
+      return { published: false, reason: 'publish' };
+    }
+    handle.then(() => { counters.published++; }, error => record(error, 'data-write'));
+    return { published: true, scopeKey: key };
+  }
+
   // §7.1 item 5 for the workers role: same gate as Todo, one slot read for both projections. The
   // tracker already holds the state the bus fed it, so this function only decides whether the slot
   // still carries a non-closed workers record and then publishes `snapshot()`. The caller owns the
@@ -872,6 +921,7 @@ export function createInstance(pi, deps = {}) {
     if (owns) {
       await publishTodo(ctx);
       await publishWorkers();
+      await publishGoal(ctx);
     }
     try { await dataWriter?.flush(); }
     catch (error) {
@@ -900,7 +950,9 @@ export function createInstance(pi, deps = {}) {
       // and return at once. The running pass drains it with its own error policy.
       // `strict` is sticky across folds: a poll fold followed by a bus fold must still disable the poll
       // when it fails, because the poll is the only caller that owns that policy (architect LOW-3).
-      autoNext = { ctx, trigger, strict: options.strict === true || autoNext?.strict === true, seq };
+      // The newest goal event rides the fold too, so a `goal_updated` burst writes the last goal.
+      autoNext = { ctx, trigger, strict: options.strict === true || autoNext?.strict === true,
+        goalEvent: options.goalEvent ?? autoNext?.goalEvent ?? null, seq };
       return null;
     }
     const job = runAutoPassMachine(ctx, trigger, options, seq);
@@ -910,12 +962,12 @@ export function createInstance(pi, deps = {}) {
     return job;
   }
 
-  async function runAutoPassMachine(ctx, trigger, { strict = false } = {}, seq) {
+  async function runAutoPassMachine(ctx, trigger, { strict = false, goalEvent = null } = {}, seq) {
     autoRunning = true;
     try {
       let result = null;
       let failure = null;
-      try { result = await runAutoPassOnce(ctx, trigger, { strict, seq }); }
+      try { result = await runAutoPassOnce(ctx, trigger, { strict, seq, goalEvent }); }
       catch (error) {
         // Critic #4: the foreground failure is remembered, not thrown yet. The folded work is still
         // drained below: with the poll disabled nothing else would ever process the newest state.
@@ -928,7 +980,7 @@ export function createInstance(pi, deps = {}) {
           // Critic #5: the trailing pass runs the newest ctx this instance actually accepted;
           // `installCtx` ignores the folded ctx if a newer one (an explicit call) arrived meanwhile.
           result = await runAutoPassOnce(next.ctx, next.trigger,
-            { strict: next.strict, seq: next.seq });
+            { strict: next.strict, seq: next.seq, goalEvent: next.goalEvent });
         } catch (error) {
           // Critic #4: a folded pass cannot reject into the caller that already returned. A folded
           // POLL pass keeps poll semantics: the failure disables polling, exactly as in the foreground.
@@ -943,7 +995,7 @@ export function createInstance(pi, deps = {}) {
     }
   }
 
-  async function runAutoPassOnce(ctx, trigger, { strict = false, seq = 0 } = {}) {
+  async function runAutoPassOnce(ctx, trigger, { strict = false, seq = 0, goalEvent = null } = {}) {
     if (!armed || !reconciler || !isSelfOwner()) return null;
     installCtx(ctx, seq);
     try {
@@ -970,6 +1022,7 @@ export function createInstance(pi, deps = {}) {
       syncJobsFromCtx(ctx);
       await publishTodo(ctx);
       await publishWorkers();
+      await publishGoal(ctx, goalEvent);
       return await reconciler.autoPass({ binding: local, roles: [...ROLES], trigger,
         ...(deps.failpoint === undefined ? {} : { failpoint: deps.failpoint }) });
     } catch (error) {
@@ -1119,9 +1172,12 @@ export function createInstance(pi, deps = {}) {
     await runAutoPass(ctx, 'tool_execution_end');
   });
 
-  pi?.on?.('goal_updated', async (_event, ctx) => {
+  // L5b: the event payload is the fallback when the retained ctx does not answer, and the pass
+  // reads `ctx.getGoalState()` as its primary source. The automatic pass is owner-self only and
+  // coalesced, so the once-per-second event cannot queue one pass per tick.
+  pi?.on?.('goal_updated', async (event, ctx) => {
     if (!armed) return;
-    await runAutoPass(ctx, 'goal_updated');
+    await runAutoPass(ctx, 'goal_updated', { goalEvent: event });
   });
 
   // The bus carries no ctx, so it drives the retained one (G9). One subscription per measured
