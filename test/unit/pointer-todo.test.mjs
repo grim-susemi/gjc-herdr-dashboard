@@ -142,8 +142,8 @@ async function open(t, { fake = fakeFocus(), options = {}, deps = {} } = {}) {
 test("the body really scrolls, so the wheel clamps are observable", async (t) => {
   const { viewer } = await open(t);
   const frame = viewer.frame;
-  assert.equal(frame.bodyLines.length - frame.bodyRows, 10, "30 tasks over 21 body rows");
-  assert.equal(frame.bodyStart, 1, "the header is the only row above the body");
+  assert.equal(frame.bodyLines.length - frame.bodyRows, 11, "30 tasks over 20 body rows");
+  assert.equal(frame.bodyStart, 2, "the header and its divider are the only rows above the body");
 });
 
 test("wheel down scrolls +3 and wheel up -3, clamped to [0, maxScroll]", async (t) => {
@@ -239,7 +239,7 @@ test("blur returns follow ON, re-arms the reveal and ends the drag; focus in doe
   // Scroll away from the selection, so "reveal re-armed" is observable as the frame
   // snapping the selection back into the body window.
   for (let step = 0; step < 4; step++) f.input.emit("data", wheelDown());
-  assert.equal(viewer.frame.scroll, 10, "the wheel scroll stuck, so a manual scroll is not snapped back");
+  assert.equal(viewer.frame.scroll, 11, "the wheel scroll stuck, so a manual scroll is not snapped back");
   const selected = viewer.frame.selection;
   const range = viewer.frame.taskRanges[selected];
   assert.ok(range.start < viewer.frame.scroll, "the selection is off screen");
@@ -248,7 +248,7 @@ test("blur returns follow ON, re-arms the reveal and ends the drag; focus in doe
   f.input.emit("data", click(footerY));
   assert.equal(viewer.frame.selection, selected, "a footer press never selects");
   f.input.emit("data", motion(footerY + 2));
-  assert.equal(viewer.frame.scroll, 8);
+  assert.equal(viewer.frame.scroll, 9);
   assert.equal(viewer.state.prefs.follow, false);
   const writes = f.writes.length;
 
@@ -262,10 +262,10 @@ test("blur returns follow ON, re-arms the reveal and ends the drag; focus in doe
   const revealed = viewer.frame;
   assert.ok(range.start >= revealed.scroll &&
     range.start < revealed.scroll + revealed.bodyRows, "the selection is revealed again");
-  assert.notEqual(revealed.scroll, 8, "and the drag scroll was replaced by the reveal");
+  assert.notEqual(revealed.scroll, 9, "and the drag scroll was replaced by the reveal");
   // Follow is not persisted, so the visible evidence of the save is the scroll it wrote.
   await flushPrefs(viewer);
-  assert.equal(f.lastPrefs().scroll, 8, "the drag scroll is still the persisted one");
+  assert.equal(f.lastPrefs().scroll, 9, "the drag scroll is still the persisted one");
   // The drag ended with the blur: a later motion report is a no-op.
   const afterBlur = viewer.frame.scroll;
   f.input.emit("data", motion(1));
@@ -371,12 +371,12 @@ test("an SGR report split across two chunks is decoded exactly once", async (t) 
 test("resize repaints, and the click mapping uses the frame drawn after the resize", async (t) => {
   const { f, viewer } = await open(t);
   const before = viewer.frame;
-  assert.equal(before.bodyRows, f.output.rows - 3);
+  assert.equal(before.bodyRows, f.output.rows - 4);
   // A taller pane adds body rows; the mapping must use the new geometry.
   f.output.columns = 80;
   f.output.rows = 14;
   f.output.emit("resize");
-  assert.equal(viewer.frame.bodyRows, 11, "the frame was redrawn for the new size");
+  assert.equal(viewer.frame.bodyRows, 10, "the frame was redrawn for the new size");
   const target = "[\"P\",0,\"t3\",0]";
   const y = rowOfTask(viewer, target);
   assert.ok(y <= viewer.frame.bodyStart + viewer.frame.bodyRows, "the target row is visible");
@@ -393,7 +393,7 @@ test("a keyboard action re-arms the reveal a pointer action disarmed", async (t)
   const footerY = viewer.frame.bodyStart + viewer.frame.bodyRows + 2;
   f.input.emit("data", click(footerY));
   f.input.emit("data", motion(2));
-  assert.equal(viewer.frame.scroll, 10, "clamped at the bottom of the body");
+  assert.equal(viewer.frame.scroll, 11, "clamped at the bottom of the body");
   assert.equal(viewer.frame.selection, selected, "the footer press selected nothing");
   assert.ok(range.start < viewer.frame.scroll, "the drag left the selection behind");
   // Any key that redraws hands the scroll back to the selection (the keyboard contract

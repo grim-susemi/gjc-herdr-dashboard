@@ -605,7 +605,7 @@ test("L5b: the viewer paints the goal row on refresh and removes it when the hos
     timeUsedSeconds: 14 };
   f.writeGoal({ schema: "gjc-herdr-dashboard/goal/1", updatedAt: 1, goal, sourceError: null });
   viewer.refresh();
-  assert.match(stripVTControlCharacters(viewer.text), /◎ ship the goal row · active · 214K tok · 14s/);
+  assert.match(stripVTControlCharacters(viewer.text), / ◎ ship the goal row · active · 214K tok · ⧖ 14s/);
   assert.deepEqual(viewer.state.goal, goal);
   // A corrupt auxiliary file removes the row but never turns the Todo pane into a source error.
   writeFileSync(join(f.state, "data", f.scopeKey, "goal.json"), "{oops");

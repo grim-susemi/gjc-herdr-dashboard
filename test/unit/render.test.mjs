@@ -218,3 +218,80 @@ test("the footer carries follow and connection but no keyboard legend in every l
     }
   }
 });
+
+// OMO packages/todo/src/render.mjs:202 at 3242ad4 paints the header name with
+// warning for last-known/disconnected and error for a source error, and accent otherwise.
+test("the Todo header name mirrors OMO's state colours: cyan, yellow offline, red source error", () => {
+  const input = projection([{ name: "Build", tasks: [{ content: "work", status: "in_progress" }] }]);
+  const waiting = renderFrame(null, { columns: 80, rows: 14, color: true, language: "en" });
+  const live = renderFrame(input, { columns: 80, rows: 14, color: true, language: "en" });
+  const empty = renderFrame(projection([], { empty: true }), { columns: 80, rows: 14, color: true, language: "en" });
+  const offline = renderFrame(input, { columns: 80, rows: 14, color: true, language: "en",
+    connection: { kind: "disconnected", at: 0 } });
+  const failed = renderFrame({ ...input, sourceError: "todo_write failed" },
+    { columns: 80, rows: 14, color: true, language: "en" });
+  for (const frame of [waiting, live, empty]) assert.ok(frame.lines[0].includes("\x1b[1;36mTodo"), "accent cyan");
+  assert.ok(offline.lines[0].includes("\x1b[1;33mTodo"), "disconnected is warning yellow");
+  assert.ok(failed.lines[0].includes("\x1b[1;31mTodo"), "source error is error red");
+  assert.equal(failed.lines[0].includes("\x1b[1;33mTodo"), false, "source error is not warning yellow");
+});
+
+// Short panes: present optional rows (goal, error, header divider) fill the room
+// above the body in priority order. An absent row must not reserve a slot, and a
+// present row that fits must never be dropped. The footer and the bottom divider
+// are never dropped (AC-F1).
+const shortProjection = () => projection([{ name: "Build", tasks: [
+  { content: "align the todo pane with omo", status: "in_progress" }] }]);
+const shortGoal = { objective: "align the todo pane with omo", status: "active",
+  tokensUsed: 12_000, timeUsedSeconds: 303 };
+const shortCases = [
+  { name: "none", options: {}, sourceError: null },
+  { name: "goal", options: { goal: shortGoal }, sourceError: null },
+  { name: "error", options: {}, sourceError: "todo_write failed" },
+  { name: "both", options: { goal: shortGoal }, sourceError: "todo_write failed" },
+];
+for (const entry of shortCases) {
+  for (const rows of [4, 5, 6, 7, 8]) {
+    test(`short pane ${rows} rows, ${entry.name}: present optional rows fit exactly`, () => {
+      const input = { ...shortProjection(), sourceError: entry.sourceError };
+      const frame = renderFrame(input, { columns: 34, rows, color: false, language: "en", ...entry.options });
+      const lines = frame.lines.map(stripVTControlCharacters);
+      assert.equal(lines.length, rows);
+      // The footer and the bottom divider are unconditional.
+      assert.match(lines.at(-1), /^ Follow ON · (LIVE|SOURCE ERROR)$/);
+      assert.match(lines.at(-2), /^─+$/);
+      const present = [entry.options.goal ? "goal" : null, entry.sourceError ? "error" : null, "divider"]
+        .filter(Boolean);
+      const kept = present.slice(0, rows - 3);
+      // Top rows are drawn header, divider, goal, error regardless of priority.
+      const expectedTop = ["header"];
+      if (kept.includes("divider")) expectedTop.push("divider");
+      if (kept.includes("goal")) expectedTop.push("goal");
+      if (kept.includes("error")) expectedTop.push("error");
+      const top = lines.slice(0, frame.bodyStart);
+      assert.equal(top.length, expectedTop.length, JSON.stringify(top));
+      assert.match(top[0], /^ Todo \[0\/1\]/);
+      for (const [index, kind] of expectedTop.slice(1).entries()) {
+        const row = top[index + 1];
+        if (kind === "divider") assert.match(row, /^─+$/, `rows=${rows} ${entry.name}: divider kept`);
+        if (kind === "goal") assert.match(row, /^ ◎ /, `rows=${rows} ${entry.name}: goal kept`);
+        if (kind === "error") assert.match(row, /^Read error: todo_write failed$/, `rows=${rows} ${entry.name}: error kept`);
+      }
+      // An absent optional row leaves no gap and is not drawn at all.
+      assert.equal(top.some((line) => /^ ◎ /.test(line)), kept.includes("goal"));
+      assert.equal(top.some((line) => /^Read error: todo_write failed$/.test(line)), kept.includes("error"));
+      assert.equal(frame.bodyRows, Math.max(0, rows - 3 - kept.length));
+      // Required short-pane counterexamples.
+      if (entry.name === "error" && rows === 4) {
+        assert.ok(top.includes("Read error: todo_write failed"), "error-only rows=4 keeps the error row");
+      }
+      if (entry.name === "none" && rows <= 5) assert.match(top[1], /^─+$/, "the header divider fits");
+      if (entry.name === "goal" && rows === 5) assert.match(top[1], /^─+$/, "goal-only rows=5 keeps the divider");
+      if (entry.name === "both" && rows === 5) {
+        assert.equal(top.some((line) => /^─+$/.test(line)), false, "both rows=5 drops only the divider");
+        assert.ok(top.some((line) => /^ ◎ /.test(line)));
+        assert.ok(top.some((line) => /^Read error: todo_write failed$/.test(line)));
+      }
+    });
+  }
+}
