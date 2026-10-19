@@ -81,9 +81,17 @@ K1 실측: 구독 모델이라 서브에이전트 `cost`가 모든 시점에서 
 
 ### 4.4 세 번째 pane(Progress)은 없다
 
-F1 실측: 대화형 main의 ctx에 `getProjectProgress`가 **없다**(`undefined`). 검증된 네이티브 원천이
-없으므로 Progress pane을 만들지 않는다. 가짜 DAG도, gjc CLI 폴링도 없다. 대신 Todo 머리줄에 목표
-1줄을 넣는다(L5b, goal이 있을 때만).
+F1 실측: GJC 0.18.11의 대화형 main ctx에서 `typeof ctx.getProjectProgress === 'undefined'`다.
+검증된 네이티브 원천이 없으므로 Progress pane(세 번째 pane)을 만들지 않는다. 2역할 band가 최종이다.
+가짜 DAG도, gjc CLI 폴링도 없다. 대신 Todo pane 맨 위에 목표 1줄을 넣는다(L5b).
+
+- 원천은 `ctx.getGoalState()`와 `goal_updated`뿐이다. `data/<scopeKey>/goal.json`에는 objective·status·
+  tokensUsed·timeUsedSeconds만 쓴다(id·provenance는 경계 밖).
+- goal이 있을 때만 `◎ <objective> · <상태> · <토큰(예: 215K)> · <경과 시간>` 한 줄을 그린다.
+  objective만 pane 폭에 맞춰 자르고(`~`), goal이 없으면 줄도 빈 행도 없다. `goal_updated` 뒤 2초
+  안에 갱신된다.
+- `goal_updated`는 초당 1회 정도 오므로 자동 pass의 병합(실행 1 + 대기 1)과 200ms writer 병합을
+  그대로 탄다. 소유자 phase가 `me`일 때만 쓰고, Todo record가 closed면 쓰지 않는다.
 
 ### 4.5 `/todo` 편집이 반영되는 조건 (G9)
 
