@@ -908,14 +908,15 @@ export function createInstance(pi, deps = {}) {
           detail: message(error), failure: 'failed:internal' }])) };
     }
     lastResultCode = result?.code ?? 'failed:internal';
-    // Every pass refreshes the background half of the workers projection before publishing, so a
-    // job the bus can never see still appears (AC2.6).
-    syncJobsFromCtx(ctx);
     // R1 (architect B1): the explicit path publishes only for a slot this instance owns after the
     // pass (the pass adopted it, or it already was ours). `busy:other-owner` and every other result
     // that did not make us the owner write nothing to the owner's projections.
     const owns = await ownsSlot(local);
     if (owns) await adoptPassScope(local);
+    // Every pass refreshes the background half of the workers projection before publishing, so a
+    // job the bus can never see still appears (AC2.6). It runs AFTER the scope adoption: a scope
+    // change resets the tracker, and a sync before it would drop the jobs from the first publish.
+    syncJobsFromCtx(ctx);
     // Both projections are flushed together, so `/dashboard` never returns before its own data is
     // on disk - for either role.
     if (owns) {

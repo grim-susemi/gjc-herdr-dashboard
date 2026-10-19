@@ -520,6 +520,21 @@ test('AC2.6: ctx.getJobs() feeds background cards and a task tool_execution_end 
   assert.equal(handle.state().workers.cards, 1);
 });
 
+// G004 delta review (MEDIUM): the explicit pass synced the jobs BEFORE adopting the scope, and the
+// adoption's tracker reset then dropped them, so the first `/dashboard` published no background card.
+test('AC2.6: a background job present at the first /dashboard is on the workers projection at once', async t => {
+  const world = await instanceWorld(t);
+  const { pi, handle } = await armed(world);
+  const { ctx } = world.ctx({ jobs: { running: [{ id: 'job-9', label: 'long build', type: 'task',
+    status: 'running', startTime: START - 2000 }], recent: [], delivery: 'queue' } });
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const published = await readJsonFile(world.workersFile());
+  assert.equal(published.cards.length, 1, JSON.stringify(published));
+  assert.equal(published.cards[0].id, 'job-9');
+  assert.equal(published.cards[0].background, true);
+  assert.equal(handle.state().workers.cards, 1);
+});
+
 // ------------------------------------------------------------------------------------ R3 ------
 test('R3: the 5 s tick promotes a pending WORKERS viewer without a second /dashboard', async t => {
   const world = await instanceWorld(t);
