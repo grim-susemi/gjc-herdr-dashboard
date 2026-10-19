@@ -143,14 +143,21 @@ await runScript("l6-userscope (AC6.2/AC6.3)", async () => {
     assert(remove.status === 0 && remove.json?.removed === true, "AC6.3: --remove deletes the shim", remove);
     writeEvidenceJson(EVID, "remove.json", remove.json);
     await startGjc();
-    const quietBase = notifyLines(fixture.readPane(parent)).length;
+    const frameBase = stripAnsi(fixture.readPane(parent));
+    const quietBase = notifyLines(frameBase).length;
     await fixture.slash(parent, "dashboard");
     await sleep(12_000);
     const frameRemoved = fixture.readPane(parent);
+    const plainRemoved = stripAnsi(frameRemoved);
     const newNotifies = notifyLines(frameRemoved).slice(quietBase);
     fixture.snapshot(EVID, "frame-after-remove", parent);
+    // Silence alone could be a swallowed keystroke (final review, MEDIUM): require positive proof that
+    // gjc took the input - the input box is back to its placeholder and the frame changed.
+    assert(/Type your message/.test(plainRemoved), "AC6.3: the input box consumed the command",
+      { frame: plainRemoved });
+    assert(plainRemoved !== frameBase, "AC6.3: gjc reacted to the typed command", { frame: plainRemoved });
     assert(newNotifies.length === 0, "AC6.3: no ext notify without the shim", { newNotifies });
-    assert(!/ineligible:|failed:/.test(stripAnsi(frameRemoved)), "AC6.3: no extension error frame");
+    assert(!/ineligible:|failed:/.test(plainRemoved), "AC6.3: no extension error frame");
     fixture.sendKeys(parent, "escape");
     await sleep(1_000);
     await exitGjc("AC6.3");
