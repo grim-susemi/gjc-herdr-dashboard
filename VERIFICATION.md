@@ -179,3 +179,48 @@ Final L4 run on the committed source (architect round 3, `7c81a7d`): `node scrip
 Architect round 3 (`35-34-ArchitectL4R3`, 0 HIGH, REQUEST CHANGES on two items) changed: (1) the explicit `/dashboard` no longer rebinds the slot before the pass's owner step and publishes only for a slot it owns after the pass, so `busy:other-owner` mutates nothing (`instance.test.mjs` "B1", mutation-checked: restoring the pre-pass rebind fails it); (2) `drain()` now waits for every fire-and-forget task (timer ticks, scheduled workers publishes, explicit passes) and loops until nothing is pending; (3) a folded trigger's `strict` is sticky; (4) the viewer heartbeat's in-flight write is returned by `stop()`; (5) the LV-10 accounting above; (6) the README reload sentence and two code comments now say that a same-process reload is handed over at arm time by the heartbeat.
 
 L4 gaps: AC4.7 live reload; cross-process lock contention live; `/resume` and fork (no persisted interactive session under the shared SDK lock); foreign panes created by a real omo; a write that is already queued on the reconciler when `session_shutdown` lands can still reach disk after the owner stamp (the stamp itself is protected and `drain()` waits for it in tests); `arm()` re-checks `armed`/`disposed` after its first heartbeat await (the later `pruneOnce` await is not re-checked); `rebind()` takes the lock in `explicit` mode even for automatic triggers (retries on EEXIST instead of skipping, baseline behaviour, not changed).
+
+## L6 (generation packaging, installer, package verification, D1-D4)
+
+L6 adds `scripts/build.mjs` (strict runtime file set + `config.json`), `scripts/install.mjs`
+(`--agent-dir`, `--lang`, `--dry-run`, `--select`, `--remove`, `--doctor`, the four D3 failpoints) and
+`scripts/verify-package.mjs` (required files, marker, config, locale header, absolute-URL import smoke,
+optional shim check). The installed generation's language is wired into the instance: an unset
+`GJC_HERDR_DASHBOARD_LANG` now falls back to the generation's own `config.json.lang` (AC-F2); an
+invalid env value still wins and reaches the viewer for its one-time notice.
+
+Unit/static (final source): `node scripts/test.mjs` -> **563 tests, 563 pass, 0 fail, 0 skipped**.
+`test/unit/install.test.mjs` covers fresh install, second install + shim switch, select, remove,
+foreign-shim refusal, dry-run (nothing written), invalid `--lang`, every failpoint state and the
+`--select` repair, plus build/verify failures (missing file, marker, config, non-function export,
+shim env/failpoint). `test/unit/instance.test.mjs` has the config-language row. SR1-SR9 pass; SR5 now
+permits only explicit absolute-URL dynamic imports and SR9 allows the install failpoint in
+`scripts/install.mjs` only. `test/unit/i18n.test.mjs` was generalized from a literal checkout-folder
+name to the real invariant (ROOT_URL = repo root); the old assertion failed only because this
+worktree is named `l6-install`.
+
+Package verification (sandbox generation, `.evidence/L6/verify-package.json`):
+`node scripts/verify-package.mjs .sandbox/install-smoke/.gjc/herdr-dashboard/generation-000001` ->
+`pass:true`, 27 required files, `importOk:true`, `defaultExport:"function"`,
+`localeHeader:"ext gen-000001"`, no errors. A managed shim checked in the same path had
+`targetMatches:true`, `envDefaults:false` and `failpointPlumbing:false`. The build CLI produced
+`generation-000001` with 27 runtime files plus `config.json` for `--lang zh-cn`.
+
+Live drills: `node test/live/l6-drills.mjs` -> `l6-drills (D1-D4): PASS` (exit 0, one clean run
+without input). Session `gjcdash-l6drill`, cwd and `--agent-dir` both
+`<repo>/.sandbox/case-drill/.gjc`; every install used that agent dir, never the user scope.
+
+| Drill | Observed | Evidence |
+|---|---|---|
+| D1 | install A (`--lang ko`) -> `ext gen-000001 · Todo 열림 · Workers 열림`; install B (`--lang en`) -> fresh gjc `ext gen-000002 · Todo adopted · Workers adopted` (A's viewers survive `/exit`, so R5's adopt keeps them); `--doctor` ok, shim `generation-000002` == `current.json` | `.evidence/L6/D1/` (`notify-a.txt`, `notify-b.txt`, `doctor.json`, `result.json`, frames) |
+| D2 | `--select generation-000001` -> fresh gjc `ext gen-000001 · Todo 인계 · Workers 인계`; same `slot` schema `gjc-herdr-dashboard/slot/1`, same `layoutKey`, 3 data scopes in the same state dir; doctor ok | `.evidence/L6/D2/` |
+| D3 | `after-gen-copy`, `after-shim-tmp`, `before-shim-rename`: install exits 2 and a fresh gjc still runs `gen-000001`, doctor ok. `after-shim-rename-before-current`: fresh gjc runs the new `gen-000006`, doctor exits non-zero with `selection-mismatch: shim generation-000006 != current.json generation-000001`; `--select generation-000001` repairs, doctor ok, fresh gjc back to `gen-000001` | `.evidence/L6/D3/` |
+| D4 | `--remove` deletes only the managed shim; generations 000001-000006, `current.json` and `state/{data,slots}` stay. A fresh gjc's `/dashboard` produced **no** `ext ` notify (`notify-lines.json` = `[]`) and no `ineligible:`/`failed:` extension frame; `--doctor` reports not installed | `.evidence/L6/D4/` |
+
+Cleanup: `.evidence/L6/cleanup.json` records the owned workspace, tab and session as
+`verifiedAbsent:true`; no foreign pane was touched. Aggregate drill result:
+`.evidence/L6/result.json`.
+
+Not run: user-scope install (AC6.2/AC6.3) - it needs owner approval and this task is restricted to
+sandbox/temp agent dirs; D1's second-session viewer generation replacement was not exercised because
+the surviving A viewers are adopted by design (R5).
