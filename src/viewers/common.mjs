@@ -141,16 +141,22 @@ export function footerText(language, { follow = true, connection = {}, notices =
   return rest.length ? `${required} · ${rest.join(" · ")}` : required;
 }
 
-// The viewer records the generation of its own ROOT (`dev` when no config.json).
-export function generationOf(rootUrl, { readFile = readFileSync } = {}) {
+// The generation and the installer language both live in `config.json` at ROOT (stage-05 R4).
+// Absent or unreadable values are an empty object, which callers read as `dev` / no choice.
+export function configOf(rootUrl, { readFile = readFileSync } = {}) {
   try {
     const value = JSON.parse(readFile(fileURLToPath(new URL("config.json", rootUrl)), "utf8"));
-    const generation = value?.generation;
-    return typeof generation === "string" && generation !== "" ? generation : "dev";
+    return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
   } catch (cause) {
     // outcome: an absent or unreadable config.json means an uninstalled dev tree.
-    return "dev";
+    return {};
   }
+}
+
+// The viewer records the generation of its own ROOT (`dev` when no config.json).
+export function generationOf(rootUrl, deps = {}) {
+  const generation = configOf(rootUrl, deps).generation;
+  return typeof generation === "string" && generation !== "" ? generation : "dev";
 }
 
 // R3 / SR9: the one place a viewer failpoint is parsed. The launcher passes
