@@ -24,5 +24,5 @@ if (files.length === 0) {
   console.error("no unit tests found in test/unit");
   process.exit(1);
 }
-const result = spawnSync(process.execPath, ["--test", ...files], { cwd: root, env, stdio: "inherit" });
+const result = spawnSync(process.execPath, ["--test", "--test-concurrency=2", ...files], { cwd: root, env, stdio: "inherit" });
 process.exit(result.status ?? 1);
