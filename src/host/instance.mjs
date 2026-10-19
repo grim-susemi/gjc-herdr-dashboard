@@ -91,7 +91,7 @@ import { createHerdr, resolveHerdrVector } from '../herdr.mjs';
 import { i18n } from '../i18n.mjs';
 import { pruneExpiredScopes, retentionDaysFromEnv } from '../retention.mjs';
 import { resolveViewerNode } from '../runtime.mjs';
-import { generationOf } from '../viewers/common.mjs';
+import { configOf, generationOf } from '../viewers/common.mjs';
 import { bindingOf, checkEligibility, notifyText } from './gjc-adapter.mjs';
 import { projectGoal } from './sources/goal.mjs';
 import { projectTodo } from './sources/todo.mjs';
@@ -315,7 +315,11 @@ export function createInstance(pi, deps = {}) {
     && text(local.parentPaneId) !== null && text(local.sessionId) !== null;
 
   function resolveLanguage() {
-    const raw = text(envOf()[LANG_ENV]) ?? null;
+    const rawEnv = text(envOf()[LANG_ENV]) ?? null;
+    // AC-F2: an installed generation carries the installer's choice in its own config.json. The env
+    // value (a dev shim or a drill) still wins, so an INVALID env value keeps its one-time footer
+    // notice instead of being silently replaced by the installed language.
+    const raw = rawEnv ?? (text(configOf(rootUrl ?? {}).lang) ?? null);
     const decision = i18n.decision(raw);
     return { language: decision.language, invalidLanguage: decision.invalidValue, raw };
   }

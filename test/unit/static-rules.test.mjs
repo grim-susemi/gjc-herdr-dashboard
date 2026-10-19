@@ -45,18 +45,23 @@ export const rules = {
   SR2: (rel, text) => (/report-agent|report-metadata|release-agent|GJC_HERDR_PANE_OWNER/.test(text) ? ["GJC herdr reporter surface"] : []),
   SR3: (rel, text) => (/\.omo|omo-stable|OMO_/.test(text) ? ["omo path or env reference"] : []),
   SR4: (rel, text) => (/_session-/.test(text) ? ["GJC session directory literal"] : []),
-  SR5: (rel, text) => (/import\(\s*[^'"`)\s]|import\(\s*['"`]\.{1,2}\//.test(text) ? ["dynamic relative import"] : []),
+  // SR5 bans a dynamic import whose argument is not an explicit absolute file URL. The plan and
+  // README §5 allow an absolute URL escape hatch; `pathToFileURL(...)` is that form.
+  SR5: (rel, text) => (/import\(\s*(?!pathToFileURL\s*\()(?![`'"])|import\(\s*['"`]\.{1,2}\//.test(text)
+    ? ["dynamic non-absolute import"] : []),
   SR6: (rel, text) => (/tab\s+focus|['"]tab['"]\s*,\s*['"]focus['"]/.test(text) ? ["herdr tab focus"] : []),
   SR7: (rel, text) => (rel !== "src/core/launch.mjs" && /['"]pane['"]\s*,\s*['"]run['"]|pane\s+run/.test(text) ? ["herdr pane run outside launch.mjs"] : []),
   SR8: (rel, text) => (/(spawn|execFile|execFileSync|spawnSync)\(\s*['"`](gjc|gjc\.exe)['"`]/.test(text) ? ["gjc spawn/execFile"] : []),
   SR9: (rel, text) => {
     const hits = [];
-    const failpointAllowed = rel === "src/core/launch.mjs" || rel === "scripts/dev-shim.mjs";
-    if (!failpointAllowed && /FAILPOINT/.test(text)) hits.push("FAILPOINT outside launch.mjs/dev-shim.mjs");
+    // The installer has its own D3 failpoint (scripts/install.mjs); product code and the installed
+    // shim must not carry one.
+    const failpointAllowed = rel === "src/core/launch.mjs" || rel === "scripts/dev-shim.mjs"
+      || rel === "scripts/install.mjs";
+    if (!failpointAllowed && /FAILPOINT/.test(text)) hits.push("FAILPOINT outside launch.mjs/dev-shim.mjs/install.mjs");
     if (rel !== "src/viewers/common.mjs" && /--failpoint/.test(text) && rel !== "scripts/dev-shim.mjs" && rel !== "src/core/launch.mjs") {
       hits.push("--failpoint parsing outside src/viewers/common.mjs");
     }
-    if (rel.startsWith("scripts/install") && /FAILPOINT/.test(text) === false) return hits;
     return hits;
   },
 };
@@ -94,7 +99,16 @@ test("SR1: an empty catch with an outcome comment is allowed", () => {
 test("SR7: pane run is allowed inside src/core/launch.mjs", () => {
   assert.deepEqual(rules.SR7("src/core/launch.mjs", "herdr('pane', 'run', id)"), []);
 });
+test("SR5: an absolute file-URL dynamic import is allowed", () => {
+  assert.deepEqual(rules.SR5("src/x.mjs", "await import(pathToFileURL(entry).href);"), []);
+  assert.deepEqual(rules.SR5("src/x.mjs", "await import(`file:///C:/tree/extension.mjs`);"), []);
+  assert.ok(rules.SR5("src/x.mjs", "await import(url);").length > 0);
+});
 test("SR9: FAILPOINT is allowed in launch.mjs and dev-shim.mjs", () => {
   assert.deepEqual(rules.SR9("src/core/launch.mjs", "FAILPOINT"), []);
   assert.deepEqual(rules.SR9("scripts/dev-shim.mjs", "FAILPOINT"), []);
+});
+test("SR9: the install failpoint is allowed only in scripts/install.mjs", () => {
+  assert.deepEqual(rules.SR9("scripts/install.mjs", "GJC_HERDR_DASHBOARD_INSTALL_FAILPOINT"), []);
+  assert.ok(rules.SR9("scripts/verify-package.mjs", "GJC_HERDR_DASHBOARD_INSTALL_FAILPOINT").length > 0);
 });

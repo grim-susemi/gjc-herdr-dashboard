@@ -190,6 +190,30 @@ node scripts/dev-shim.mjs --case <id> [--state <dir>] [--herdr <json argv>] [--v
   import를 금지하고 절대 URL은 허용한다).
 - case id는 한글과 공백을 포함해도 된다(`.sandbox/한글 공백 케이스/`).
 
+## 설치
+
+세대를 설치하면 `<agent-dir>/extensions/gjc-herdr-dashboard.js` shim과
+`<agent-dir>/herdr-dashboard/generation-NNNNNN/` 트리가 생긴다. shim이 실제 선택이고,
+`<agent-dir>/herdr-dashboard/current.json`은 그 기록이다. `<agent-dir>/herdr-dashboard/state/`는
+런타임 소유이므로 installer가 건드리지 않는다.
+
+```powershell
+node scripts/install.mjs --agent-dir <agent-dir> --lang ko
+node scripts/install.mjs --agent-dir <agent-dir> --select generation-000001
+node scripts/install.mjs --agent-dir <agent-dir> --remove
+node scripts/install.mjs --agent-dir <agent-dir> --doctor
+```
+
+- `--lang ko|en|zh-cn`(기본 `ko`)은 세대의 `config.json`에 기록되고, 새 GJC 세션의 알림·viewer
+  문구가 그 언어를 따른다. 잘못된 값은 설치 자체가 실패한다.
+- `--dry-run`은 설치 계획만 출력하고 아무것도 쓰지 않는다.
+- `--doctor`는 shim 대상·`current.json`·세대 목록을 보고하고, 불일치가 있으면 0이 아닌 코드로
+  끝난다. `--select`로 정정한다.
+- `--remove`는 관리 shim만 지운다. 세대와 `state/`는 보존된다. 관리 마커가 없는 shim은
+  덮어쓰지도 지우지도 않는다.
+- 사용자 범위 설치는 소유자 승인 아래
+  `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --lang ko`로 실행한다.
+
 ## 6. 알림 문구 (notify)
 
 `/dashboard`는 자격과 무관하게 항상 등록되고, 매번 자격을 다시 평가한다. 명시 pass는 결과 하나를
