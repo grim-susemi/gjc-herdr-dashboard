@@ -1185,6 +1185,41 @@ test("L4: markStopped never stamps a release on a record another instance owns",
 
 // The remaining L4 owner/rebind regressions are in reconciler.test.mjs (writeOwner after markStopped)
 // and below (a rebind that did not happen).
+// AC-F2: an installed generation carries the installer's language in its own config.json. The env
+// value is the dev/drill override; an invalid env value must still win over the configured one so
+// the viewer keeps showing its one-time invalid-language notice.
+test("AC-F2: the generation's config.json chooses the language when the env has none", async t => {
+  const root = await mkdtemp(join(tmpdir(), "gjc-instance-config-"));
+  t.after(async () => { await rm(root, { recursive: true, force: true }); });
+  await writeFile(join(root, "config.json"),
+    JSON.stringify({ generation: "gen-000042", lang: "en" }), "utf8");
+  const rootUrl = new URL("./", pathToFileURL(join(root, "config.json")));
+  const world = await makeWorld(t);
+  delete world.env.GJC_HERDR_DASHBOARD_LANG;
+  const pi = piOf();
+  const eligibility = () => ({ ok: true, reason: null, rootUrl, rootPath: root,
+    stateDir: world.stateDir, moduleUrl: MODULE_URL });
+  const handle = createInstance(pi, world.deps({ checkEligibility: eligibility }));
+  const { ctx } = world.ctx();
+  await pi.commands.get("dashboard").handler({}, ctx);
+  assert.equal(handle.state().language, "en");
+  assert.equal(handle.state().rawLanguage, "en");
+  assert.equal(handle.state().gen, "gen-000042");
+  assert.equal(handle.state().invalidLanguage, null);
+  await handle.dispose();
+
+  const second = await makeWorld(t, { env: { GJC_HERDR_DASHBOARD_LANG: "zz" } });
+  const secondPi = piOf();
+  const secondHandle = createInstance(secondPi, second.deps({
+    checkEligibility: () => ({ ok: true, reason: null, rootUrl, rootPath: root,
+      stateDir: second.stateDir, moduleUrl: MODULE_URL }) }));
+  const { ctx: secondCtx } = second.ctx();
+  await secondPi.commands.get("dashboard").handler({}, secondCtx);
+  assert.equal(secondHandle.state().language, "ko", "an invalid env value still falls back to ko");
+  assert.equal(secondHandle.state().rawLanguage, "zz", "the viewer still receives the invalid value");
+  assert.equal(secondHandle.state().invalidLanguage, "zz");
+});
+
 // Architect L4 #7: `binding` used to advance before the rebind, so a rebind that lost (busy lock, failed
 // write) was never retried by the poll: the slot stayed on the old session until an unrelated event.
 test("L4: a rebind that did not happen is retried by the next trigger", async t => {

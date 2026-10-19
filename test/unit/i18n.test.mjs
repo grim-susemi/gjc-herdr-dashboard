@@ -36,7 +36,9 @@ test("the default language is ko and unsupported values are reported, not thrown
 });
 
 test("locale files resolve against a ROOT URL, one directory above the module", () => {
-  assert.ok(fileURLToPath(ROOT_URL).replaceAll("\\", "/").endsWith("/gjc-herdr-dashboard/"));
+  // The checkout directory may be named anything (this worktree is `l6-install`); the invariant is
+  // that ROOT_URL is the repository root two levels above this test file, not a literal folder name.
+  assert.equal(fileURLToPath(ROOT_URL), fileURLToPath(new URL("../../", import.meta.url)));
   assert.ok(fileURLToPath(localeUrl(ROOT_URL, "ko")).endsWith(join("locale", "ko.json")));
   const i18n = createI18n(ROOT_URL);
   assert.equal(i18n.messages("ko").todo, "Todo");
