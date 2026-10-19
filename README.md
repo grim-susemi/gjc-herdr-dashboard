@@ -204,8 +204,10 @@ node scripts/install.mjs --agent-dir <agent-dir> --remove
 node scripts/install.mjs --agent-dir <agent-dir> --doctor
 ```
 
-- `--lang ko|en|zh-cn`(기본 `ko`)은 세대의 `config.json`에 기록되고, 새 GJC 세션의 알림·viewer
-  문구가 그 언어를 따른다. 잘못된 값은 설치 자체가 실패한다.
+- `--lang ko|en|zh-cn`(기본 `ko`)은 세대의 `config.json`에 기록되고, 새 GJC 세션의 알림과 새로 뜬
+  viewer 문구가 그 언어를 따른다. 이미 떠 있던 viewer를 인계(adopt)하면 그 viewer는 이전 언어를
+  유지하므로, viewer에서 `q` 후 `/dashboard`로 다시 열어야 바뀐다(4.6). 잘못된 값은 설치 자체가
+  실패한다.
 - `--dry-run`은 설치 계획만 출력하고 아무것도 쓰지 않는다.
 - `--doctor`는 shim 대상·`current.json`·세대 목록을 보고하고, 불일치가 있으면 0이 아닌 코드로
   끝난다. `--select`로 정정한다.
