@@ -114,6 +114,35 @@ gjc sessions that are already open keep generation-000001 until they are restart
 
 gjc sessions that are already open keep generation-000002 (or generation-000001) until they are restarted (PROVENANCE.md:238); restart them to see the new panes.
 
+### 사용자 범위 설치 (generation-000004)
+
+소유자 승인(answer #299 "A · 세대 4 설치 후 재촬영·F1~F4 재검토")에 따라 generation-000004를 설치했다. push와 merge는 하지 않았다.
+
+- 단위: `node scripts/test.mjs` -> 688 tests, 688 pass, 0 fail, 0 skipped, 0 todo; 실패 이름은 기준선(593 pass, 0 fail)과 같다 = 없음 (`task-9d-unit.txt`, `task-0-baseline-failing.txt`).
+- 패키지 스모크: scratch agent dir에 `--lang ko` 설치 exit 0 (`generation-000001`, 29 files); `scripts/verify-package.mjs` exit 0, `pass:true`, 28 required files, `importOk:true`, `defaultExport:"function"`, `localeHeader:"ext gen-000001"`, shim `targetMatches:true` (`task-9d-package-install.json`, `task-9d-package-verify.json`).
+- 실제 설치: `--dry-run` exit 0 -> `generation-000004`, `previous: generation-000003`; 설치 exit 0 (29 files); 설치된 트리 verify-package exit 0, `pass:true`, `localeHeader:"ext gen-000004"` (`task-9d-install-dry-run.json`, `task-9d-install.json`, `task-9d-verify-installed.json`).
+- l6-userscope: `--confirm-user-scope` PASS (exit 0, 124074 ms). notify `ext gen-000004 · Todo 열림 · Workers 열림`; frame-todo row 0 ` Todo [0/0]  done:0 · drop:0`, row 1 구분선, footer ` Follow ON · EMPTY`; frame-workers row 0 ` Workers [0/0]  run 0`, row 1 구분선, footer ` Follow ON · EMPTY`; AC6.3에서 shim 제거 시 ext notify 없음. outer finally의 `--select generation-000004` exit 0, current/shim은 설치 직후 기록과 바이트 동일 (`task-9d-l6-userscope.log.txt`, `task-9d-l6-guard.json`, `task-9d-l6-frames.txt`).
+- doctor: 설치 전 세 세대(`generation-000003` selected, `generation-000001`/`generation-000002` usable) -> 설치 후 네 세대(`generation-000004` selected, 나머지 usable), mismatches 없음. 정확히 한 세대만 추가되고 제거된 세대는 없다 (`task-9d-doctor-pre.json`, `task-9d-doctor-post-install.json`, `task-9d-install-diff.json`).
+- state: l6가 만든 slot `d63e48d0...`과 data `0b10dff9...`는 l6가 스스로 제거했고, 종료 후 state는 baseline과 같다. l6/guard 프로세스와 `gjcdash-userscope` 세션은 남지 않았다 (`task-9d-state-compare.json`, `task-9d-l6-state-cleanup.json`, `task-9d-processes-after.txt`).
+- 설치된 generation-000004 트리는 ebff37d의 repo 파일과 28/28 해시 동일하다 (`task-9d-installed-vs-repo.json`).
+- 롤백 명령: `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --select generation-000003` (또는 `generation-000002`/`generation-000001`; 이번 단계에서는 실행하지 않음).
+- OMO protected는 전후 바이트 동일: wrapper `2ae22897...`, pointer `685978bb...`, main `6690857a...`, status 0 (`task-9d-protected-before.txt`, `task-9d-protected-after.txt`, `task-9d-protected-diff.txt`).
+- 증거: `task-9d-release.txt` 및 위 파일들.
+
+해시 표 (sha256; 트리는 정렬된 `<sha256>  <path>` manifest의 sha256):
+
+| 항목 | 설치 전 (gen-3) | 설치 후 (gen-4) | l6 이후 |
+|---|---|---|---|
+| current.json | `aa747c89...` | `d3beac1b...` | `d3beac1b...` |
+| shim | `0dfaf4bb...` | `f56d09b5...` | `f56d09b5...` |
+| generation-000001 tree | `a9adb2c0...` | `a9adb2c0...` | `a9adb2c0...` |
+| generation-000002 tree | `b29388d6...` | `b29388d6...` | `b29388d6...` |
+| generation-000003 tree | `6a165014...` | `6a165014...` | `6a165014...` |
+| generation-000004 tree | - | `12ab1141...` | `12ab1141...` |
+| models.yml | `29747daa...` | `29747daa...` | `29747daa...` |
+
+gjc sessions that are already open keep generation-000003 until they are restarted (PROVENANCE.md:238); restart them to see the new panes.
+
 ## L0
 
 실행 환경: Windows, Node v24.12.0, Herdr 0.9.3, gjc 0.18.11. 라이브 프로브는 harness가 만든 별도 Herdr session `gjcdash-probe`에서만 실행했다. 소유자 pane에는 입력하지 않았다.
