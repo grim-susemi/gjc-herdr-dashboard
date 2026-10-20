@@ -18,6 +18,8 @@ F4/F1/F3 final-wave 지적 중 rows 11, 12, 13, 17, 16을 고쳤다. 이 절은 
 
 F2 2차 검토의 H1(배지 분리)을 `4d22a30`에서 고쳤다. 24열 background card에서 `[librarian]`이 `[librarian` + `] background`로 갈라지던 회귀를 재현했고, 이제 `[agent]`가 identity 행에 들어가면 통째로 그리고 ` background`만 두 칸 들여쓰기 dim 행으로 내린다. 긴 agent는 마지막 grapheme을 `]`와 함께 continuation 행에 붙여 `]`만 있는 행을 없앴다(단, columns-1 아래에서 agent text가 `]`와 함께 들어가지 않는 degenerate 폭은 예외다). explicit 4폭 × background on/off × agent 길이 1..columns-3 테스트와 56-case grid의 `]`-only/whole-badge 단언을 추가했고, mutation 3종(whole-badge 분기 제거, trailing-grapheme 이동 제거, 둘 다 복원)에서 새 테스트가 실패함을 확인했다. targeted 182/182, 전체 **687/687** 통과(기존 686 + explicit 1, fail 0). 증거는 `task-fix3-repro.txt`, `task-fix3-unit.txt`, `task-fix3-fuzz.txt`, `task-fix3-mutation.txt`다.
 
+3차 검증의 H1(continuation 행을 정확히 채우는 길이에서 닫는 `]`가 빠짐)과 M1(그 경계 회귀 누락)을 `c3a9ff5`에서 고쳤다. ad-hoc 소비 loop를 버리고 `[`+agent+`]` 전체를 grapheme 단위 chunk로 나눠 마지막 chunk가 항상 `]`를 포함하게 했으며, 마지막 chunk가 `]` 하나뿐인 경우에만 앞 chunk의 마지막 grapheme을 내려 `  a]`로 닫는다(continuation room >= 3; badge 행을 그리는 17열 이상에서 항상 성립). 17/18/24/26/34/54/80열 × background on/off × ASCII 1..7×columns 및 CJK/combining/emoji/ZWJ 1..5×columns의 모든 길이를 검사하는 속성 테스트를 추가했고 기존 단언은 그대로 두었다. targeted 43/43, 전체 **688/688** 통과(fail 0). 10,000-frame fuzz(0 failures)와 mutation 3종(81701c4 renderer 복원, lone-`]` 후처리 제거, cap `…]` 제거)이 모두 의도한 테스트에서 실패함을 확인했다. 증거는 `task-fix4-repro.txt`, `task-fix4-unit.txt`, `task-fix4-fuzz.txt`, `task-fix4-mutation.txt`다.
+
 사용자 스코프의 generation-000002는 이 수정들보다 먼저 설치되었다. 따라서 그 pane은 rows 11-17 수정을 포함하지 않는다. 이후 owner 승인 아래 rows 11-17을 포함한 generation-000003을 설치했고, generation-000001과 generation-000002 rollback은 그대로 유지된다(아래 `사용자 범위 설치 (generation-000003)`).
 
 ## 2026-10-20 OMO grammar alignment
