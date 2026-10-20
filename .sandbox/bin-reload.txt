@@ -1,3 +1,0 @@
-/\/reload[a-z-]*/g -> /reload | /reloaded
-/name:"reload[a-zA-Z-]*"/g -> name:"reload"
-/Reload extensions[^"]{0,60}/g -> none

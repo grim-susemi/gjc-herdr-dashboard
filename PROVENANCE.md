@@ -2,6 +2,10 @@
 
 복사 원천: omo-herdr-dashboard (읽기 전용, `git archive`로 풀어서 사용).
 
+경로 자리표시자: `<archive-root>`는 익명화된 경로 라벨이며 실제 경로가 아니다. 그 아래 디렉터리 이름
+`omo-herdr-dashboard-<sha8>/`(suffix는 고정 SHA의 8자 접두이며, 이 문서에서는
+`omo-herdr-dashboard-4082c750/`)와 아래 SHA는 기록된 사실이다.
+
 ## 고정 SHA
 
 | 항목 | 값 |
@@ -46,7 +50,7 @@ SHA가 계획과 달라서 계획 15.1 규칙대로 새 SHA로 고정했다. 바
 
 ### Lane A — core state (L1)
 
-Pinned copy source: `C:/Users/USER/AppData/Local/Temp/omo-herdr-dashboard-4082c750/` (archive extract of
+Pinned copy source: `<archive-root>/omo-herdr-dashboard-4082c750/` (archive extract of
 omo-herdr-dashboard at SHA `4082c7509c4a2f8a53128b85bfd38acf017a52c3`). Read-only; nothing was built or
 executed from that tree.
 
@@ -105,7 +109,7 @@ L1 이후 복사한 파일마다 {원본@SHA, 기준선 상태, 유지/적응/�
 
 ### Lane C — L1 core lifecycle (launch / reconciler / data)
 
-Pinned copy source: `C:/Users/USER/AppData/Local/Temp/omo-herdr-dashboard-4082c750/` (archive extract of
+Pinned copy source: `<archive-root>/omo-herdr-dashboard-4082c750/` (archive extract of
 omo-herdr-dashboard at SHA `4082c7509c4a2f8a53128b85bfd38acf017a52c3`). Read-only; nothing was built or
 executed from that tree.
 
@@ -201,7 +205,7 @@ and viewer args), R4, R6; `herdr-dash-a29-fix-01/stage-01-planner.md` (A-29/C-14
 
 ### Lane D — host adapter / Todo source / dev shim / README
 
-Pinned copy source: `C:/Users/USER/AppData/Local/Temp/omo-herdr-dashboard-4082c750/` (extract of
+Pinned copy source: `<archive-root>/omo-herdr-dashboard-4082c750/` (extract of
 omo-herdr-dashboard at SHA `4082c7509c4a2f8a53128b85bfd38acf017a52c3`). Read-only: nothing in that
 tree was built, installed or executed for this lane. The only omo file that informed code here is
 `packages/todo/src/native-todo.mjs`, read for the *shape* of the phase payload and the

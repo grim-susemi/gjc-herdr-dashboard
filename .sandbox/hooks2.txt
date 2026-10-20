@@ -1,8 +1,0 @@
-46: //            trigger?, failpoint?, hooks? }   // trigger is recorded for A-31 evidence; failpoint
-47: //                                 // injects the R3 crash/ready-delay fixture; hooks drive the lock
-220: now, hooks: input?.hooks ?? {} });
-276: const listed = await call('pane', 'list');
-289: try { info = await call('pane', 'process-info', '--pane', record.paneId); }
-309: try { layoutRead = { layout: (await call('pane', 'layout', '--pane', binding.parentPaneId))?.layout ?? null }; }
-395: try { await call('pane', 'close', record.paneId); }
-403: const listed = await call('pane', 'list');

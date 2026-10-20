@@ -1,4 +1,0 @@
-status=2
-stderr=install-failpoint: GJC_HERDR_DASHBOARD_INSTALL_FAILPOINT=before-shim-rename
-
-stdout=

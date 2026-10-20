@@ -1,4 +1,0 @@
-ebe79288142cb2c8b09d9bc5e2c7082d5c6600fea2ce2bff89c8c13faf025b4b  C:/Users/USER/.omo-stable-500/home/.omo/agent/extensions/omo-herdr-dashboard.js
-cdfb4d00770e194dc946796619bdd595655e2793330dd6eed66c090639670815  C:/Users/USER/.omo-stable-500/home/.omo/agent/herdr-dashboard/integration/current.json
-main=fffed31f43ff1328f2257b65a8b4111469efd8ca
-status-porcelain-lines=0

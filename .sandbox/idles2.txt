@@ -1,5 +1,0 @@
-=== test/live/l2-workers.mjs
-53: const status = () => fixture.listPanes().find((p) => p.pane_id === parent)?.agent_status ?? null;
-=== test/live/l3-pointer.mjs
-50: const status = () => fixture.listPanes().find((p) => p.pane_id === parent)?.agent_status ?? null;
-51: const idle = async (label) => {

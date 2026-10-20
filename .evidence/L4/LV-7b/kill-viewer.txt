@@ -1,2 +1,0 @@
-pid=62728 pane=w1:p4
-SUCCESS: The process with PID 62728 (child process of PID 54108) has been terminated.

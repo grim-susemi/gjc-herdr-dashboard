@@ -13,7 +13,7 @@
 // Slot/data entries this run created under `<agent-dir>/herdr-dashboard/state` belong to the dead
 // test session; they are removed after the fixture cleanup, entries that existed before are kept.
 //
-// Run: node test/live/l6-userscope.mjs --agent-dir C:/Users/USER/.gjc/agent --confirm-user-scope
+// Run: node test/live/l6-userscope.mjs --agent-dir <agent-dir> --confirm-user-scope
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";

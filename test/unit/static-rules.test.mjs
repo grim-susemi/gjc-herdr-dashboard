@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, relative, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -111,4 +112,60 @@ test("SR9: FAILPOINT is allowed in launch.mjs and dev-shim.mjs", () => {
 test("SR9: the install failpoint is allowed only in scripts/install.mjs", () => {
   assert.deepEqual(rules.SR9("scripts/install.mjs", "GJC_HERDR_DASHBOARD_INSTALL_FAILPOINT"), []);
   assert.ok(rules.SR9("scripts/verify-package.mjs", "GJC_HERDR_DASHBOARD_INSTALL_FAILPOINT").length > 0);
+});
+
+function privateRecordPath(path) {
+  return /(^|\/)(?:\.evidence|\.sandbox|\.gjc|redacted-records)(?:\/|$)/.test(path)
+    || path === "backup" || path.startsWith("backup/") || path === "backup-manifest.json";
+}
+
+function personalEnvironmentLiteral(text) {
+  return /[a-z]:[\\/]+Users[\\/]+[^\s"'<>\\/]+/i.test(text)
+    || /\/(?:home|Users)\/[^\s"'<>/]+/.test(text)
+    || /\b01a[0-9a-f]{5}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i.test(text);
+}
+
+test("privacy: local records and inventories cannot enter the published index", () => {
+  const files = execFileSync("git", ["-C", root, "ls-files", "--cached", "-z"], { encoding: "utf8" })
+    .split("\0").filter(Boolean);
+  assert.ok(files.length > 0, "the published file set must not be empty");
+  assert.deepEqual(files.filter(privateRecordPath), []);
+});
+
+test("privacy: published source and documentation contain no personal environment literals", () => {
+  const files = execFileSync("git", ["-C", root, "ls-files", "--cached", "-z"], { encoding: "utf8" })
+    .split("\0").filter(Boolean);
+  assert.ok(files.length > 0, "the published file set must not be empty");
+  const violations = files.filter((file) => personalEnvironmentLiteral(execFileSync("git",
+    ["-C", root, "show", `:${file}`], { encoding: "utf8" })));
+  assert.deepEqual(violations, []);
+});
+
+test("privacy: default staging excludes local artifacts and redacted backups", () => {
+  const files = [".evidence/run.json", ".sandbox/frame.txt", ".gjc/state.json",
+    "backup/redacted-records/report.json", "backup-manifest.json"];
+  const ignored = execFileSync("git", ["-C", root, "check-ignore", "--no-index", "--stdin"], {
+    encoding: "utf8", input: files.join("\n") + "\n",
+  }).trim().split(/\r?\n/);
+  assert.deepEqual(ignored, files);
+});
+
+test("privacy: the path guard catches local records even below another directory", () => {
+  for (const file of [".evidence/run.json", ".sandbox/frame.txt", ".gjc/state.json",
+    "backup/report.json", "backup-manifest.json", "export/.gjc/state.json",
+    "export/redacted-records/frame.txt"]) assert.equal(privateRecordPath(file), true, file);
+  assert.equal(privateRecordPath("src/core/slot.mjs"), false);
+  assert.equal(privateRecordPath("test/unit/static-rules.test.mjs"), false);
+});
+
+test("privacy: the literal guard catches user paths and historical session IDs", () => {
+  const windows = ["C:", "Users", "private-person", "project"].join("/");
+  assert.equal(personalEnvironmentLiteral(windows), true);
+  assert.equal(personalEnvironmentLiteral(windows.replaceAll("/", "\\")), true);
+  assert.equal(personalEnvironmentLiteral(["", "home", "private-person", "project"].join("/")), true);
+  assert.equal(personalEnvironmentLiteral(["", "Users", "private-person", "project"].join("/")), true);
+  const session = ["01a00000", "0000", "7000", "8000", "000000000000"].join("-");
+  assert.equal(personalEnvironmentLiteral(session), true);
+  assert.equal(personalEnvironmentLiteral("<user-home>/.gjc/agent and <repo>/.evidence/run.json"), false);
+  assert.equal(personalEnvironmentLiteral("scopeKey, sessionId and node:crypto are protocol names"), false);
 });

@@ -222,7 +222,8 @@ node scripts/install.mjs --agent-dir <agent-dir> --doctor
 - `--remove`는 관리 shim만 지운다. 세대와 `state/`는 보존된다. 관리 마커가 없는 shim은
   덮어쓰지도 지우지도 않는다.
 - 사용자 범위 설치는 소유자 승인 아래
-  `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --lang ko`로 실행한다.
+  `node scripts/install.mjs --lang ko`로 실행한다. `--agent-dir`를 생략하면 installer 기본값인
+  `<home>/.gjc/agent`를 쓴다.
 
 ## 6. 알림 문구 (notify)
 

@@ -1,2 +1,0 @@
-pid=81156 pane=w1:p4
-SUCCESS: The process with PID 81156 (child process of PID 82104) has been terminated.

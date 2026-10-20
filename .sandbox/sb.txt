@@ -1,3 +1,0 @@
-614:  async function syncBinding(local) {
-733:    await syncBinding(local);
-752:    await syncBinding(local);

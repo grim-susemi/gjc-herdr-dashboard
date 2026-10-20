@@ -1,3 +1,0 @@
-a082df4 L4 review fixes: owner-phase gate for auto passes, final markStopped, rebind retry, auto-pass coalescing, evidence level switch
-ee6b165 docs(L4): record that /reload has no slash trigger
-ae366a4 feat(L4): owner record adopt on restart, session_switch rebind, LV-5/LV-9 live scripts

@@ -1,4 +1,0 @@
-{"runtime":"bun","self":"true","dead":"ESRCH","system4":"EPERM","pid1":"ESRCH"}
-bun exit=0
-{"runtime":"node","self":"true","dead":"ESRCH","system4":"EPERM","pid1":"ESRCH"}
-node exit=0

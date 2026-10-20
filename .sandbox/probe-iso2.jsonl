@@ -1,4 +1,0 @@
-{"gate":"P2-factory","pid":2960,"t":1792199751959,"instance":1,"busKeys":[],"url":"hboard/.sandbox/probe2-ext.mjs"}
-{"gate":"G3-session_start","pid":2960,"t":1792199752502,"instance":1,"kind":"main","depth":0,"hasUI":false,"isTTY":false}
-{"gate":"G5-turn_end","pid":2960,"t":1792199753824,"instance":1,"kind":"main","jobs":{"running":0,"recent":[]}}
-{"gate":"G12-event","pid":2960,"t":1792199753913,"instance":1,"name":"session_shutdown","kind":"main","sidType":"string","sid":"01a1476d"}

@@ -1,4 +1,0 @@
-test/unit/pointer-todo.test.mjs:72:  t.after(() => rmSync(state, { recursive: true, force: true }));
-test/unit/pointer-workers.test.mjs:79:  t.after(() => rmSync(state, { recursive: true, force: true }));
-test/unit/viewer.test.mjs:56:  t.after(() => rmSync(state, { recursive: true, force: true }));
-test/unit/workers-viewer.test.mjs:64:  t.after?.(() => rmSync(state, { recursive: true, force: true }));

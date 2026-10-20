@@ -1,3 +1,0 @@
-l3-pointer (LV-8): FAIL live-assertion: the parent returned to idle (after todo_write)
---- details ---
-{"status":"done"}

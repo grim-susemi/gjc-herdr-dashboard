@@ -1,4 +1,0 @@
-464:  async function pollTick() {
-494:      pollTick();
-730:  async function currentBinding(ctx) {
-790:  // passes `strict` so an exception can disable polling (see `pollTick`).

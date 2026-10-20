@@ -1,5 +1,0 @@
-216:    lastBinding = binding;
-725:  let lastBinding = null;
-735:    lastBinding = normalized;
-751:    const binding = lastBinding;
-775:      lastBinding = normalized;

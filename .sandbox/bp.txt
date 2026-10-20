@@ -1,8 +1,0 @@
-test('AC2.7: a throwing bus handler becomes the workers sourceError and never escapes into the host', async t => {
-  const world = await instanceWorld(t, {
-    workersTrackerFactory: () => {
-      const tracker = createWorkersTracker({ now: () => world.clock.now() });
-      return { ...tracker, onProgress: () => { throw new Error('injected bus fault'); } };
-    },
-  });
-  const { pi, handle, ctx } = await armed(world);

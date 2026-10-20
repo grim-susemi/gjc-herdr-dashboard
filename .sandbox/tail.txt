@@ -1,5 +1,0 @@
-ait pi2.handlers.get("session_start")({}, ctx2);
-  await writeFile(slotPaths(world2.stateDir, world2.layoutKey).owner, "{ not json");
-  await pi2.handlers.get("session_shutdown")({}, ctx2);
-  assert.equal(await readFile(slotPaths(world2.stateDir, world2.layoutKey).owner, "utf8"), "{ not json");
-});

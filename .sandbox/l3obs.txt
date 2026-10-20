@@ -1,5 +1,0 @@
-obs=19
-{"name":"workers: blur returns follow ON","ok":true,"detail":{"frame":"Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n
-{"name":"workers: click turns follow OFF","ok":true,"detail":{"frame":"Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n
-{"name":"workers: drag keeps follow OFF","ok":true,"detail":{"afterDrag":"Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\
-{"name":"workers: resize redraws the frame and the viewer stays alive","ok":true,"detail":{"before":"Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r

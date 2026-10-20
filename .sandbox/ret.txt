@@ -1,6 +1,0 @@
-712:    if (!workersRecord || workersRecord.state === 'closed') return { published: false, reason: 'closed' };
-719:      return { published: false, reason: 'projection' };
-727:      return { published: false, reason: 'publish' };
-730:    return { published: true, scopeKey: key };
-1052:  return {
-1068:        return { sourceError: view.sourceError, ignored: view.ignored, cards: view.cards.length };

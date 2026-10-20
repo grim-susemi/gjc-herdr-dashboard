@@ -1,2 +1,0 @@
-pid=85536
-SUCCESS: The process with PID 85536 (child process of PID 22468) has been terminated.

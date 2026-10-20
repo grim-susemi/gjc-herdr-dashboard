@@ -1,7 +1,0 @@
-832: try { await dataWriter?.flush(); }
-941: // `stoppedAt` (awaited by `session_shutdown`, fired here). Panes are never closed and records are
-943: function disposeLocal() {
-951: function dispose() {
-960: // The failure is recorded instead of escaping as an unhandled rejection; `session_shutdown`
-985: pi?.on?.('session_shutdown', async () => {
-998: // outcome: a second `session_shutdown` (or a later `dispose()`) finds `armed === false` and

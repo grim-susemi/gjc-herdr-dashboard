@@ -1,8 +1,0 @@
-56:| A-6 | §10, §13(`gjc-cli.mjs` 없음) | SR8, AC5.1–5.3 |
-274:| Goal(L5b) | `ctx.getGoalState()`와 `goal_updated`. {objective, status, tokensUsed, timeUsedSeconds}만 쓴다 |
-385:- **Planner 판단: Todo 머리줄 목표 1줄을 포함한다(L5b).**
-387:  - goal이 있을 때만 보인다. P1을 출시하면 이 줄은 뺀다. 소유자가 원하지 않으면 L5b만 빼면 되고, 아키텍처에는 영향이 없다.
-457:| L5 세 번째 역할 | F1 → P1 또는 생략 + L5b | AC5.*. P1이면 AC-F5와 LV-8 +6건 | — |
-532:- **AC5.1**: F1 결과와 결정을 기록한다. P1이면 필드마다 fixture가 있고 AC-F5를 통과한다.
-533:- **AC5.2**: 생략 시 2역할이 최종이고 README에 근거가 있다. 목표 1줄은 goal이 있을 때만 보이고 `goal_updated` 후 2s 안에 바뀐다. 34열 footer가 잘리지 않는다.
-534:- **AC5.3**: SR4·SR8(gjc spawn·`.gjc` 읽기 없음).

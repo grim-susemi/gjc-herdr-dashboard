@@ -1,2 +1,0 @@
-process.env.GJC_PROBE_OUT = "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\l5-probe-out.jsonl";
-export { default } from "file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/.sandbox/probe-goal-ext.mjs";

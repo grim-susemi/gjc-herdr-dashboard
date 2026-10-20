@@ -1,1 +1,0 @@
-lt3-delay (LV-3): PASS

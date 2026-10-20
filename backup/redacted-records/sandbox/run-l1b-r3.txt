@@ -1,3 +1,0 @@
-l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9): FAIL live-assertion: /new changed the scopeKey
---- details ---
-{"before":{"sessionId":"01a14ae3-5f8b-705e-a4f9-45856b03d2a0","scopeKey":"redacted","scopeEpoch":1,"language":"ko"},"after":{"sessionId":"01a14ae3-5f8b-705e-a4f9-45856b03d2a0","scopeKey":"redacted","scopeEpoch":1,"language":"ko"}}

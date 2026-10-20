@@ -1,1 +1,0 @@
-35:✔ auto-pass coalescing: a bus burst is folded and the session change after it still rebinds (345.2953ms)

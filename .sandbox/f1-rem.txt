@@ -1,6 +1,0 @@
-{
- "getProjectProgress": "undefined",
- "type": "undefined",
- "keys": "undefined",
- "ctxKeys": "abort,abortPromptAndWait,clearContext,compact,credentialSessionId,cwd,cycleModel,cycleThinkingLevel,getActiveModelProfile,getActivePromptHandle,getActiveTools,getAllTools,getArtifact,getArtifactRange,getBranchCandidates,getConfigItems,getContextUsage,getExtensions,getGoalState,getJobs,getPendingMessageCounts,getQueuedMessages,getSessionWorkLease,getSkillState,getSystemPrompt,getTodoState,getTransc"
-}

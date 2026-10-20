@@ -1,6 +1,0 @@
-first_seen_at=1792241879295 projection_updatedAt=1792241878912 generatedAt=1792241879112
-event_to_disk_ms=383 (sampled every 250 ms)
-prompt_to_row_ms=5299 (includes the model turn)
-todo_append_reflected_ms_after_enter=2445 (README 4.5: no event, next-event path; G9 value freshness was never measured)
-
-{"ac110":"idle -> working -> idle over 19717 ms","ac12":{"todoWriteEventToDiskMs":383,"todoAppendReflectedMs":2445},"lv6":{"calls":86,"mutations":0,"newFiles":0},"lv11":{"scopeEpoch":[1,2]},"ac19Exit":{"disconnectMs":1249}}

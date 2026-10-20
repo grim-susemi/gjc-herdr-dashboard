@@ -1,1 +1,0 @@
-Unknown gjc ultragoal quality-gate subcommand: G001; supported: init, source-hash, lane-selection, validate

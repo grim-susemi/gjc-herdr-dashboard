@@ -1,9 +1,0 @@
-✔ AC2.6: a background job present at the first /dashboard is on the workers projection at once (43.5969ms)
-ℹ tests 1
-ℹ suites 0
-ℹ pass 1
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 97.0437

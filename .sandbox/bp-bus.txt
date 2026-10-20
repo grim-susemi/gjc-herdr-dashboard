@@ -1,6 +1,0 @@
-440: assert.doesNotThrow(() => pi.channels.get('task:subagent:progress')({ progress: { id: 'x' } }));
-455: pi.channels.get('task:subagent:lifecycle')({ id: 'sub-1', agent: 'executor', status: 'started',
-457: pi.channels.get('task:subagent:event')({ ignored: true });
-528: pi.channels.get('task:subagent:lifecycle')({ id: 'sub-2', agent: 'executor', status: 'started',
-564: pi.channels.get('task:subagent:lifecycle')({ id: 'sub-3', agent: 'executor', status: 'started',
-589: ['task:subagent:event', 'task:subagent:lifecycle', 'task:subagent:progress']);

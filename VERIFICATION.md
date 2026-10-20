@@ -2,6 +2,9 @@
 
 증거는 `.evidence/` 아래에 있고 git에서 제외된다. 아래 기록은 실제로 실행한 명령의 결과만 적는다.
 
+경로 자리표시자: `<user-home>`, `<repo>`, `<external-evidence-root>`, `<agent-dir>`, `<herdr-bin>`은
+익명화된 경로 라벨이다. 그대로 실행할 수 있는 명령이 아니며, 기록된 측정값만 유효하다.
+
 ## 2026-10-20 Dashboard polish (owner test findings)
 
 owner 테스트에서 나온 아래 항목을 고쳤다. 아래 당시 기록은 고치지 않고 새 변경만 추가한다.
@@ -68,11 +71,11 @@ pane 문법을 omo `3242ad4`에 맞췄다. 규칙과 의도된 차이는 `GRAMMA
 | l5-goal | PASS 81972 ms | PASS 82925 ms |
 
 - window 1의 omo-protected 수령증은 샌드박스 HOME에서 찍혀 경로가 MISSING이다. **유효한 증거가 아니다.**
-- window 2는 `HOME=USERPROFILE=C:/Users/USER`로 omo-protected를 찍었고 전후가 바이트 동일하다: wrapper `25c376b0...`, pointer `5d6c0120...`, main `d8836c7b...`.
+- window 2는 `HOME=USERPROFILE=<user-home>`로 omo-protected를 찍었고 전후가 바이트 동일하다: wrapper `25c376b0...`, pointer `5d6c0120...`, main `d8836c7b...`.
 - 두 window 모두 GJC `current.json` `950a9d67...`, shim `07acd7cc...`가 전후 바이트 동일하고 `--doctor`는 ok, `generation-000001`이다.
 - 갱신했지만 라이브로 다시 돌리지 않은 스크립트: l3-pointer, l4-adopt, l6-drills, l6-userscope(계획상 todo 7에서 `--confirm-user-scope` 금지), kill-recovery, lt3-delay.
 
-증거(`C:/Users/USER/orca/projects/기타 작업/.omo/evidence/gjc-dashboard-omo-align/`): `task-3-todo-frames.txt`, `task-4-workers-frames.txt`, `task-7-live-pass.txt`, `task-7-rerun-live-pass.txt`, `task-8-docs-review.txt`, `task-8-docs-before.txt`.
+증거(`<external-evidence-root>/gjc-dashboard-omo-align/`): `task-3-todo-frames.txt`, `task-4-workers-frames.txt`, `task-7-live-pass.txt`, `task-7-rerun-live-pass.txt`, `task-8-docs-review.txt`, `task-8-docs-before.txt`.
 
 ### 사용자 범위 설치 (generation-000002)
 
@@ -83,7 +86,7 @@ pane 문법을 omo `3242ad4`에 맞췄다. 규칙과 의도된 차이는 `GRAMMA
 - 실제 설치: `--dry-run` exit 0 -> `generation-000002`, `previous: generation-000001`; 설치 exit 0; 설치된 트리 verify-package exit 0, `pass:true`, `localeHeader:"ext gen-000002"` (`task-9-install.json`, `task-9-verify-installed.json`).
 - l6-userscope: `--confirm-user-scope` PASS (exit 0, 110188 ms). notify `ext gen-000002 · Todo 열림 · Workers 열림`; frame-todo row 0 ` Todo [0/0]  done:0 · drop:0`, row 1 구분선, footer ` Follow ON · EMPTY`; frame-workers row 0 ` Workers [0/0]  run 0`, row 1 구분선, footer ` Follow ON · EMPTY`; AC6.3에서 shim 제거 시 ext notify 없음. outer finally의 `--select generation-000002` exit 0, current/shim은 설치 직후 기록과 바이트 동일 (`task-9-l6-frames.txt`, `task-9-l6-guard.json`).
 - doctor: 설치 전 `generation-000001` 하나(selected, usable) -> 설치 후 두 개(`generation-000002` selected, `generation-000001` usable), mismatches 없음. 정확히 한 세대만 추가되고 제거된 세대는 없다 (`task-9-doctor-diff.txt`).
-- 롤백 명령: `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --select generation-000001` (이번 단계에서는 실행하지 않음).
+- 롤백 명령: `node scripts/install.mjs --agent-dir <agent-dir> --select generation-000001` (이번 단계에서는 실행하지 않음).
 - OMO protected는 전후 바이트 동일: wrapper `25c376b0...`, pointer `5d6c0120...`, main `d8836c7b...`.
 - 증거: `task-9-release.txt` 및 위 파일들.
 
@@ -110,7 +113,7 @@ gjc sessions that are already open keep generation-000001 until they are restart
 - doctor: 설치 전 두 세대(`generation-000002` selected, `generation-000001` usable) -> 설치 후 세 세대(`generation-000003` selected, `generation-000001`/`generation-000002` usable), mismatches 없음. 정확히 한 세대만 추가되고 제거된 세대는 없다 (`task-9b-doctor-diff.txt`, `task-9c-doctor-post.json`, `task-9c-doctor-check.json`).
 - state: l6가 만든 slot `d63e48d0...`과 data `5433373b...`는 l6가 스스로 제거했고, 종료 후 state는 baseline과 같다. l6/guard 프로세스와 `gjcdash-userscope` 세션은 남지 않았다 (`task-9c-state-compare.json`, `task-9c-l6-state-cleanup.json`, `task-9c-processes-after.txt`).
 - 설치된 generation-000003 트리는 eaf4553의 repo 파일과 28/28 해시 동일하다 (`task-9c-installed-vs-repo.json`).
-- 롤백 명령: `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --select generation-000002` (또는 `generation-000001`; 이번 단계에서는 실행하지 않음).
+- 롤백 명령: `node scripts/install.mjs --agent-dir <agent-dir> --select generation-000002` (또는 `generation-000001`; 이번 단계에서는 실행하지 않음).
 - OMO protected는 전후 바이트 동일: wrapper `2ae22897...`, pointer `685978bb...`, main `6690857a...`, status 0 (`task-9c-protected-before.txt`, `task-9c-protected-after.txt`, `task-9c-protected-diff.txt`).
 - 증거: `task-9c-release.txt` 및 위 파일들.
 
@@ -138,7 +141,7 @@ gjc sessions that are already open keep generation-000002 (or generation-000001)
 - doctor: 설치 전 세 세대(`generation-000003` selected, `generation-000001`/`generation-000002` usable) -> 설치 후 네 세대(`generation-000004` selected, 나머지 usable), mismatches 없음. 정확히 한 세대만 추가되고 제거된 세대는 없다 (`task-9d-doctor-pre.json`, `task-9d-doctor-post-install.json`, `task-9d-install-diff.json`).
 - state: l6가 만든 slot `d63e48d0...`과 data `0b10dff9...`는 l6가 스스로 제거했고, 종료 후 state는 baseline과 같다. l6/guard 프로세스와 `gjcdash-userscope` 세션은 남지 않았다 (`task-9d-state-compare.json`, `task-9d-l6-state-cleanup.json`, `task-9d-processes-after.txt`).
 - 설치된 generation-000004 트리는 ebff37d의 repo 파일과 28/28 해시 동일하다 (`task-9d-installed-vs-repo.json`).
-- 롤백 명령: `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --select generation-000003` (또는 `generation-000002`/`generation-000001`; 이번 단계에서는 실행하지 않음).
+- 롤백 명령: `node scripts/install.mjs --agent-dir <agent-dir> --select generation-000003` (또는 `generation-000002`/`generation-000001`; 이번 단계에서는 실행하지 않음).
 - OMO protected는 전후 바이트 동일: wrapper `2ae22897...`, pointer `685978bb...`, main `6690857a...`, status 0 (`task-9d-protected-before.txt`, `task-9d-protected-after.txt`, `task-9d-protected-diff.txt`).
 - 증거: `task-9d-release.txt` 및 위 파일들.
 
@@ -162,7 +165,7 @@ gjc sessions that are already open keep generation-000003 until they are restart
 
 | Gate | 기대값 | 실측 | 판정 | 증거 |
 |---|---|---|---|---|
-| G0 | `repositoryBinding` = sibling | no-op executor의 git toplevel = `C:/Users/USER/orca/projects/gjc-herdr-dashboard` | PASS | `.evidence/L0/G0-binding.txt` |
+| G0 | `repositoryBinding` = sibling | no-op executor의 git toplevel = `<repo>` | PASS | `.evidence/L0/G0-binding.txt` |
 | B1·B2 | 기록 | B1 759개 중 746 pass, 13 fail. 계획 기대(746/758, 12 fail)와 다르므로 `B1-isolated`. B2 파일 34개 | 기록됨 | `baseline-omo.json`, `b1-report.txt` |
 | G1 | 0.18.11이 project-scope 절대 URL `.js` shim을 로드, factory 1회 | 로드됨. factory 1회. `import.meta.url`은 실제 `spike/probe-ext.mjs` 경로. 프로세스 cwd = case 디렉터리(project dir = cwd) | PASS | `probe-g1-headless.jsonl`, `probe-g2-interactive.jsonl` |
 | G2 | `send-text /dashboard` + `send-keys enter` 후 프레임에 notify | 슬래시 자동완성 때문에 `/dashboard` 전체를 한 번에 보내면 Enter가 입력되지 않았다. `/dash` 입력 후 자동완성이 열린 상태에서 `board`를 추가하고 Enter를 보내면 핸들러가 실행되고 프레임에 `PROBE-DASHBOARD-OK`가 보였다 | PASS (입력 절차 주의) | `G2-frame2.txt`, `probe-g2-interactive.jsonl` |
@@ -172,11 +175,11 @@ gjc sessions that are already open keep generation-000003 until they are restart
 | G9 | 보관한 ctx로 1s 타이머 `getLeafId`, switch 뒤 `getSessionId` | 시작 시 보관한 ctx로 2s 간격 호출(`G9-interval`)을 `/new` 전후로 계속 실행했다. `/new`(`session_switch`) 뒤에도 보관 ctx의 `sessionManager.getSessionId()`/`getLeafId()`는 예외 없이 string을 반환했다(전환 후 호출 7회 이상). 단 보관 ctx가 새 sessionId를 보는지 옛 것을 보는지는 값 비교를 하지 않아 모른다(타입만 기록). `/resume`·`/fork` 뒤는 미측정 | 부분(예외 없음은 확인, 값의 신선도는 모름 -> 계획의 실패 경로 "이벤트로 갱신"을 기본으로 채택) | `probe-interactive-no-session.jsonl` |
 | G10 | `process.kill(pid,0)`: 자기/죽은/타 사용자 | Bun 1.4.0과 Node 모두 자기=true, 존재하지 않는 pid=ESRCH, 시스템 pid 4=EPERM | PASS | `.sandbox/g10.mjs` 실행 출력 |
 | G11 | `pi.on` 반환값 | undefined. `ctx.mode` 없음 | PASS(기록) | probe jsonl |
-| G12 | `/reload`·`/new`·`/resume`·`/fork` 이벤트 순서, reload 때 이전 인스턴스가 shutdown을 받는지 | `/new`(대화형, `--no-session`): main에서 `session_before_switch`(reason=new) -> `session_switch`(reason=new)이고 factory 재호출 없음, 같은 프로세스. `session_shutdown`은 sub 세션 종료에서만 관측됨. `/fork`는 `--no-session`에서 `Error: Fork requires a persisted session`으로 불가. `/resume`은 저장된 세션이 있어야 하는데 이 환경에서 persisted 대화형 시작이 공용 SDK 인덱스 락(`~/.gjc/agent/sdk/sessions/index.jsonl.lock`)에 막혀 측정하지 못했다. `/reload`는 slash 명령이 아니라서 측정하지 못했다. `SessionSwitchEvent.reason`은 `"new"|"resume"|"fork"`로 선언돼 있다 | 부분(`/new`만 실측; 나머지는 §7.1③의 동일 sessionId+동일 moduleUrl 교체 규칙이 reload를 덮는다) | `probe-interactive-no-session.jsonl`, `probe-g12-new.jsonl` |
+| G12 | `/reload`·`/new`·`/resume`·`/fork` 이벤트 순서, reload 때 이전 인스턴스가 shutdown을 받는지 | `/new`(대화형, `--no-session`): main에서 `session_before_switch`(reason=new) -> `session_switch`(reason=new)이고 factory 재호출 없음, 같은 프로세스. `session_shutdown`은 sub 세션 종료에서만 관측됨. `/fork`는 `--no-session`에서 `Error: Fork requires a persisted session`으로 불가. `/resume`은 저장된 세션이 있어야 하는데 이 환경에서 persisted 대화형 시작이 공용 SDK 인덱스 락(`<user-home>/.gjc/agent/sdk/sessions/index.jsonl.lock`)에 막혀 측정하지 못했다. `/reload`는 slash 명령이 아니라서 측정하지 못했다. `SessionSwitchEvent.reason`은 `"new"|"resume"|"fork"`로 선언돼 있다 | 부분(`/new`만 실측; 나머지는 §7.1③의 동일 sessionId+동일 moduleUrl 교체 규칙이 reload를 덮는다) | `probe-interactive-no-session.jsonl`, `probe-g12-new.jsonl` |
 | U9 | split/close 20회 | 20회 성공, id 목록 기록. id는 재사용되지 않고 증가 | PASS | `probe.jsonl` |
 | U10 | 새 pane에서 `exit` | pane이 list에서 사라짐 | PASS | `probe.jsonl` |
 | U12 | split 직접 명령·label 옵션 | split 옵션: `--pane --current --direction --ratio --cwd --env --right-click --focus --no-focus`. 직접 명령/label 옵션은 없음 | 기록 | `probe.jsonl` |
-| G13 | `GJC_CODING_AGENT_DIR`로 바꾼 agent-dir의 `extensions/*.js`를 project-scope에서 로드(드릴용) | **정정: user-scope 로드는 확인하지 못했다.** 앞선 PASS는 같은 case 디렉터리의 project-scope shim(`work/.gjc/extensions/`)이 남아 있어서 생긴 오판이었다. project-scope shim을 제거하고 다시 돌리면 `GJC_CODING_AGENT_DIR`로 지정한 agent-dir의 `extensions/`는 로드되지 않았다(`probe-g13v` 재현). 같은 환경변수로 실행한 `gjc config path`도 `C:\Users\USER\.gjc\agent`를 출력했고, 대화형 시작은 여전히 `C:\Users\USER\.gjc\agent\sdk\sessions\index.jsonl.lock`을 잡으려 했다. 즉 이 0.18.11 바이너리는 이 환경에서 `GJC_CODING_AGENT_DIR`를 따르지 않는다(원인은 미확인) | FAIL(user-scope 드릴 불가) -> 계획 경로: 드릴은 dev shim 경로로만 하고 L6 사용자 범위 드릴은 소유자 승인 아래에서 | `.sandbox/probe-g13v` 재현 명령 |
+| G13 | `GJC_CODING_AGENT_DIR`로 바꾼 agent-dir의 `extensions/*.js`를 project-scope에서 로드(드릴용) | **정정: user-scope 로드는 확인하지 못했다.** 앞선 PASS는 같은 case 디렉터리의 project-scope shim(`work/.gjc/extensions/`)이 남아 있어서 생긴 오판이었다. project-scope shim을 제거하고 다시 돌리면 `GJC_CODING_AGENT_DIR`로 지정한 agent-dir의 `extensions/`는 로드되지 않았다(`probe-g13v` 재현). 같은 환경변수로 실행한 `gjc config path`도 `<agent-dir>`를 출력했고, 대화형 시작은 여전히 `<agent-dir>/sdk/sessions/index.jsonl.lock`을 잡으려 했다. 즉 이 0.18.11 바이너리는 이 환경에서 `GJC_CODING_AGENT_DIR`를 따르지 않는다(원인은 미확인) | FAIL(user-scope 드릴 불가) -> 계획 경로: 드릴은 dev shim 경로로만 하고 L6 사용자 범위 드릴은 소유자 승인 아래에서 | `.sandbox/probe-g13v` 재현 명령 |
 | U7 | socket `events.subscribe` -> `pane_focused` | Windows에서 `\\.\pipe\<HERDR_SOCKET_PATH 전체>` 형태로 연결(omo와 동일). subscribe ack 후 `pane_focused`, `tab_focused`, `workspace_focused` 수신 | PASS | `probe.jsonl` |
 | G6 포커스 | `split --no-focus` 전후 focused 집합 불변 | `[w1:p1]` -> `[w1:p1]` | PASS | `probe.jsonl` |
 | U11 | 셸 종류, trailer, 한글·공백 인용 | 셸은 Windows PowerShell(5.1). `pane run`으로 한글·공백 경로와 따옴표 인자가 그대로 전달됨 | PASS | 명령 출력 |
@@ -202,14 +205,14 @@ G12 확인용 `/new` 입력 뒤 같은 pane에 `/reload`를 보냈는데, 그것
 
 ### L0 종료 처리
 - `spike/`는 삭제했다(사본은 git 밖 `.evidence/L0/spike-src/`).
-- harness가 만든 Herdr session `gjcdash-probe`는 workspace 2개를 닫고 `herdr session stop`으로 중지했다. 기존 session(`default`, `piomo`, `gen10qa` 등)과 소유자 pane `w1:pT5`는 건드리지 않았다.
-- 소유자 Go(2026-10-17 10:35 KST)를 받은 뒤 이 기록을 확정했다. 보강 증거: `g10-output.txt`(G10 bun/node 단독 실행; gjc 프로세스 안에서의 실행은 아님), `g13-config-path.txt`(`gjc config path`가 환경변수 격리와 무관하게 `C:\Users\USER\.gjc\agent`를 출력). 아키텍트 비차단 지적(SR 자체검증 분기 보강, SR9 FAILPOINT/INSTALL 범위, SR5 verify-package import, G12 reload 실측 또는 AC4.7 축소, 제품 스캔 0개 가드, SR8 우회)은 L1 이월 항목이다.
+- harness가 만든 Herdr session `gjcdash-probe`는 workspace 2개를 닫고 `herdr session stop`으로 중지했다. 기존 session들과 소유자 pane은 건드리지 않았다.
+- 소유자 Go(2026-10-17 10:35 KST)를 받은 뒤 이 기록을 확정했다. 보강 증거: `g10-output.txt`(G10 bun/node 단독 실행; gjc 프로세스 안에서의 실행은 아님), `g13-config-path.txt`(`gjc config path`가 환경변수 격리와 무관하게 `<agent-dir>`를 출력). 아키텍트 비차단 지적(SR 자체검증 분기 보강, SR9 FAILPOINT/INSTALL 범위, SR5 verify-package import, G12 reload 실측 또는 AC4.7 축소, 제품 스캔 0개 가드, SR8 우회)은 L1 이월 항목이다.
 
 ## L1 (Todo pane, instance lifecycle and lock)
 
 Unit: `node scripts/test.mjs` 357 tests, 357 pass (LT-1..LT-8 incl. LT-4 matrix, LT-6 clauses 1-3, A-29..A-32 obligations, SR1-SR9, R3 heartbeat-tick and viewer-failpoint argv). Reconciler stress: 15 repeated runs, 0 failures after replacing a timer-based wait with a deterministic gate. `live-wrapper.test.mjs` once failed a single full-suite run (`delay-run-25s` detach test, since deleted) and passed 6/6 isolated re-runs; the flag no longer exists.
 
-Live (harness-owned Herdr session `gjcdash-l1`, interactive `gjc --no-session --no-title` in `.sandbox/case-lv1`, dev shim, GJC 0.18.11; session stopped and workspace closed afterwards; owner pane `w1:pT5` and all other sessions untouched):
+Live (harness-owned Herdr session `gjcdash-l1`, interactive `gjc --no-session --no-title` in `.sandbox/case-lv1`, dev shim, GJC 0.18.11; session stopped and workspace closed afterwards; the owner pane and all other sessions untouched):
 
 | Item | Observed | Result | Evidence |
 |---|---|---|---|
@@ -336,12 +339,12 @@ L4 gaps: AC4.7 live reload; cross-process lock contention live; `/resume` and fo
 
 ## L5 (goal line, third pane omitted)
 
-- F1 re-measure (GJC 0.18.11, interactive main): `typeof ctx.getProjectProgress === 'undefined'`, so no native Progress source exists and the third pane stays omitted; the band remains two roles. Evidence: `C:/Users/USER/orca/projects/gjc-herdr-dashboard/.evidence/L5/goalsurface/summary.json` (read-only main-checkout measurement; `f1-remeasure.json` and `probe-f1-rerun.jsonl` alongside).
+- F1 re-measure (GJC 0.18.11, interactive main): `typeof ctx.getProjectProgress === 'undefined'`, so no native Progress source exists and the third pane stays omitted; the band remains two roles. Evidence: `<repo>/.evidence/L5/goalsurface/summary.json` (read-only main-checkout measurement; `f1-remeasure.json` and `probe-f1-rerun.jsonl` alongside).
 - L5b source: `src/host/sources/goal.mjs` projects `{objective, status, tokensUsed, timeUsedSeconds}` from `ctx.getGoalState()` (primary) and the `goal_updated` payload (fallback); id, provenance, createdAt and updatedAt never cross. Unit tests: `test/unit/goal-source.test.mjs`.
 - Host: every explicit/automatic pass publishes `data/<scopeKey>/goal.json` only after the owner-phase gate; the automatic path is the existing coalesced pass (one running + one trailing) and the 200 ms writer merge. `goal_updated` is the trigger; `dispose()`/`drain()` still flush the write. Unit tests: `test/unit/instance.test.mjs` "L5b: ..." (4 tests, including a foreign-owner no-write case and a 30-event burst).
 - Render: one goal row at the top of the Todo pane (`◎ <objective> · <status> · <tokens> · <elapsed>`), only the objective is fitted; no goal means no row and no blank. Matrix 34/52 x ko/en/zh-cn: `test/unit/goal-render.test.mjs` (footer content and width asserted). Viewer read/clear: `test/unit/viewer.test.mjs` "L5b: ...".
 - Units: `node scripts/test.mjs` -> 575 tests, 575 pass, 0 fail (includes SR1-SR9). The locale test's ROOT check was made worktree-safe (it used to require the checkout basename `gjc-herdr-dashboard`; the `ROOT/locale/<lang>.json` contract is unchanged).
-- Live: `node test/live/l5-goal.mjs` with `HERDR_BIN_PATH=C:\Users\USER\AppData\Local\Programs\Herdr\bin\herdr.exe` -> PASS. `frame-before` had no `◎`; after `/goal reply with the single word ok and stop` the gjc status line showed `🎯 Goal`, and the Todo pane showed the row 440 ms later (gate 2000 ms): `◎ reply with the single word ok and stop · 진행 · 0 토큰 · 0초`; footer `자동 추적 ON · 원본 비어 있음`. Cleanup verified the session, workspace and tab absent. Evidence: `.evidence/L5/LV-goal/{result.json,frame-before.txt,gjc-goal-status.txt,frame-goal.txt,layout-parent.json,layout-todo.json,notify-open.txt,cleanup.json}`.
+- Live: `node test/live/l5-goal.mjs` with `HERDR_BIN_PATH=<herdr-bin>` -> PASS. `frame-before` had no `◎`; after `/goal reply with the single word ok and stop` the gjc status line showed `🎯 Goal`, and the Todo pane showed the row 440 ms later (gate 2000 ms): `◎ reply with the single word ok and stop · 진행 · 0 토큰 · 0초`; footer `자동 추적 ON · 원본 비어 있음`. Cleanup verified the session, workspace and tab absent. Evidence: `.evidence/L5/LV-goal/{result.json,frame-before.txt,gjc-goal-status.txt,frame-goal.txt,layout-parent.json,layout-todo.json,notify-open.txt,cleanup.json}`.
 - Live limitation: this host's GJC profile `m1` has no `openai-codex` credentials (`profile unavailable: m1` in the parent frame), so the goal's model turn did not run and `tokensUsed`/`timeUsedSeconds` stayed 0. The goal-mode status line and the Todo row were still produced; the compact `215K` format is covered by the unit matrix.
 - L5 gaps: no live run with a non-zero goal token/time counter (blocked by the missing model credentials); the third pane remains omitted by design.
 

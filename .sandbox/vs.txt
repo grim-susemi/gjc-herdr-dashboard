@@ -1,9 +1,0 @@
-315: function savePrefs() {
-343: heartbeat.stop();
-356: // first, flush any pending preference save, then close our own pane. closeOwnPane
-376: function stop() {
-495: // Returns the pending preference save, so a caller can await the write. The key
-539: const saved = savePrefs();
-553: const saved = savePrefs();
-733: if (options.once) { await viewer.stop(); return 0; }
-736: const detach = () => { void viewer.stop(); };

@@ -1,8 +1,0 @@
-Usage: node scripts/dev-shim.mjs --case <id> [--state <dir>] [--herdr <json argv>]
-                                  [--viewer-failpoint <value>] [--root <dir>]
-  --case             case id; the shim goes to <root>/case-<id>/.gjc/extensions/
-  --state            absolute state dir written as GJC_HERDR_DASHBOARD_STATE_DIR
-                     (default <case>/.gjc/herdr-dashboard/state)
-  --herdr            JSON argv array for GJC_HERDR_DASHBOARD_HERDR (§7.10)
-  --viewer-failpoint value for GJC_HERDR_DASHBOARD_VIEWER_FAILPOINT (R3, SR9)
-  --root             sandbox root (default <repo>/.sandbox)

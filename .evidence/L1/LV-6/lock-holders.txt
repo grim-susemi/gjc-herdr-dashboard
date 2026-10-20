@@ -1,3 +1,0 @@
-lock files by pid [[40744,2]]
-lock files by instanceId [["25b69c58-6828-4ee5-b5d3-bbdf098430b9",2]]
-owner {"schema":"gjc-herdr-dashboard/owner/1","pid":40744,"instanceId":"25b69c58-6828-4ee5-b5d3-bbdf098430b9","sessionId":"01a1483c-2b35-77af-9edb-f717ba9db4b0","heartbeatAt":1792214521682}

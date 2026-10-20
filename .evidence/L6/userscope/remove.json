@@ -1,9 +1,0 @@
-{
-  "removed": true,
-  "agentDir": "C:\\Users\\USER\\.gjc\\agent",
-  "shim": "C:\\Users\\USER\\.gjc\\agent\\extensions\\gjc-herdr-dashboard.js",
-  "generationsKept": [
-    "generation-000001"
-  ],
-  "state": "C:\\Users\\USER\\.gjc\\agent\\herdr-dashboard\\state"
-}

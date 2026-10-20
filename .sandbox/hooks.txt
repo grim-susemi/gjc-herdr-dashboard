@@ -1,7 +1,0 @@
-59: const world = {
-64: spawn: (overrides = {}) => {
-719: // A "frozen holder" is a pass stopped inside `acquireLock` by the `afterLastCheck` hook, which runs
-727: const pass = holder.explicit({ hooks: { afterLastCheck: async () => { created(); await gate; } } });
-824: const result = await stale.explicit({ hooks: { afterLastCheck: addLater(5) } });
-834: const fencedResult = await fenced.explicit({ hooks: { afterLastCheck: addLater(9) } });
-1104: const exhausted = await tight.explicit({ hooks: { afterLastCheck: async () => {

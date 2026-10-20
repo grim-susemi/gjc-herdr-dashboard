@@ -1,5 +1,8 @@
+# Local work records are private, including redacted copies and backup inventories.
 .sandbox/
 .evidence/
 .gjc/
+backup/
+backup-manifest.json
 dist/
 node_modules/

@@ -1,7 +1,0 @@
-cmd:goal -> false
-/goal -> true
-goal-mode -> true
-goals.json -> true
-goal.json -> false
-goal-state -> true
-slash cmds: "/goal"

@@ -1,1 +1,0 @@
-l4-adopt (LV-5 / AC4.1 / AC4.4 / AC4.6): PASS

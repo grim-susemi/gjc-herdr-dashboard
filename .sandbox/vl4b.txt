@@ -1,9 +1,0 @@
-mjs` LT-6/LT-4 |
-| L1-L3 scripts re-run on the final source | l4-adopt, l4-coexist, l4-lock, kill-recovery, l1-behaviour, lt1-fault, lt3-delay, l2-workers, l2-width, l3-pointer: all PASS in one pass; `l1-behaviour` 5 further consecutive runs PASS (`/exit` -> `연결 끊김` 0.5, 1.4, 0.8, 1.1, 0.5 s after Enter; gate 5 s). Owner kill (kill-recovery) showed `연결 끊김` 8.9 s after the kill (gate 20 s) | PASS | `.evidence/L4/*` |
-| AC-G1 | protected omo files and omo ref/status identical before/after the final L4 live set | PASS | `.evidence/L4/AC-G1-{before,after}.txt` |
-
-`l1-behaviour` flake history, all runs (the `/new` assertion): before the `session_switch` handler 4 of 7 runs failed; with it 5 of 5 passed, then 2 of 11 later runs failed (1 of 3, then 1 of 6, with the script loosened in between: retries 3 -> 6, idle wait, 20 s window) - the cause was the auto-pass queue backlog above, not input loss (the frame showed `New session started` while the slot still named the old session). With coalescing: 8 of 8 PASS, then the full set and 5 further runs PASS.
-
-Defects found by L4 live runs and fixed: (1) the restarted process's first heartbeat overwrote the previous owner record so `/dashboard` reported `ready` instead of `adopted`; (2) a `/new` rebound late; (3) the auto-pass queue grew without bound while a subagent was publishing progress; (4) the unit teardown `rm` of the temp state directory raced a late write and failed `ENOTEMPTY` intermittently (`maxRetries` in four test files).
-
-L4 gaps: AC4.7 live reload; cross-process lock contention live; `/resume` and fork (no persisted interactive session under the shared SDK lock); foreign panes created by a real omo; an in-flight auto pass or heartbeat can still outlive `session_shutdown` by one await (the stamp itself is protected).

@@ -1,7 +1,0 @@
-schema,session,created,observed,closed,verifiedAbsent
-new attempt 1: scope unchanged
-new attempt 2: scope unchanged
-new attempt 3: scope unchanged
-new attempt 4: scope unchanged
-new attempt 5: scope unchanged
-new attempt 6: scope unchanged

@@ -1,5 +1,0 @@
-modelProfile: 
-modelRoles: 
-  agentModelOverrides: 
-    architect: anthropic/claude-opus-5-5:max
-    critic: openai-codex/gpt-6.1-sol:high

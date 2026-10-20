@@ -1,4 +1,0 @@
-first_seen_at=1792436513176 projection_updatedAt=1792436512912 generatedAt=1792436513113
-event_to_disk_ms=264
-event_to_viewer_screen_ms=1156 (sampled every 250 ms plus a pane read; the viewer repaints every 1 s)
-prompt_to_row_ms=6050 (includes the model turn)

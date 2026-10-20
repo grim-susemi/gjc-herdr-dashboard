@@ -1,3 +1,0 @@
-C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/internal-urls/docs-index.generated.ts:139:	"tools/task.md": "# task\n\n> Launch subagents for parallel, optionally isolated work.\n\n## Source\n- Entry: `
-C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:46:export const TASK_SUBAGENT_PROGRESS_CHANNEL = "task:subagent:progress";
-C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:49:export const TASK_SUBAGENT_LIFECYCLE_CHANNEL = "task:subagent:lifecycle";

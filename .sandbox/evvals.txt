@@ -1,4 +1,0 @@
-timing: { "killedAt": 1792336836490, "killToLabelMs": 9342, "ownerHeartbeatAt": 1792336835332, "lastHeartbeatToLabelMs": 10500 } 
-ac12: first_seen_at=1792336151731 projection_updatedAt=1792336151263 generatedAt=1792336151465 event_to_disk_ms=468 event_to_viewer_screen_ms=1395 (sampled every 250 ms plus a pane read; the viewer repaints every 1 s) prompt_to_row_ms=6073 (includes the model turn) 
-attempts: [ { "attempt": 1, "notifiesBefore": 0, "pairNotifies": 1, "pairLines": [ "ext dev · Todo 열림 · Workers 열림" ], "cumulative": 1 }, { "attempt": 2, "notifiesBefore": 1, "pairNotifies": 2, "pairLines": [ "ext dev · Todo 정상 · Workers 정상", "ext dev · Todo 정상 · Workers 정상" ], "cumulative": 3 } ] 
-tests: ℹ tests 546 ℹ pass 546 ℹ fail 0

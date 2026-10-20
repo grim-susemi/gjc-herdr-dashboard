@@ -1,4 +1,0 @@
-src/core/reconciler.mjs:64:  slotPaths, writeIntent, writeOwner as writeOwnerFile, writeSlot } from './slot.mjs';
-src/core/reconciler.mjs:456:        await writeOwnerFile(paths.owner, ownerRecord({ pid, instanceId,
-src/core/reconciler.mjs:468:        await writeOwnerFile(paths.owner, ownerRecord({ pid, instanceId,
-src/core/reconciler.mjs:761:      await writeOwnerFile(paths.owner, owner);

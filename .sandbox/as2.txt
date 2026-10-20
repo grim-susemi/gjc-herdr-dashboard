@@ -1,7 +1,0 @@
-"blocked"
-"done"
-"idle"
-"unknown"
-"waiting"
-"working"
-has agent_status
