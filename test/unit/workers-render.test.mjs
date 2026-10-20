@@ -631,6 +631,29 @@ test("the header is `Workers [done/total]` with an always-present run count and 
   assert.match(agent.bodyLines[0], /explorer/);
 });
 
+test("a narrow mixed header drops secondary tallies before the completed fold", () => {
+  const cards = [card("r", { title: "run", status: "running" }),
+    card("f", { title: "fail", status: "failed" }),
+    card("c", { title: "done", status: "completed" })];
+  const header = (columns, showCompleted = false) => frameOf(cards, { columns, rows: 14,
+    view: { follow: false, showCompleted } }).lines[0];
+  // 34 columns: failed is dropped first, but the done count and its mark survive.
+  assert.equal(header(34), " Workers [1/3]  run 1 · done 1 ▸");
+  assert.equal(header(34, true), " Workers [1/3]  run 1 · done 1 ▾");
+  // 24/26 columns still clip the retained summary like OMO rather than dropping the mark
+  // for a different one; the run count is always readable.
+  assert.equal(header(24), " Workers [1/3]  run 1 …");
+  assert.equal(header(26), " Workers [1/3]  run 1 · …");
+  // Wide panes keep every tally in the documented order.
+  assert.equal(header(54), " Workers [1/3]  run 1 · failed 1 · done 1 ▸");
+  // Drop order is paused, aborted, failed; the fold segment is never dropped while it fits.
+  const all = [card("r", { status: "running" }), card("f", { status: "failed" }),
+    card("a", { status: "aborted" }), card("p", { status: "paused" }),
+    card("c", { status: "completed" })];
+  const five = frameOf(all, { columns: 52, rows: 14, view: { follow: false } }).lines[0];
+  assert.equal(five, " Workers [1/5]  run 1 · failed 1 · done 1 ▸");
+});
+
 test("the header name is bold cyan in every state, the tally is bold yellow, the summary dim", () => {
   const frame = frameOf([card("c1")], { columns: 60, color: true });
   assert.ok(frame.lines[0].startsWith(" \x1b[1;36mWorkers\x1b[0m \x1b[1;33m["));

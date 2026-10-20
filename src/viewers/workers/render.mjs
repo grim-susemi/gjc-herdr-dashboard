@@ -296,19 +296,34 @@ function body(cards, { columns, color, language, now, spin, view, selection }) {
   return { bodyLines, ranges };
 }
 
-function headerSummary(cards, language, showCompleted) {
+function headerSummary(cards, language, showCompleted, room = Infinity) {
   const at = (status) => cards.filter((card) => statusOf(card?.status) === status).length;
-  const parts = [t(language, "workers.tally.running", { count: at("running") })];
+  const entries = [{ status: "running",
+    text: t(language, "workers.tally.running", { count: at("running") }) }];
   for (const status of tallied.slice(1)) {
     const found = at(status);
-    if (found > 0) parts.push(t(language, `workers.tally.${status}`, { count: found }));
+    if (found > 0) {
+      entries.push({ status, text: t(language, `workers.tally.${status}`, { count: found }) });
+    }
   }
   const done = at("completed");
   if (done > 0) {
-    parts.push(`${t(language, "workers.tally.done", { count: done })} ` +
-      `${showCompleted ? "▾" : "▸"}`);
+    entries.push({ status: "done",
+      text: `${t(language, "workers.tally.done", { count: done })} ` +
+        `${showCompleted ? "▾" : "▸"}` });
   }
-  return parts.join(" · ");
+  // Narrow-header priority: drop the secondary tallies before the fold segment, so
+  // `done N ▸/▾` survives a mixed 34-column header while the always-present run
+  // count stays. Any remaining overflow is ordinary OMO-style fitting by the caller.
+  let kept = entries;
+  const summary = (list) => list.map((entry) => entry.text).join(" · ");
+  if (width(summary(kept)) > room) {
+    for (const status of ["paused", "aborted", "failed"]) {
+      kept = kept.filter((entry) => entry.status !== status);
+      if (width(summary(kept)) <= room) break;
+    }
+  }
+  return summary(kept);
 }
 
 function headerPlain(cards, language, showCompleted) {
@@ -357,10 +372,10 @@ export function renderWorkers(projection, {
   const title = t(languageCode, "workers.title");
   const tally = `[${cards.filter((card) => statusOf(card?.status) === "completed").length}/` +
     `${cards.length}]`;
-  const summary = headerSummary(cards, languageCode, showCompleted);
   const edge = columns > 1 ? " " : "";
   const room = columns - edge.length;
   const rest = room - width(`${title} ${tally}`) - 2;
+  const summary = headerSummary(cards, languageCode, showCompleted, rest);
   const header = rest < 0
     ? `${edge}${paint(fit(`${title} ${tally}`, room, false, "…"), "accent", color, true)}`
     : `${edge}${paint(title, "accent", color, true)} ${paint(tally, "time", color, true)}` +

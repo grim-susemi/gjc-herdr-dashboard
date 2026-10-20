@@ -654,7 +654,7 @@ const WORKERS_EXPECTED = {
         " Follow ON · LIVE"
       ],
       "34": [
-        " Workers [1/3]  run 1 · failed 1…",
+        " Workers [1/3]  run 1 · done 1 ▸",
         "─────────────────────────────────",
         ">▌⠋ build the grammar · ⧖ 5m 0s",
         " ▌[worker]",
@@ -736,7 +736,7 @@ const WORKERS_EXPECTED = {
         " Follow ON · LIVE"
       ],
       "34": [
-        " Workers [1/3]  run 1 · failed 1…",
+        " Workers [1/3]  run 1 · done 1 ▾",
         "─────────────────────────────────",
         ">▌⠋ build the grammar · ⧖ 5m 0s",
         " ▌[worker]",
@@ -818,7 +818,7 @@ const WORKERS_EXPECTED = {
         "Follow OFF · OFFLINE 09:05"
       ],
       "34": [
-        " Workers [1/3]  run 1 · failed 1…",
+        " Workers [1/3]  run 1 · done 1 ▸",
         "─────────────────────────────────",
         ">▌⠋ build the grammar · ⧖ 5m 0s",
         " ▌[worker]",
