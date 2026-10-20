@@ -16,6 +16,8 @@ F4/F1/F3 final-wave 지적 중 rows 11, 12, 13, 17, 16을 고쳤다. 이 절은 
 
 검증자 지적 2건을 반영했다. `5897fbe`는 identity wrap 경계에서 첫 행이 agent 전체를 소비해 닫는 `]`가 빠지던 문제를 닫는 continuation 행으로 고치고, 4개 폭 × background on/off × 7개 agent 길이의 56개 경계 grid 회귀 테스트를 추가했으며 GRAMMAR G7의 "세 행" 문구를 continuation 행과 일치시켰다. `7159676`은 divider 도입 뒤 약해진 두 단언을 복원했다: 12장/11 divider geometry에서 drag 목적지는 18행(`c4.start 16` + `bodyStart 2` + 1 = 19행에서 1행까지)이고, 10장/9 divider의 maxScroll 15에서는 첫 스크롤 행이 card 9 위 divider, 다음 행이 card 9, 이어 divider와 card 10이다. 전체 단위 테스트는 **686/686** 통과했다(기존 685 + G7 경계 회귀 1, fail 0). 증거는 `task-fix2-unit.txt`, `task-fix2-boundaries.txt`, `task-fix2-mutation.txt`다.
 
+F2 2차 검토의 H1(배지 분리)을 `4d22a30`에서 고쳤다. 24열 background card에서 `[librarian]`이 `[librarian` + `] background`로 갈라지던 회귀를 재현했고, 이제 `[agent]`가 identity 행에 들어가면 통째로 그리고 ` background`만 두 칸 들여쓰기 dim 행으로 내린다. 긴 agent는 마지막 grapheme을 `]`와 함께 continuation 행에 붙여 `]`만 있는 행을 없앴다(단, columns-1 아래에서 agent text가 `]`와 함께 들어가지 않는 degenerate 폭은 예외다). explicit 4폭 × background on/off × agent 길이 1..columns-3 테스트와 56-case grid의 `]`-only/whole-badge 단언을 추가했고, mutation 3종(whole-badge 분기 제거, trailing-grapheme 이동 제거, 둘 다 복원)에서 새 테스트가 실패함을 확인했다. targeted 182/182, 전체 **687/687** 통과(기존 686 + explicit 1, fail 0). 증거는 `task-fix3-repro.txt`, `task-fix3-unit.txt`, `task-fix3-fuzz.txt`, `task-fix3-mutation.txt`다.
+
 사용자 스코프의 generation-000002는 이 수정들보다 먼저 설치되었다. 따라서 그 pane은 rows 11-17 수정을 포함하지 않는다. 이후 owner 승인 아래 rows 11-17을 포함한 generation-000003을 설치했고, generation-000001과 generation-000002 rollback은 그대로 유지된다(아래 `사용자 범위 설치 (generation-000003)`).
 
 ## 2026-10-20 OMO grammar alignment
