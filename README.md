@@ -88,7 +88,7 @@ F1 실측: GJC 0.18.11의 대화형 main ctx에서 `typeof ctx.getProjectProgres
 - 원천은 `ctx.getGoalState()`와 `goal_updated`뿐이다. `data/<scopeKey>/goal.json`에는 objective·status·
   tokensUsed·timeUsedSeconds만 쓴다(id·provenance는 경계 밖).
 - goal이 있을 때만 헤더 구분선 아래에 ` ◎ <objective> · <상태> · <NK tok> · ⧖ <경과 시간>` 한 줄을 그린다.
-  예: ` ◎ align the todo pane~ · active · 12K tok · ⧖ 5m 3s`. 헤더 위에는 아무것도 없고, 이 줄은 스크롤되는
+  예: ` ◎ align the todo pane · active · 12K tok · ⧖ 5m 3s`. 헤더 위에는 아무것도 없고, 이 줄은 스크롤되는
   본문 위에 고정된다. objective만 pane 폭에 맞춰 자르고(`~`), 좁으면 `tok`부터, 그다음 `◎ `를 뺀다.
   goal이 없으면 줄도 빈 행도 없다. `goal_updated` 뒤 2초 안에 갱신된다.
 - 실제 프레임 예(54열): 헤더 ` Todo [0/2]  done:0 · drop:0`, footer ` Follow ON · LIVE`, 빈 상태

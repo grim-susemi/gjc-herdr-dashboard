@@ -2,6 +2,20 @@
 
 증거는 `.evidence/` 아래에 있고 git에서 제외된다. 아래 기록은 실제로 실행한 명령의 결과만 적는다.
 
+## 2026-10-20 Final-wave follow-up (rows 11-17)
+
+F4/F1/F3 final-wave 지적 중 rows 11, 12, 13, 17, 16을 고쳤다. 이 절은 아래의 당시 기록을 고치지 않고 새 변경만 추가한다.
+
+- **row 11**: Todo EMPTY footer를 OMO Todo `packages/todo/src/render.mjs:230,236`과 같이 cyan `36`으로 바꿨다. WAITING/OFFLINE/SOURCE ERROR는 yellow `33`을 유지하고, Workers EMPTY도 cyan `36`이다. GRAMMAR G3를 고치고 `todo-footer` deviation 행을 삭제했다(Deviations 17행). goal row가 inset을 두 번 빼 한 칸을 잃던 문제도 고쳐 24/26/34/52/54에서 쓸 수 있는 폭 전체를 쓴다.
+- **row 12**: 34열 mixed header에서 secondary tally를 fold segment보다 먼저 떨어뜨려 `run 1 · done 1 ▸/▾`를 유지한다. 우선순위는 paused → aborted → failed이고 fold segment는 마지막이며, 24열은 OMO처럼 `…`로 clipping한다(GRAMMAR G1/G9).
+- **row 13**: 연속으로 그려진 Workers card 사이에 dim full-width divider를 넣었다(OMO `packages/dag/src/render.mjs:568-579`, 특히 `:575`). 첫 card 앞과 마지막 card 뒤에는 없다. selectable/click 범위, scroll 최대치, row budget, completed folding은 divider를 card range 밖에 두어 유지한다(GRAMMAR G7).
+- **row 17**: `c`로 보인 completed card에 OMO의 per-card chevron을 붙여 ` ✓ ▸ done one · ⧖ 12s`로 그린다(OMO `:402`). column-0 선택 marker와 색은 그대로다(GRAMMAR G7/G9).
+- **row 16 (#259)**: 긴 agent/role identity를 ellipsis로 자르지 않고 다음 행에 이어 쓴다. 첫 행은 `[agent`, continuation은 badge 아래 두 칸 들여쓰기와 같은 bar column, 마지막 행은 `]`로 닫는다. `background`는 마지막 identity 행에 붙거나 별도 dim 들여쓰기 행으로 남는다. 최대 6 continuation 행을 그리며, 그를 넘으면 마지막 행이 `…]`로 끝난다. fixture `architect-role-` + `long-role-name-`×6 + `TAIL`은 24/34/54에서 TAIL을 보인다(GRAMMAR G7/G11/truncation/j).
+
+단위 테스트: 관련 targeted 159/159, 전체 `node scripts/test.mjs`는 global lock wrapper로 **685/685** 통과했다(기준선 683 + 새 테스트 2, fail 0). frame/probe 증거는 `task-fix-frames-before.txt`, `task-fix-frames-after.txt`, `task-fix-unit.txt`, `task-fix-probe.txt`다.
+
+사용자 스코프의 generation-000002는 이 수정들보다 먼저 설치되었다. 따라서 현재 설치된 pane은 rows 11-17 수정을 포함하지 않으며, 새 generation 설치는 owner 승인 대기 중이다. generation-000001 rollback은 그대로 유지된다.
+
 ## 2026-10-20 OMO grammar alignment
 
 pane 문법을 omo `3242ad4`에 맞췄다. 규칙과 의도된 차이는 `GRAMMAR.md`(G1..G13, Deviations 18행)에 있다. 아래 기존 절들은 당시 사실 기록이라 고치지 않았다.
