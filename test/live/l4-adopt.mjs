@@ -1,11 +1,11 @@
 // LV-5 / AC4.1, AC4.4 and AC4.6 live: restart adopt, slot corruption, retention.
 //
-//   A. `/dashboard` opens the Todo and Workers panes. `/exit` leaves both viewers alive (`연결 끊김`).
+//   A. `/dashboard` opens the Todo and Workers panes. `/exit` leaves both viewers alive (`OFFLINE`).
 //      Before the restart the script seeds three derived-state scopes (one 30 days old, one 1 day old,
 //      one unrelated slot file) to measure AC4.6 on the real arm path.
 //   B. gjc is started again in the SAME parent pane (same Herdr socket + parent pane id = same layout
 //      key). The next `/dashboard` is `adopted`: the pane ids are unchanged, no pane is added, and the
-//      `연결 끊김` label of both viewers clears. The old (30 day) scope is gone, the 1 day scope stays,
+//      `OFFLINE` label of both viewers clears. The old (30 day) scope is gone, the 1 day scope stays,
 //      slots/ is untouched (AC4.6).
 //   C. The slot file is overwritten with garbage (AC4.4). The next `/dashboard` quarantines it
 //      (`slot.json.corrupt-*` exists), the pass finishes, and exactly one Todo and one Workers pane
@@ -101,7 +101,7 @@ await runScript('l4-adopt (LV-5 / AC4.1 / AC4.4 / AC4.6)', async () => {
     assert(stopped.pid === ownerBefore.pid, 'the owner record of the exited process is the one that stopped', { stopped });
     const exitedFrame = await until(() => {
       const frame = stripAnsi(fixture.readPane(before.todo[0]));
-      return /연결 끊김/.test(frame) ? frame : null;
+      return /OFFLINE/.test(frame) ? frame : null;
     }, 'disconnected label after /exit', 30_000);
     writeEvidence(evidence, 'todo-after-exit.txt', exitedFrame);
     await sleep(3_000);
@@ -125,8 +125,8 @@ await runScript('l4-adopt (LV-5 / AC4.1 / AC4.4 / AC4.6)', async () => {
     for (const role of ['todo', 'workers']) {
       labelCleared[role] = await until(() => {
         const frame = stripAnsi(fixture.readPane(after[role][0]));
-        return /연결 끊김/.test(frame) ? null : frame;
-      }, `${role} viewer clears 연결 끊김`, 45_000);
+        return /OFFLINE/.test(frame) ? null : frame;
+      }, `${role} viewer clears OFFLINE`, 45_000);
       writeEvidence(evidence, `${role}-after-adopt.txt`, labelCleared[role]);
     }
     const ownerAfter = readJson(ownerFile);

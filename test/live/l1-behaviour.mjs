@@ -5,7 +5,7 @@
 //                   the first sample that shows the row)
 //   LV-6            a task subagent run: wrapper-log Herdr call count before/after, state-dir file diff
 //   AC1.11 / LV-11  `/new` then a Todo row then the old scope is not mixed: scopeKey changes, pane id stays
-//   AC1.9 (exit)    `/exit` -> the viewer shows `연결 끊김` within 5 s, pane stays
+//   AC1.9 (exit)    `/exit` -> the viewer shows `OFFLINE` within 5 s, pane stays
 //
 // Run: node test/live/l1-behaviour.mjs
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -201,7 +201,7 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
 
     for (let i = 0; i < 60 && status() !== 'idle'; i += 1) await sleep(2_000);
     await sleep(2_000);
-    // ---- AC1.9 exit: /exit -> 연결 끊김 within 5 s ----------------------------------------------
+    // ---- AC1.9 exit: /exit -> OFFLINE within 5 s ------------------------------------------------
     fixture.sendText(parent, '/exi');
     await sleep(900);
     fixture.sendText(parent, 't');
@@ -215,12 +215,12 @@ await runScript('l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9)', async () => {
       const pane = viewerPanes(fixture)[0];
       if (!pane) break;
       frame = stripAnsi(fixture.readPane(pane.pane_id));
-      if (/연결 끊김/.test(frame)) disconnectMs = Date.now() - exitAt;
+      if (/OFFLINE/.test(frame)) disconnectMs = Date.now() - exitAt;
     }
     writeEvidence(evidence, 'viewer-after-exit.txt', frame);
     writeEvidence(evidence, 'ac1-9-exit.txt', `disconnect_label_ms_after_enter=${disconnectMs}`);
-    assert(disconnectMs !== null, 'the viewer showed 연결 끊김 after /exit', { frame });
-    assert(disconnectMs <= 5_000, `AC1.9: 연결 끊김 within 5 s of a normal exit (took ${disconnectMs} ms)`, { frame });
+    assert(disconnectMs !== null, 'the viewer showed OFFLINE after /exit', { frame });
+    assert(disconnectMs <= 5_000, `AC1.9: OFFLINE within 5 s of a normal exit (took ${disconnectMs} ms)`, { frame });
     assert(viewerPanes(fixture).length === 1, 'the viewer pane stays after /exit');
     result.ac19Exit = { disconnectMs };
     writeEvidenceJson(evidence, 'result.json', result);

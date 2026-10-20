@@ -6,7 +6,7 @@
 // override is typed: the installed product resolves Herdr exactly as it would for the owner.
 //
 //   AC6.2  --doctor ok -> fresh gjc `/dashboard` -> `ext gen-NNNNNN · Todo 열림 · Workers 열림`
-//          (token == the selected generation), Todo viewer paints `자동 추적 ON`, a Workers pane exists
+//          (token == the selected generation), Todo viewer paints `Follow ON`, a Workers pane exists
 //   AC6.3  --remove -> fresh gjc `/dashboard` -> no `ext ` notify and no extension error frame
 //   restore --select <the same generation> -> --doctor ok again (the owner keeps the install)
 //
@@ -129,7 +129,7 @@ await runScript("l6-userscope (AC6.2/AC6.3)", async () => {
       if (todo === null) await sleep(1_000);
     }
     assert(todo !== null, "AC6.2: a Todo viewer pane exists", { panes: fixture.listPanes() });
-    await fixture.waitFor(todo.pane_id, (value) => stripAnsi(value).includes("자동 추적 ON"),
+    await fixture.waitFor(todo.pane_id, (value) => stripAnsi(value).includes("Follow ON"),
       { timeoutMs: 45_000, label: "Todo viewer footer" });
     fixture.snapshot(EVID, "frame-todo", todo.pane_id);
     const workers = viewerPanes(fixture, "workers")[0] ?? null;

@@ -154,8 +154,8 @@ await runScript("l6-drills (D1-D4)", async () => {
     assert(/열림/.test(openA.line), "D1: the ko generation says opened", { line: openA.line });
     writeEvidence(ev("D1"), "notify-a.txt", openA.line);
     fixture.snapshot(join(EVIDENCE_L6, "D1"), "frame-a", parent);
-    const frameA = await todoViewerFrame("D1", "viewer-a", "자동 추적 ON");
-    assert(/실시간|연결 대기|원본/.test(frameA), "D1: the ko viewer painted its footer", { frameA });
+    const frameA = await todoViewerFrame("D1", "viewer-a", "Follow ON");
+    assert(/LIVE|WAITING|EMPTY/.test(frameA), "D1: the ko viewer painted its footer", { frameA });
     const slotA = readJson(join(STATE_DIR, "slots", listDir(join(STATE_DIR, "slots"))[0], "slot.json"));
     await exitGjc("D1 after A");
 

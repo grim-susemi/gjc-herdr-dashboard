@@ -26,7 +26,7 @@ const SESSION = 'gjcdash-lt3';
 const WRAPPER = join(REPO, 'test', 'live', 'herdr-wrapper.mjs');
 const PENDING = /열림|준비|opened|pending/;
 const ROW = 'lv3-row-alpha';
-const LIVE_FOOTER = /실시간/;
+const LIVE_FOOTER = /LIVE/;
 const sleep = (ms) => new Promise((done) => { setTimeout(done, ms); });
 
 const slotOf = (stateDir) => {
@@ -124,7 +124,7 @@ await runScript('lt3-delay (LV-3)', async () => {
     const viewer = viewerPanes(fixture)[0];
     const frame = stripAnsi(fixture.readPane(viewer.pane_id));
     assert(frame.includes(ROW), 'the viewer shows the fixture Todo row', { frame });
-    assert(LIVE_FOOTER.test(frame), 'the footer says 실시간', { frame });
+    assert(LIVE_FOOTER.test(frame), 'the footer says LIVE', { frame });
     assert(viewerPanes(fixture).length === 1, 'still one role pane');
 
     writeEvidence(evidence, 'early-frame.txt', earlyFrame ?? '');
@@ -138,7 +138,7 @@ await runScript('lt3-delay (LV-3)', async () => {
     await expectNoNotify(fixture, ws.rootPaneId, PENDING,
       { windowMs: 10_000, baseline: notifyLines(fixture.readPane(ws.rootPaneId)).filter((l) => PENDING.test(l)).length });
 
-    fixture.record('assertion', `lv3: ${opened.line}; ready at +${readyAtMs} ms with the row and 실시간`);
+    fixture.record('assertion', `lv3: ${opened.line}; ready at +${readyAtMs} ms with the row and LIVE`);
     return { notify: opened.line, readyAtMs, samples: samples.length };
   } finally {
     const cleanup = await fixture.cleanup();
