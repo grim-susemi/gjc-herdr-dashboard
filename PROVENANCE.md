@@ -8,7 +8,8 @@
 |---|---|
 | 계획에 적힌 SHA | `26e60ca20a2152c7c00fa6a060c78f697f752ff4` |
 | L0 시점 `main` | `4082c7509c4a2f8a53128b85bfd38acf017a52c3` |
-| 고정한 SHA | `4082c7509c4a2f8a53128b85bfd38acf017a52c3` |
+| 고정한 SHA | `4082c7509c4a2f8a53128b85bfd38acf017a52c3` (초기 이식) |
+| 재정렬 SHA (2026-10-20) | `3242ad43561e10bc66b3f28b6345420962b4df99` (`3242ad4`, see the re-alignment section below and GRAMMAR.md) |
 | 변경 파일 (26e60ca2..4082c750) | `README.md`, `VERIFICATION.md`, `packages/dag/src/render.mjs`, `packages/dag/test/dashboard-b.test.mjs` |
 | 변경 커밋 | `4082c75 fix(workers): flatten child cards while retaining group context` |
 | omo `status --porcelain` | 비어 있음 (L0 시점) |
@@ -342,3 +343,13 @@ not modified by this lane; nothing under `src/` was edited. Every path a test wr
 | `src/viewers/workers/render.mjs` | `packages/dag/src/render.mjs` | adapt | 15/7/8(`dashboard-b.test.mjs`) | omo의 DAG 카드에서 **카드 골격만** 가져왔다: 상태 글리프 + 제목 1행, 문맥 2행(도구·의도·마지막 출력), 지표 3행, 그리고 "그려진 모든 행은 pane 폭을 넘지 않는다" 규칙. 뺀 것: DAG 그래프와 run 선택기, 모델/effort 배지, 상자 그리기, 하위 작업 들여쓰기, omo 자체 투영에만 있는 지표 어휘(`metricUnknown`·`cost_status`·`tokens_per_second` 등). 프레임 골격(헤더 → 본문 → 구분선 → 호출자가 준 footer)과 스크롤·선택 계약은 `src/viewers/todo/render.mjs`를 따랐다. omo의 `compactDuration`(`{count}h/{count}m/{count}s`)은 어휘를 그대로 쓰되 키를 `workers.compact*`로 분리했다. **footer는 이 모듈이 만들지 않는다**: 호출자가 이미 완성한 줄 배열을 받아 그대로 마지막 행으로 붙이고, 자르지도 감싸지도 않는다(AC-F1·AC-F3의 내용 단언은 호출자 몫). `color`는 이미 크기가 정해진 run만 SGR로 감싸므로 폭을 바꿀 수 없다(테스트로 고정). |
 | `test/unit/workers-render.test.mjs` | `packages/dag/test/dashboard-b.test.mjs` | adapt + new | — | omo 테스트에서 "카드 한 장을 여러 폭에서 검사한다"는 발상만 가져왔고, 단언은 우리 계약으로 새로 썼다. 상태 6종 × 24/40/54열 × ko/en 스냅샷(폭이 아니라 내용을 단언), 완료 카드 자동 접힘과 `c`/카드별 펼침, 실패와 중단의 글리프·단어 구분(AC2.2), 24열에서 제목과 상태가 함께 남는지(AC-F4), 선택 이동과 양 끝 클램프, `d` 상세 보기, 스크롤 클램프와 follow, 알 수 없는 비용·컨텍스트의 `?` 표기(K1; 0도 알 수 없음), 호출자 footer의 무손실 통과, 색상이 폭을 바꾸지 않는지, 적대적 제목의 제어문자 제거. 33/33. |
 | `locale/{ko,en,zh-cn}.json` | `packages/dag/src/i18n.mjs`(workers 어휘) | adapt | — | `workers.` 접두사 키 29개(상태 7·지표 5·압축 기간 3·상세 필드 7·본문 4·제목/미상/백그라운드 3)를 추가했다. omo 표에서 `metricUnknown`·`cost`·`compactHours/Minutes/Seconds`에 대응하는 어휘를 가져왔지만 omo의 지표 키(`input_tokens` 등)는 우리 투영에 없어 넣지 않았다. 실패(`workers.status.failed`)와 중단(`workers.status.aborted`)은 세 언어 모두 다른 단어다. 세 파일은 키·보간 파라미터가 동일하다(`test/unit/i18n.test.mjs`가 단언). |
+
+## Re-alignment with omo-herdr-dashboard 3242ad4 (2026-10-20)
+
+The pane grammar was re-aligned with omo-herdr-dashboard at `3242ad43561e10bc66b3f28b6345420962b4df99`. The rules and their OMO source lines are in GRAMMAR.md; nothing was vendored, the grammar is ported by hand. Files re-aligned:
+
+- `src/viewers/common.mjs`
+- `src/viewers/todo/render.mjs`
+- `src/viewers/workers/render.mjs`
+- `src/viewers/workers/viewer.mjs`
+- `locale/*.json`

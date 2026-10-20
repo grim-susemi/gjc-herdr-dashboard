@@ -8,6 +8,7 @@
 // The text primitives (clean/width/fit/wrap) are narrowly adapted from
 // omo-herdr-dashboard `packages/todo/src/render.mjs` @4082c750, which in turn
 // adapted them from omo-herdr-dag-follow/src/render.mjs.
+// grammar re-aligned with omo-herdr-dashboard 3242ad4, see GRAMMAR.md
 // MIT License, Copyright (c) 2026 omo-herdr-dag contributors.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
