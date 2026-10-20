@@ -79,7 +79,8 @@ await runScript('l4-adopt (LV-5 / AC4.1 / AC4.4 / AC4.6)', async () => {
     const opened = await sendSlash(fixture, parent, 'dashboard', OPENED, { label: 'open' });
     writeEvidence(evidence, 'notify-open.txt', opened.line);
     await until(() => viewerPanes(fixture, 'workers')[0] && viewerPanes(fixture, 'todo')[0], 'both role panes');
-    for (const pane of viewerPanes(fixture, null)) fixture.adoptPane(pane.pane_id, { role: 'viewer', label: pane.label });
+    // Panes carry no manual label, so adoption records the id and the tab only.
+    for (const pane of viewerPanes(fixture, null)) fixture.adoptPane(pane.pane_id, { role: 'viewer' });
     const before = roleIds(fixture);
     const slotsDir = join(paths.stateDir, 'slots');
     const slotKey = readdirSync(slotsDir)[0];

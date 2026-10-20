@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createDataWriter } from '../../src/core/data.mjs';
-import { key8Of, labelOf, layoutKeyOf, slotPaths } from '../../src/core/slot.mjs';
+import { layoutKeyOf, slotPaths } from '../../src/core/slot.mjs';
 import { createReconciler } from '../../src/core/reconciler.mjs';
 import { writeJson } from '../../src/storage.mjs';
 import { createFakeClock, createFakeHerdr, createFakeProcesses, createPassTracer } from './fake-herdr.mjs';
@@ -25,7 +25,8 @@ const OWNER_PID = 4242;
 const VIEWER = fileURLToPath(new URL('../../src/viewers/todo/viewer.mjs', import.meta.url));
 // A-32: the closed set of verbs an automatic pass may use.
 const AUTO_ALLOWED = new Set(['pane list', 'pane process-info', 'pane layout']);
-const MUTATIONS = new Set(['pane split', 'pane rename', 'pane run', 'pane close', 'pane focus']);
+// `pane rename` is absent on purpose: panes carry no manual label, so the product never issues it.
+const MUTATIONS = new Set(['pane split', 'pane run', 'pane close', 'pane focus']);
 
 // The shared pass-formatting contract: exactly one notify per explicit pass, none for automatic
 // passes (plan 7.4). The reconciler hands the caller every notify material for explicit passes and
@@ -43,7 +44,6 @@ async function createWorld(t, options = {}) {
   const tracer = createPassTracer(fake.herdr);
   const binding = { socket: '/tmp/herdr.sock', parentPaneId: 'w1:p1', tabId: 'w1:t1', sessionId: 's-1' };
   const layoutKey = layoutKeyOf({ socket: binding.socket, parentPaneId: binding.parentPaneId });
-  const key8 = key8Of(layoutKey);
   const paths = slotPaths(stateDir, layoutKey);
   const deps = {
     stateDir, herdr: tracer.herdr, vector: ['herdr.exe'], now: clock.now,
@@ -58,7 +58,7 @@ async function createWorld(t, options = {}) {
   const make = overrides => createReconciler({ ...deps, ...options.deps, ...overrides });
   const reconciler = make();
   const world = {
-    stateDir, clock, fake, processes, tracer, binding, layoutKey, key8, paths, deps, reconciler, make,
+    stateDir, clock, fake, processes, tracer, binding, layoutKey, paths, deps, reconciler, make,
     // A second, independent view of the same fake: a test that must prove a pass issued NO herdr
     // call at all gives that pass its own tracer, because a shared tracer's trace is reset when
     // the next pass starts.
@@ -105,6 +105,22 @@ async function createWorld(t, options = {}) {
 }
 
 // Open the todo role the way the product does: one explicit pass from a clean state.
+// Run one explicit pass against a view of `pane list` that reports `paneId` under `tabId` instead
+// of the real one. Everything still goes through the world's tracer, so the usual verb assertions
+// keep working. Since panes carry no label any more, this is how a test makes a same-id pane
+// provably NOT ours without deleting it.
+async function passWithTab(world, { paneId, tabId }) {
+  const retab = async (...args) => {
+    const result = await world.tracer.herdr(...args);
+    if (args[0] !== 'pane' || args[1] !== 'list') return result;
+    return { ...result, panes: result.panes.map(pane => (pane.pane_id === paneId
+      ? { ...pane, tab_id: tabId } : pane)) };
+  };
+  const retabbed = world.make({ herdr: retab });
+  return world.tracer.inPass('explicit', () => retabbed.explicitPass({
+    binding: world.binding, roles: ['todo'] }));
+}
+
 async function openTodo(world, overrides = {}) {
   const first = await world.explicit(overrides);
   const record = (await world.slot())?.roles?.todo ?? null;
@@ -200,16 +216,18 @@ test('LT-2 r5: a dead viewer on a pane whose shell changed keeps the orphan (T17
   assert.equal(pass.roles.todo.code, 'partial:ownership-unproven');
   assert.equal(pass.roles.todo.keptPaneId, record.paneId);
   assert.equal(world.fake.has(record.paneId), true, 'a pane we cannot prove ours is never closed');
-  assert.equal(world.fake.labelOf(record.paneId), record.label, 'and never renamed');
+  assert.equal(world.fake.paneLabel(record.paneId), null, 'and never renamed');
   assert.equal(world.fake.commandOf(record.paneId), world.fake.commandOf(record.paneId));
 });
 
-test('LT-2 r6: a pane carrying a different label is an unproven orphan (T5, partial)', async t => {
+test('LT-2 r6: a same-id pane reported under another tab is an unproven orphan (T5, partial)', async t => {
   const world = await createWorld(t);
   const { record } = await openTodo(world);
-  world.fake.setLabel(record.paneId, 'someone else');
-  const pass = await world.explicit();
+  // Identity is paneId + tabId now that no pane carries a label, so a pane with our id in a
+  // different tab proves nothing: the pass keeps the orphan and opens a new pane next to it.
+  const pass = await passWithTab(world, { paneId: record.paneId, tabId: 'w2:t9' });
   assertEqualsPartial(pass, record);
+  assert.equal(world.fake.has(record.paneId), true, 'the unprovable pane is never closed');
 });
 
 function assertEqualsPartial(pass, record) {
@@ -373,12 +391,18 @@ test('S6a A-29: an automatic pass takes zero action while the q pane exists, the
 });
 
 test('S6b A-29: the not-O+ q variants keep the pane, open a new one and report partial with the paneId', async t => {
-  for (const variant of ['shell', 'label']) {
+  // Without a pane label there are two ways to be present-but-not-ours: the shell changed, or the
+  // pane list reports our id under another tab.
+  for (const variant of ['shell', 'tab']) {
     const { world, record } = await closingQWorld(t);
-    if (variant === 'shell') world.fake.setShell(record.paneId, 31337);
-    else world.fake.setLabel(record.paneId, 'GJC Todo · other');
+    let explicit;
     const panesBefore = world.fake.ids();
-    const explicit = await world.explicit();
+    if (variant === 'shell') {
+      world.fake.setShell(record.paneId, 31337);
+      explicit = await world.explicit();
+    } else {
+      explicit = await passWithTab(world, { paneId: record.paneId, tabId: 'w2:t9' });
+    }
     assert.equal(explicit.roles.todo.id, 'T20');
     assert.equal(explicit.roles.todo.code, 'partial:ownership-unproven');
     assert.equal(explicit.roles.todo.keptPaneId, record.paneId);
@@ -644,7 +668,7 @@ test('LT-5: a foreign pane, a corrupt slot, an unknown schema and a small parent
   assert.match(opened.roles.todo.detail, /shape:foreign:w1:p9/);
   assert.equal(foreign.fake.paneIds().filter(paneId => paneId !== 'w1:p1' && paneId !== 'w1:p9').length, 1,
     'the Todo pane is still created');
-  assert.equal(foreign.fake.labelOf('w1:p9'), 'DAG · x');
+  assert.equal(foreign.fake.paneLabel('w1:p9'), 'DAG · x');
   assert.equal(foreign.fake.commandOf('w1:p9'), null);
   assert.equal(foreign.fake.shellOf('w1:p9'), 6060);
   assert.deepEqual(foreign.tracer.mutations('explicit')
@@ -699,8 +723,8 @@ test('LT-5: a foreign pane, a corrupt slot, an unknown schema and a small parent
   assert.deepEqual(siblings.tracer.mutations('explicit')
     .filter(entry => ['w1:p8', 'w1:p7'].includes(entry.argv[2])), [],
   'no foreign pane was closed, renamed, run or focused');
-  assert.equal(siblings.fake.labelOf('w1:p8'), 'OmO DAG');
-  assert.equal(siblings.fake.labelOf('w1:p7'), 'OmO Todo · x');
+  assert.equal(siblings.fake.paneLabel('w1:p8'), 'OmO DAG');
+  assert.equal(siblings.fake.paneLabel('w1:p7'), 'OmO Todo · x');
   assert.equal(siblings.fake.shellOf('w1:p8'), 6061);
   assert.equal(siblings.fake.shellOf('w1:p7'), 6062);
   assert.equal(rebuilt.roles.todo.code.startsWith('layout-waiting') ||
@@ -770,7 +794,7 @@ test('LT-7 (b): a frozen holder blocks the second pass and its own mutations sta
   assert.equal((await world.slot())?.roles?.todo?.token, 'tok-slow');
   const panes = world.fake.paneIds().filter(paneId => paneId !== 'w1:p1');
   assert.equal(panes.length, 1);
-  assert.equal(world.fake.labelOf(panes[0]), labelOf('todo', world.key8));
+  assert.equal(world.fake.paneLabel(panes[0]), null, 'the resumed launch never renamed the pane');
 });
 
 test('LT-7 (b, owner variant): a live owner with a ten-minute-old heartbeat is busy:other-owner', async t => {
@@ -874,8 +898,8 @@ test('LT-7 (h): the lock history only ever grows by own generations, with no for
 
 // ------------------------------------------- partial launch state: the record is never lost ----
 test('a launch failure that already wrote the record is never lost by the following pass', async t => {
-  // FP2 crashes after the pending record exists but before `pane rename`. The pass that runs next
-  // must not write a stale pre-launch slot snapshot over that record.
+  // FP2 crashes right after the pending record exists (and after the intent is cleared). The pass
+  // that runs next must not write a stale pre-launch slot snapshot over that record.
   const world = await createWorld(t);
   const pass = await world.explicit({ failpoint: 'fp2' });
   assert.equal(pass.roles.todo.code, 'failed:failpoint');
@@ -883,62 +907,56 @@ test('a launch failure that already wrote the record is never lost by the follow
   assert.equal(onDisk.roles.todo.state, 'pending');
   assert.equal(onDisk.roles.todo.paneId, pass.roles.todo.keptPaneId);
   assert.equal(world.fake.has(onDisk.roles.todo.paneId), true);
-  // The leftover is the FP2 row the plan defines: a pending record whose pane carries no label yet,
-  // so ownership is unprovable -> T5 partial, keep the pane, open one next to it. Never a second
-  // record for the same role and never a silent drop.
+  // The leftover pane is ours through paneId + tabId alone (there is no label to lose any more), so
+  // the next pass adopts the record instead of orphaning it: T9 pending, exactly one role pane, and
+  // the record on disk is the one FP2 wrote - never a second record and never a silent drop.
   const next = await world.explicit();
-  assert.equal(next.roles.todo.id, 'T5');
-  assert.equal(next.roles.todo.code, 'partial:ownership-unproven');
-  assert.equal(next.roles.todo.keptPaneId, onDisk.roles.todo.paneId);
-  assert.equal(world.fake.has(onDisk.roles.todo.paneId), true, 'the unlabelled pane is never closed');
-  assert.equal(world.fake.paneIds().filter(paneId => paneId !== 'w1:p1').length, 2);
+  assert.equal(next.roles.todo.id, 'T9');
+  assert.equal(next.roles.todo.paneId, onDisk.roles.todo.paneId);
+  assert.equal(world.fake.paneIds().filter(paneId => paneId !== 'w1:p1').length, 1,
+    'the recorded pane is adopted; nothing new is split');
   const after = await world.slot();
   assert.equal(after.roles.todo.state, 'pending');
-  assert.equal(after.roles.todo.paneId !== onDisk.roles.todo.paneId, true,
-    'the new record names the new pane');
+  assert.equal(after.roles.todo.paneId, onDisk.roles.todo.paneId);
+  assert.equal(after.roles.todo.token, onDisk.roles.todo.token, 'the record was never rewritten');
 });
 
-test('a failed rename still attributes the pane and no viewer is ever started', async t => {
-  const world = await createWorld(t);
-  world.fake.setFailures({ rename: { code: 'herdr_error' } });
-  const renamed = await world.explicit();
-  assert.equal(renamed.roles.todo.code, 'failed:herdr-rename');
-  assert.equal(renamed.roles.todo.failure, 'failed:herdr-rename');
-  // The record was already written, so the pane is attributed to the failing pass and kept.
-  const record = await world.slot();
-  assert.equal(record.roles.todo.state, 'pending');
-  assert.equal(record.roles.todo.paneId, renamed.roles.todo.keptPaneId);
-  assert.equal(world.fake.labelOf(record.roles.todo.paneId), null, 'no rename happened');
-  assert.equal(world.fake.commandOf(record.roles.todo.paneId), null, 'and no viewer was started');
-  // The intent was already cleared (the record attributes the pane), so the next pass sees an
-  // unlabelled pending pane: T5 partial, keep it, open one next to it.
-  world.fake.setFailures({});
-  const next = await world.explicit();
-  assert.equal(next.roles.todo.id, 'T5');
-  assert.equal(next.roles.todo.code, 'partial:ownership-unproven');
-  assert.equal(next.roles.todo.keptPaneId, record.roles.todo.paneId);
-  assert.equal(world.fake.has(record.roles.todo.paneId), true, 'the unlabelled pane is never closed');
-  assert.equal(world.fake.paneIds().filter(paneId => paneId !== 'w1:p1').length, 2);
-});
-
-test('a run failure keeps the renamed pane and reports it as failed:herdr-run', async t => {
+test('a run failure keeps the recorded pane and reports it as failed:herdr-run', async t => {
   const world = await createWorld(t);
   world.fake.setFailures({ run: { code: 'herdr_error' } });
   const run = await world.explicit();
   assert.equal(run.roles.todo.code, 'failed:herdr-run');
   const record = await world.slot();
   assert.equal(record.roles.todo.state, 'pending');
-  assert.equal(world.fake.labelOf(record.roles.todo.paneId), record.roles.todo.label,
-    'the rename succeeded before the run failed');
+  // Nothing was renamed on the way: the record is the pane's whole identity.
+  assert.equal(world.fake.paneLabel(record.roles.todo.paneId), null);
   assert.equal(world.fake.commandOf(record.roles.todo.paneId), null);
-  // The renamed pane is now provably ours, so the next pass restarts the viewer on it (T9/T16 path
-  // depends on the viewer state; the run target is always a pane of that same pass).
+  // The recorded pane is provably ours through paneId + tabId, so the next pass adopts it as a
+  // pending record. The run target is always a pane of that same pass, so nothing is started there.
   world.fake.setFailures({});
   world.tracer.set('explicit');
   const next = await world.explicit();
-  assert.ok(['T9', 'T12', 'T4', 'T16'].includes(next.roles.todo.id), next.roles.todo.id);
+  assert.equal(next.roles.todo.id, 'T9');
+  assert.equal(next.roles.todo.paneId, record.roles.todo.paneId);
   assert.equal(world.fake.commandOf(record.roles.todo.paneId), null,
     'this lane never starts a viewer on a pane it did not split in the same pass');
+  assert.deepEqual(world.tracer.verbs('explicit').filter(verb => verb === 'pane rename'), []);
+});
+
+test('no pass of a whole launch lifecycle issues pane rename or labels a pane', async t => {
+  const world = await createWorld(t);
+  const { record } = await openTodo(world);
+  // A slow pass, a promotion and a steady pass all keep Herdr's own null label.
+  world.clock.advance(20000);
+  await world.explicit();
+  await world.ready('todo', world.readyRecord({ paneId: record.paneId, token: record.token }));
+  await world.explicit();
+  await world.explicit();
+  assert.equal(world.tracer.totals()['pane rename'] ?? 0, 0, 'pane rename is never issued');
+  for (const paneId of world.fake.paneIds()) {
+    if (paneId === 'w1:p1') continue;
+    assert.equal(world.fake.paneLabel(paneId), null, paneId);
+  }
 });
 
 // --------------------------------------------------------------------- T18 / T19 slot rows ----
@@ -946,7 +964,7 @@ test('T19: a leftover intent is an interrupted launch - explicit clears it and o
   const world = await createWorld(t);
   // An FP1 crash left intent.json behind and no record at all.
   await writeJson(world.paths.intent, { schema: 'gjc-herdr-dashboard/intent/1', role: 'todo',
-    token: 'tok-x', label: labelOf('todo', world.key8), tabId: world.binding.tabId, at: START });
+    token: 'tok-x', tabId: world.binding.tabId, at: START });
   const auto = await world.auto('turn_end');
   assert.equal(auto.roles.todo.id, 'T19');
   assert.equal(auto.roles.todo.code, 'none');
@@ -1087,32 +1105,46 @@ test('markStopped is final: a writeOwner that follows (or races) it cannot erase
   assert.ok(late.ok === true || late.code === 'stopped', JSON.stringify(late));
 });
 
-test('FP3: a renamed-but-unstarted pane converges T9 -> T10 -> T11 with no re-entry', async t => {
+test('T5: a fresh pane in the same tab that no record names is still not ours', async t => {
   const world = await createWorld(t);
-  // fp3 leaves our label on an empty shell: the record is pending, the pane is ours, and no viewer
-  // was ever started. The plan's ladder is T9 (pending) -> T10 (slow) -> T11 (stalled, close + create).
-  const crashed = await world.explicit({ failpoint: 'fp3' });
-  assert.equal(crashed.roles.todo.code, 'failed:failpoint');
-  const record = await world.slot().then(slot => slot.roles.todo);
-  assert.equal(record.state, 'pending');
-  assert.equal(world.fake.labelOf(record.paneId), record.label, 'the rename had already happened');
-  assert.equal(world.fake.commandOf(record.paneId), null, 'and the run had not');
-  // No ready file ever appears for it (the viewer never started).
-  const first = await world.explicit();
-  assert.equal(first.roles.todo.id, 'T9');
-  assert.equal(first.roles.todo.code, 'pending');
-  world.clock.set(record.pendingSince + 20000);
-  const slow = await world.explicit();
-  assert.equal(slow.roles.todo.id, 'T10');
-  assert.equal(slow.roles.todo.code, 'pending-slow');
-  world.clock.set(record.pendingSince + 120000);
-  const stalled = await world.explicit();
-  assert.equal(stalled.roles.todo.id, 'T11');
-  assert.equal(stalled.roles.todo.code, 'replaced:stalled');
-  assert.equal(world.fake.has(record.paneId), false, 'the stalled pane is closed');
-  assert.equal(world.fake.paneIds().filter(paneId => paneId !== 'w1:p1').length, 1);
-  // The empty shell never received a command: the close is the only thing that happened to it.
-  assert.equal(world.fake.commandOf(record.paneId), null);
+  const { record } = await openTodo(world);
+  // A fresh pane in the same tab, with the SAME shell pid as ours: only paneId + tabId separates
+  // it from the recorded pane, so a pass that used anything weaker would adopt it by accident.
+  // (`w1:p9` is outside the fixture's generated ids so the next split cannot collide with it.)
+  const fresh = world.fake.addPane('w1:p9', { shell: world.fake.shellOf(record.paneId) });
+  // The record's own pane is still listed, but under another tab: O fails, so this is T5. The pass
+  // keeps the orphan and opens its own pane; the fresh pane is neither claimed nor touched.
+  const pass = await passWithTab(world, { paneId: record.paneId, tabId: 'w2:t9' });
+  assert.equal(pass.roles.todo.id, 'T5');
+  assert.equal(pass.roles.todo.code, 'partial:ownership-unproven');
+  assert.equal(pass.roles.todo.keptPaneId, record.paneId, 'the unprovable pane is named as kept');
+  assert.notEqual(pass.roles.todo.paneId, fresh, 'the unmatched fresh pane is never claimed');
+  assert.notEqual(pass.roles.todo.paneId, record.paneId);
+  assert.equal(world.fake.commandOf(fresh), null, 'and no viewer was ever started in it');
+  assert.equal(world.fake.paneLabel(fresh), null);
+  assert.equal(world.fake.has(fresh), true, 'and it is never closed');
+  const stored = await world.slot().then(slot => slot.roles.todo);
+  assert.equal(stored.paneId, pass.roles.todo.paneId);
+  assert.notEqual(stored.paneId, fresh);
+
+  // The direct form of the same claim: a record whose pane is gone, plus a fresh pane in the tab
+  // that the record does not name. paneId membership alone cannot adopt it, so the record is
+  // discarded (T4) and the pass opens its own pane next to the fresh one.
+  const second = await createWorld(t);
+  await writeJson(second.paths.slot, {
+    schema: 'gjc-herdr-dashboard/slot/1', layoutKey: second.layoutKey,
+    parent: { socket: second.binding.socket, paneId: 'w1:p1', tabId: 'w1:t1' }, herdr: ['herdr.exe'],
+    scope: { sessionId: 's-1', scopeKey: 'pre-scope', scopeEpoch: 1, language: 'ko' },
+    roles: { todo: { state: 'pending', token: 'tok-stale', paneId: 'w1:p8', tabId: 'w1:t1',
+      shellPid: 500, pendingSince: START } },
+  });
+  // A pane the fixture will never generate, so the split this pass makes cannot collide with it.
+  const stranger = second.fake.addPane('w1:pZ', { shell: 500 });
+  const later = await second.explicit();
+  assert.equal(later.roles.todo.id, 'T4', 'the recorded pane is absent, so nothing is owned');
+  assert.notEqual(later.roles.todo.paneId, stranger, 'the unnamed fresh pane is never adopted');
+  assert.equal(second.fake.commandOf(stranger), null);
+  assert.equal((await second.slot()).roles.todo.paneId, later.roles.todo.paneId);
 });
 
 // ------------------------------------------------------------------- budgets and deadlines ----
@@ -1199,7 +1231,7 @@ test('LT-8: every run target belongs to the same pass split and no pass ever sen
       extra: { closing: 'q' } }));
     cases.push(['T20', world, await world.explicit()]);
   }
-  for (const failpoint of ['fp1', 'fp2', 'fp3', 'fp4']) {
+  for (const failpoint of ['fp1', 'fp2', 'fp4']) {
     const world = await createWorld(t);
     const pass = await world.explicit({ failpoint });
     cases.push([failpoint, world, pass]);

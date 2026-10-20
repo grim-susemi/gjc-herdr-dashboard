@@ -12,13 +12,17 @@
 // (K1: the host reports 0 for subscription models, indistinguishable from "never
 // measured", so the renderer prints the localized unknown label instead).
 //
+// The pane wears GJC's own `red-claw` palette (24-bit SGR bodies, `style` below)
+// instead of the 16-colour OMO table.
+//
 // The input is the shared workers projection contract
 // (`gjc-herdr-dashboard/workers/1`):
 //   { schema, updatedAt, empty: boolean, sourceError: string | null,
-//     cards: [{ id, agent, title, status, background, currentTool, lastIntent,
-//       lastOutput, toolCount, tokens, contextPercent, cost, durationMs, retry,
-//       startedAt, endedAt }] }   // newest first, at most 50 per scope
+//     cards: [{ id, agent, title, status, background, model, currentTool,
+//       lastIntent, lastOutput, toolCount, tokens, contextPercent, cost,
+//       durationMs, retry, startedAt, endedAt }] }   // newest first, at most 50 per scope
 // with `status` exactly one of pending | running | completed | failed | aborted | paused.
+// `model` is `provider/modelId` or null; a missing/null model is simply not drawn.
 //
 // Card rows (GRAMMAR G7/G8):
 //   row 1  column 0 is the status bar (only on a multi-row card), then the glyph,
@@ -26,12 +30,17 @@
 //          time. The word and time are reserved before the title is sized; when the
 //          title would keep fewer than 10 cells the time moves to the front of row 3
 //          (OMO `:409-410`).
-//   row 2  `[agent]` in magenta plus ` background` in dim, left out when empty.
-//   row 3  `48K tok · 12 tools · ctx 41%` in grey; each part is omitted when the
-//          projection has no finite value for it.
-//   row 4  the retry alert `↻ 2 · 3s` in yellow, only when `retry` is an object.
-// Cost, tool, intent, last output and the exact duration live in the `d` detail
-// view of the selected card.
+//   row 2  `[agent]` in coral plus ` <model>` in seafoam plus ` background` in dim,
+//          left out when empty. The model only rides here on the ordinary shortcut
+//          path, where badge, model and tail all fit; a wrapped identity stays as
+//          it is and the model leads row 3 instead.
+//   row 3  `48K tok · 12 tools · ctx 41%` in muted; each part is omitted when the
+//          projection has no finite value for it. A model that could not ride on
+//          row 2 leads this row (`claude-sonnet-4.6 · 48K tok · ...`).
+//   row 4  the retry alert `↻ 2 · 3s` in sand, only when `retry` is an object.
+// A collapsed one-row completed card never shows the model.
+// Cost, tool, model, intent, last output and the exact duration live in the `d`
+// detail view of the selected card.
 //
 // Completed cards are not drawn unless `showCompleted` is set (then row 1 only) or
 // their `expanded[id]` flag is true (then the full card). A selected card that
@@ -64,10 +73,15 @@ const layout = { fallbackColumns: 16, fallbackRows: 3 };
 export const SPINNER = Object.freeze(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
 const marks = { pending: "○", running: SPINNER[0], completed: "✓", failed: "×",
   aborted: "⊘", paused: "Ⅱ", unknown: "?" };
-// OMO :86-91: status colours, the magenta role badge, the yellow time (also the
-// paused/failed-to-connect warning colour) and dim for dividers and secondary rows.
-const style = { accent: "36", pending: "90", running: "36", completed: "32", failed: "31",
-  aborted: "35", paused: "33", unknown: "31", muted: "90", badge: "35", time: "33", dim: "2" };
+// GJC's own palette, `red-claw` (24-bit SGR bodies: each entry is used verbatim as
+// `\x1b[<body>m`, so the header still prepends the bold `1;`). The role badge is coral
+// and the model seafoam, so the two identity facts never share a colour.
+const style = { accent: "38;2;255;106;61", pending: "38;2;111;71;67",
+  running: "38;2;255;106;61", completed: "38;2;110;231;183",
+  failed: "38;2;255;77;94", aborted: "38;2;255;138;101",
+  paused: "38;2;245;184;75", unknown: "38;2;255;77;94",
+  muted: "38;2;185;143;134", badge: "38;2;255;138;101",
+  model: "38;2;125;211;199", time: "38;2;255;215;168", dim: "38;2;111;71;67" };
 // Header tally order: running first because it is why the pane exists, then the two
 // failure states kept apart (AC2.2), then paused, then the completed group.
 const tallied = ["running", "failed", "aborted", "paused"];
@@ -92,10 +106,25 @@ const count = (value) => (Number.isFinite(value) ? Math.max(0, Math.round(value)
 const text = (value) => (typeof value === "string" && value !== "" ? clean(value) : "");
 
 const statusOf = (status) => (Object.hasOwn(marks, status) ? status : "unknown");
+// Display band: live work first, finished work stacked below it. Failed and aborted cards sit
+// between the two so a problem is never buried under a pile of completed cards. Array sort is
+// stable, so inside one band the projection's own order (newest first) is kept.
+const bandOf = (status) => (status === "completed" ? 2 : status === "failed" || status === "aborted" ? 1 : 0);
 const statusLabel = (language, status) => t(language, `workers.status.${statusOf(status)}`);
 const unknown = (language) => t(language, "workers.unknown");
 const expandedFlag = (expanded, id) => Boolean(expanded && typeof expanded === "object" &&
   expanded[id] === true);
+
+// The card's model in display form: host form is `provider/modelId`, and only the id
+// is read on a card row, so everything before the FIRST `/` is dropped. A value with
+// no `/` is already a bare id and stays whole. A card row is one line, so any newline
+// becomes a space; anything non-string is no model.
+function modelNameOf(value) {
+  const raw = text(value).replaceAll("\n", " ").trim();
+  if (raw === "") return "";
+  const slash = raw.indexOf("/");
+  return (slash < 0 ? raw : raw.slice(slash + 1)).trim();
+}
 
 // One caller-supplied footer entry stays exactly one row: control sequences are
 // stripped and an embedded newline becomes a space, but nothing is ever cut.
@@ -171,14 +200,35 @@ function metricsText(card, language) {
   return parts.join(" · ");
 }
 
+// One row fitted as a whole, then cut back into coloured runs in segment order. Fitting
+// runs the existing cell budget and `…` mark over the plain text, so a colour can never
+// change a row's width.
+function paintSegments(segments, room, color) {
+  const plain = segments.map((segment) => segment.text).join("");
+  const fitted = fit(plain, room, false, "…");
+  let at = 0, painted = "";
+  for (const segment of segments) {
+    const end = Math.min(fitted.length, at + segment.text.length);
+    if (end > at) painted += paint(fitted.slice(at, end), segment.token, color);
+    at = Math.max(at, end);
+    if (at >= fitted.length) return painted;
+  }
+  // The `…` mark (or a cut tail) past the last whole run keeps that run's colour, so a
+  // fitted row is still exactly `fit()`'s plain text. No text, no escape sequence.
+  const tail = fitted.slice(at);
+  return tail === "" ? painted
+    : painted + paint(tail, segments.at(-1)?.token ?? "muted", color);
+}
+
 // The detail view (`d`, never persisted) is the selected card's full record, one
-// field per row, two cells in and muted. It is the only place cost, the current
-// tool, the intent, the last output and the exact duration are printed.
+// field per row, two cells in and muted. It is the only place cost, the model, the
+// current tool, the intent, the last output and the exact duration are printed.
 function detailRows(card, { columns, color, language, now }) {
   const value = (raw) => text(raw) || unknown(language);
   const rows = [
     `${t(language, "workers.field.id")}: ${text(card?.id)}`,
     `${t(language, "workers.field.agent")}: ${value(card?.agent)}`,
+    `${t(language, "workers.field.model")}: ${value(card?.model)}`,
     `${t(language, "workers.field.status")}: ${statusLabel(language, statusOf(card?.status))}`,
     `${t(language, "workers.field.tool")}: ${value(card?.currentTool)}`,
     `${t(language, "workers.field.intent")}: ${value(card?.lastIntent)}`,
@@ -214,6 +264,19 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
   const agent = text(card?.agent).replaceAll("\n", " ");
   const background = card?.background === true;
   const hasAgentRow = !oneRow && Boolean(agent || background);
+  // A one-row folded card never shows the model: there is no second row to hold it.
+  const modelName = oneRow ? "" : modelNameOf(card?.model);
+  const modelSuffix = modelName === "" ? "" : ` ${modelName}`;
+  const rowRoom = columns - 1;
+  const badgeTail = background ? ` ${t(language, "workers.background")}` : "";
+  // The ordinary shortcut path is unchanged: the whole badge plus the background tail fits
+  // one row. The model only joins that row when it also fits there, so a card whose badge row
+  // would overflow falls back to leading row 3 with the model instead of being rewrapped.
+  const shortcutRow = Boolean(agent) && rowRoom >= 1 &&
+    width(`[${agent}]`) + width(badgeTail) <= rowRoom;
+  const modelFitsOnBadge = shortcutRow &&
+    width(`[${agent}]`) + width(modelSuffix) + width(badgeTail) <= rowRoom;
+  const statsModel = modelFitsOnBadge ? "" : modelName;
   const metrics = metricsText(card, language);
   const retry = card?.retry && typeof card.retry === "object" && !Array.isArray(card.retry)
     ? card.retry : null;
@@ -233,7 +296,7 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
   const titleRoomWithTime = room - 2 - width(fold) - width(word) - width(timeSuffix);
   const timeInTitle = titleRoomWithTime >= Math.min(width(name), 10);
   const titleRoom = timeInTitle ? titleRoomWithTime : room - 2 - width(fold) - width(word);
-  const statsRow = !oneRow && (metrics !== "" || !timeInTitle);
+  const statsRow = !oneRow && (metrics !== "" || statsModel !== "" || !timeInTitle);
   const multiRow = hasAgentRow || statsRow || Boolean(alert);
   const bar = paint(multiRow ? "▌" : " ", status, color);
   // Even the status word does not fit: keep the existing single coloured strip
@@ -249,17 +312,19 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
     (timeInTitle ? paint(timeSuffix, timeToken, color) : ""),
   ];
   if (hasAgentRow) {
-    const rowRoom = columns - 1;
     if (agent) {
-      const tail = background ? ` ${t(language, "workers.background")}` : "";
+      const tail = badgeTail;
       const full = `[${agent}]`;
-      // The ordinary short badge keeps exactly its previous one-row shape.
-      if (rowRoom >= 1 && width(full) + width(tail) <= rowRoom) {
+      // The ordinary short badge keeps its one-row shape and is the only path that shows
+      // the model: `[agent] model background`, all in one row.
+      if (shortcutRow) {
         lines.push(`${bar}${paint(full, "badge", color)}` +
+          (modelFitsOnBadge ? paint(modelSuffix, "model", color) : "") +
           (tail ? paint(tail, "dim", color) : ""));
       } else {
         // OMO `:395,399,445-447`: the role keeps its own rows instead of being cut
-        // short to share one. Only card.agent is wrapped; there is no model source.
+        // short to share one. Only card.agent is wrapped; the model deliberately stays
+        // off these rows and leads the metrics row instead.
         // `[agent` starts on the first row, continuation rows align under the badge
         // (two-cell indent) and keep the card's bar column, and the closing `]` ends
         // the last identity row. The background mark moves to that last row when it
@@ -349,15 +414,17 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
     }
   }
   if (statsRow) {
-    const plain = [timeInTitle ? "" : elapsed, metrics].filter(Boolean).join(" · ");
-    const fitted = fit(plain, columns - 1, false, "…");
-    if (!timeInTitle && fitted.startsWith(elapsed)) {
-      const rest = fitted.slice(elapsed.length);
-      lines.push(`${bar}${paint(elapsed, timeToken, color)}` +
-        `${rest ? paint(rest, "muted", color) : ""}`);
-    } else {
-      lines.push(`${bar}${paint(fitted, "muted", color)}`);
-    }
+    // The model leads the row whenever it could not ride on row 2, ahead of the metrics it
+    // introduces (`gpt-5.5 · 48K tok · ...`) and of a time that moved off row 1.
+    const segments = [];
+    const add = (value, token) => {
+      if (value === "") return;
+      segments.push({ text: `${segments.length ? " · " : ""}${value}`, token });
+    };
+    add(statsModel, "model");
+    if (!timeInTitle) add(elapsed, timeToken);
+    add(metrics, "muted");
+    lines.push(`${bar}${paintSegments(segments, columns - 1, color)}`);
   }
   if (alert) {
     lines.push(`${bar}${paint(fit(alert, columns - 1, false, "…"), "time", color)}`);
@@ -459,7 +526,7 @@ export function renderWorkers(projection, {
     if (status !== "completed") return true;
     return showCompleted || expandedFlag(view?.expanded, id) ||
       (typeof requested === "string" && requested !== "" && requested === id);
-  });
+  }).sort((left, right) => bandOf(statusOf(left?.status)) - bandOf(statusOf(right?.status)));
   const selectable = idsOf(drawn);
   const selection = resolveSelection(selectable, requested);
 

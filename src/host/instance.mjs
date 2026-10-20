@@ -84,15 +84,17 @@ import { randomUUID } from 'node:crypto';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createDataWriter } from '../core/data.mjs';
-import { pidAlive as probePid } from '../core/liveness.mjs';
+import { pidAlive as probePid, viewerState } from '../core/liveness.mjs';
 import { createReconciler } from '../core/reconciler.mjs';
 import { layoutKeyOf, readSlot, slotPaths } from '../core/slot.mjs';
 import { createHerdr, resolveHerdrVector } from '../herdr.mjs';
 import { i18n } from '../i18n.mjs';
 import { pruneExpiredScopes, retentionDaysFromEnv } from '../retention.mjs';
 import { resolveViewerNode } from '../runtime.mjs';
+import { readJson } from '../storage.mjs';
 import { configOf, generationOf } from '../viewers/common.mjs';
 import { bindingOf, checkEligibility, notifyText } from './gjc-adapter.mjs';
+import { createNativeTodoMask } from './native-todo.mjs';
 import { projectGoal } from './sources/goal.mjs';
 import { projectTodo } from './sources/todo.mjs';
 import { createWorkersTracker } from './sources/workers.mjs';
@@ -117,6 +119,11 @@ export const DASHBOARD_DESCRIPTION = 'Open the Herdr dashboard for this session'
 // matches the measured host surface.
 export const BUS_CHANNELS = Object.freeze(['task:subagent:lifecycle', 'task:subagent:progress',
   'task:subagent:event']);
+
+// Event-burst budgets. A progress event may start an automatic pass at most once per second, and a
+// coalesced workers publish waits this long between trailing rounds.
+const BUS_PASS_MIN_MS = 1000;
+const WORKERS_PUBLISH_GAP_MS = 120;
 
 const message = (cause) => String(cause?.message ?? cause ?? 'error');
 const text = (value) => (typeof value === 'string' && value !== '' ? value : null);
@@ -216,7 +223,11 @@ export function createInstance(pi, deps = {}) {
   // Built at ARM time (a sub session must not even construct one) and reset whenever the scope
   // key changes: the cards, the source error and the ignore counter all belong to one scope.
   let workersTracker = null;
+  // Hides GJC's own chat-side Todo panel while the dashboard Todo viewer is provably alive.
+  // Built at ARM time like the tracker; null on a sub session or an ineligible main.
+  let nativeMask = null;
   let busUnsubscribe = null;
+  let lastBusPassAt = Number.NEGATIVE_INFINITY;
   let latestCtx = null;
   // Trigger sequence: assigned synchronously at every entry point, so it orders triggers by arrival
   // (not by completion). `installedSeq` is the seq of the ctx currently in `latestCtx`, which lets
@@ -388,6 +399,8 @@ export function createInstance(pi, deps = {}) {
     // §7.6: the workers tracker is pure state; this instance is its only feeder. Rebuilt on every
     // arm so a re-armed instance never inherits another scope's cards.
     workersTracker = workersTrackerOf()({ now: () => clock() });
+    nativeMask = (typeof deps.nativeTodoMaskFactory === 'function'
+      ? deps.nativeTodoMaskFactory : createNativeTodoMask)();
   }
 
   async function heartbeatOnce() {
@@ -449,18 +462,43 @@ export function createInstance(pi, deps = {}) {
   // state() and the next trigger retries. #3: it is owner-gated exactly like the automatic pass, so
   // a bus event after a restart cannot write over the previous owner's Workers projection before an
   // explicit `/dashboard` adopts the slot.
+  //
+  // Coalesced: a running subagent emits hundreds of bus events per second, and each used to cost a
+  // slot read plus an owner-phase read. One publish runs at a time; every call that lands meanwhile
+  // only sets `workersPublishAgain`, and the running job takes one trailing round (after a short
+  // breather) over the newest tracker state. The writer's own 200 ms merge then bounds the disk.
+  let workersPublishJob = null;
+  let workersPublishAgain = false;
   function scheduleWorkersPublish() {
     if (!armed || !workersTracker) return null;
-    return track(Promise.resolve().then(async () => {
-      const wanted = bindingOfCtx()(latestCtx, envOf());
-      if (validBinding(wanted) && await ownsSlot(wanted)) await publishWorkers();
-    })
-      .catch(error => {
+    if (workersPublishJob !== null) {
+      workersPublishAgain = true;
+      return workersPublishJob;
+    }
+    const run = async () => {
+      try {
+        do {
+          workersPublishAgain = false;
+          const wanted = bindingOfCtx()(latestCtx, envOf());
+          if (validBinding(wanted) && await ownsSlot(wanted)) await publishWorkers();
+          if (workersPublishAgain && armed) await breathe(WORKERS_PUBLISH_GAP_MS);
+        } while (workersPublishAgain && armed);
+      } catch (error) {
         // outcome: a workers publish that could not run is kept in state(); the bus burst it came
         // from is already in the tracker and the next trigger writes it.
         record(error, 'workers-publish');
-      }));
+      } finally {
+        workersPublishJob = null;
+        workersPublishAgain = false;
+      }
+    };
+    workersPublishJob = track(run());
+    return workersPublishJob;
   }
+  const breathe = (ms) => new Promise(done => {
+    const timer = setTimeout(done, ms);
+    timer.unref?.();
+  });
 
   // `ownerPhase` on the reconciler's queue, reduced to the one question the data paths ask: may this
   // instance write for this binding? Anything but `me` means the slot belongs to someone else (the
@@ -477,7 +515,11 @@ export function createInstance(pi, deps = {}) {
   // rethrown into the host's event dispatch.
   function attachWorkersBus() {
     const offs = [];
-    const subscribe = (channel, feed) => {
+    // `pass: 'always'` runs the automatic pass for every event (lifecycle: a handful per run);
+    // `'throttled'` runs it at most once per BUS_PASS_MIN_MS (progress: hundreds per second);
+    // `'never'` only feeds the tracker (raw child events: token-rate, and the pass has nothing to
+    // learn from them - the 1 s poll and the lifecycle/turn events already carry the pass).
+    const subscribe = (channel, feed, pass) => {
       const off = pi?.events?.on?.(channel, payload => {
         if (!armed) return;
         try { feed(payload); }
@@ -487,16 +529,20 @@ export function createInstance(pi, deps = {}) {
           workersTracker?.fail(error, 'bus');
         }
         scheduleWorkersPublish();
-        if (!latestCtx) return;
+        if (pass === 'never' || !latestCtx) return;
+        if (pass === 'throttled') {
+          const at = clock();
+          if (at - lastBusPassAt < BUS_PASS_MIN_MS) return;
+          lastBusPassAt = at;
+        }
         runAutoPass(latestCtx, 'bus');
       });
       if (typeof off === 'function') offs.push(off);
     };
-    subscribe('task:subagent:lifecycle', payload => workersTracker?.onLifecycle(payload));
-    subscribe('task:subagent:progress', payload => workersTracker?.onProgress(payload));
-    // `task:subagent:event` carries raw child events and is deliberately NOT consumed (§7.6); it is
-    // subscribed so the trigger set matches the measured host surface.
-    subscribe('task:subagent:event', () => {});
+    subscribe('task:subagent:lifecycle', payload => workersTracker?.onLifecycle(payload), 'always');
+    subscribe('task:subagent:progress', payload => workersTracker?.onProgress(payload), 'throttled');
+    // Raw child events are consumed for exactly one fact: which model a card runs on.
+    subscribe('task:subagent:event', payload => workersTracker?.onEvent?.(payload), 'never');
     busUnsubscribe = offs;
   }
 
@@ -934,6 +980,7 @@ export function createInstance(pi, deps = {}) {
       // pass still notifies its own result, which is the one message the user is owed.
       record(error, 'data-flush');
     }
+    await syncNativeTodo(ctx);
     notify(ctx, result ?? { code: 'failed:internal' }, result?.ok === true ? 'info' : 'warn', notice);
     return result;
   }
@@ -1028,14 +1075,45 @@ export function createInstance(pi, deps = {}) {
       await publishTodo(ctx);
       await publishWorkers();
       await publishGoal(ctx, goalEvent);
-      return await reconciler.autoPass({ binding: local, roles: [...ROLES], trigger,
+      const passResult = await reconciler.autoPass({ binding: local, roles: [...ROLES], trigger,
         ...(deps.failpoint === undefined ? {} : { failpoint: deps.failpoint }) });
+      await syncNativeTodo(ctx);
+      return passResult;
     } catch (error) {
       // outcome: an event handler must not throw (LT-1), so the failure is kept in state() and the
       // next trigger or `/dashboard` runs again - nothing is latched. A `strict` caller owns the
       // recording (and the consequence) instead, so one fault is never reported twice.
       if (strict) throw error;
       record(error, `auto:${trigger}`);
+      return null;
+    }
+  }
+
+  // The chat-side Todo panel is hidden only while the dashboard Todo viewer is provably alive: a
+  // `ready` slot record AND a ready file whose token, pane, pid and heartbeat all check out
+  // (`viewerState`). Every other situation - no slot, a pending or closed record, a dead or
+  // unresponsive viewer, a foreign owner, an unreadable file - shows the native panel again, so a
+  // crashed dashboard can never leave the user without any Todo list on screen.
+  async function syncNativeTodo(ctx) {
+    if (!nativeMask) return null;
+    try {
+      let wanted = false;
+      if (isSelfOwner() && stateDir && layoutKey !== null) {
+        const read = await readSlot(paths().slot);
+        const record = read.status === 'ok' ? read.slot?.roles?.todo ?? null : null;
+        if (record && record.state === 'ready') {
+          let ready = null;
+          try { ready = await readJson(paths().ready('todo')); }
+          catch { ready = null; }
+          const probe = typeof deps.pidAlive === 'function' ? deps.pidAlive : probePid;
+          wanted = viewerState({ ready, record, now: clock(), pidAlive: probe }) === 'ready';
+        }
+      }
+      return nativeMask.apply(ctx ?? latestCtx, wanted);
+    } catch (error) {
+      // outcome: a cosmetic mask that could not be decided is recorded and left as it was; the next
+      // trigger decides again.
+      record(error, 'native-todo');
       return null;
     }
   }
@@ -1066,6 +1144,10 @@ export function createInstance(pi, deps = {}) {
     stopHeartbeat();
     if (pollTimer !== null) { disarmTimer(pollTimer); pollTimer = null; }
     detachWorkersBus();
+    // Release the native Todo panel: this instance can no longer vouch for the viewer. A successor
+    // instance (reload) re-hides it on its first pass.
+    try { nativeMask?.release(latestCtx); }
+    catch (error) { record(error, 'native-todo-release'); }
     armed = false;
   }
 

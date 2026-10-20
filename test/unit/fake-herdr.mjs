@@ -225,13 +225,14 @@ export function createFakeHerdr(options = {}) {
     tabId,
     parentPaneId,
     // ---- observation helpers for the assertions -------------------------------------------
+    // `paneLabel` only OBSERVES what Herdr holds: the product never sets a label, and the tests
+    // assert that a launch leaves it null.
     ids: () => [...panes.keys()],
     paneIds: () => [...panes.keys()],
-    labelOf: paneId => panes.get(paneId)?.label ?? null,
+    paneLabel: paneId => panes.get(paneId)?.label ?? null,
     commandOf: paneId => panes.get(paneId)?.command ?? null,
     shellOf: paneId => shells.get(paneId) ?? null,
     has: paneId => panes.has(paneId),
-    setLabel: (paneId, label) => { if (!panes.has(paneId)) throw fail('pane_not_found'); panes.get(paneId).label = label; },
     setShell: (paneId, pid) => { shells.set(paneId, pid); },
     setPaneRect: (paneId, rect) => { rects.set(paneId, { ...rect }); },
     addPane: (paneId, { label = null, shell = shellPid, rect = null } = {}) =>

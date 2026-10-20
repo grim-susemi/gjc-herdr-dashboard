@@ -8,7 +8,7 @@ import { PANE_MUTATION_ACTIONS, TABLE_IDS, INPUT_DOMAIN, decideOwnerPhase, decid
   decideRoleFromInput, enumerateInputs } from '../../src/core/transitions.mjs';
 
 const RECORD = { state: 'pending', token: 'tok', paneId: 'w1:p5', tabId: 'w1:t1',
-  label: 'GJC Todo · aaaaaaaa', shellPid: 4242, pendingSince: 0 };
+  shellPid: 4242, pendingSince: 0 };
 
 const caseOf = (overrides = {}) => {
   const { record, observation, ...rest } = overrides;

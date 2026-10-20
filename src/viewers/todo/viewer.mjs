@@ -275,9 +275,21 @@ export async function startViewer(options, {
 
   // The 1s timer and resize re-read slot, owner and projection before drawing; repainting the
   // last frame alone would never show a Todo update that landed after the first paint.
+  //
+  // The write is `\x1b[H` plus a per-line `\x1b[K`, never `\x1b[2J`: a full-screen clear every
+  // second makes the pane visibly flicker and costs the terminal a whole repaint. An unchanged frame
+  // is not written at all, so an idle dashboard sends no bytes. `lastWritten` is reset by the screen
+  // enter and by a resize, because both leave the terminal content in an unknown state.
+  let lastWritten = null, checkedStamp = null;
+  const writeFrame = () => {
+    if (!isInteractive || closing || disposed || !frame) return;
+    if (frame.text === lastWritten) return;
+    lastWritten = frame.text;
+    output.write?.(`\x1b[H${frame.text.replaceAll("\n", "\x1b[K\r\n")}\x1b[K\x1b[J`);
+  };
   const paint = async () => {
     refresh();
-    if (isInteractive) output.write?.(`\x1b[H\x1b[2J${frame.text}`);
+    writeFrame();
     return frame;
   };
 
@@ -285,6 +297,7 @@ export async function startViewer(options, {
   // pointer modes on; leaving has to undo exactly that, or the pane is left unusable.
   const enterScreen = () => {
     if (!isInteractive) return;
+    lastWritten = null;
     output.write?.(`\x1b[?1049h\x1b[?25l${enablePointer}`);
   };
   const leaveScreen = () => {
@@ -459,9 +472,15 @@ export async function startViewer(options, {
     const goalResult = readGoal(`${options.state}/data/${scopeKey}/goal.json`, { read: port.read });
     goal = goalResult.goal;
     goalError = goalResult.error;
-    if (projection !== null && prefs.selection !== null &&
-      !taskKeys(projection).includes(prefs.selection)) prefs.selection = null;
+    // The selection check walks every task, and the projection only changes when the owner writes
+    // it, so the walk runs once per distinct stamp (or selection) instead of once per second.
+    const stamp = `${projection?.updatedAt ?? ""}|${prefs.selection ?? ""}`;
+    if (projection !== null && prefs.selection !== null && stamp !== checkedStamp) {
+      checkedStamp = stamp;
+      if (!taskKeys(projection).includes(prefs.selection)) prefs.selection = null;
+    }
     draw();
+    writeFrame();
     events.emit("frame", frame);
   }
 
@@ -480,18 +499,22 @@ export async function startViewer(options, {
       const current = frame ?? draw();
       const stepped = stepSelection(current, sequence === "j" || sequence === "\x1b[B" ? 1 : -1);
       prefs.selection = stepped.selection;
-      prefs.scroll = current.scroll;
+      // A follow-ON frame may sit past the end of the body on purpose (it pins the current
+      // phase); prefs only ever store a scroll the body can actually reach.
+      prefs.scroll = Math.min(current.scroll, maxScrollOf());
     } else return Promise.resolve();
     // The keyboard always reveals the selection: only a pointer action holds a manual
     // scroll position, and any key that redraws hands it back to the selection.
     revealSelection = true;
     const saved = savePrefs();
     draw();
+    writeFrame();
     events.emit("frame", frame);
     return saved;
   }
 
-  const onResize = () => { void paint(); };
+  // A resize leaves stale cells outside the new frame, so the next write must not be skipped.
+  const onResize = () => { lastWritten = null; void paint(); };
 
   // The wheel and the drag clamp against the last drawn frame: it carries both the row
   // count and the body height, so a pointer can never scroll past the body (AC3.1).
@@ -505,6 +528,7 @@ export async function startViewer(options, {
   function commit() {
     const saved = savePrefs();
     draw();
+    writeFrame();
     events.emit("frame", frame);
     return saved;
   }
@@ -548,7 +572,8 @@ export async function startViewer(options, {
       if (hit) prefs.selection = hit[0];
     }
     // A press commits the position it was aimed at: the screen must not jump back to a stale pref.
-    prefs.scroll = at;
+    // The clamped value is what a follow-ON frame can persist, not its off-body pin.
+    prefs.scroll = Math.min(at, maxScrollOf());
     dragY = mouse.y;
     prefs.follow = false;
     revealSelection = false;

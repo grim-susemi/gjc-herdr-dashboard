@@ -256,8 +256,9 @@ export async function startViewer(options, {
   let lastSelection = null;
   // Pointer drag anchor (1-based SGR row), cleared by release and by blur (AC3.1), plus
   // the two disposers that `finish()` has to release: the input decoder and the Herdr
-  // focus subscription.
-  let dragY, disposeInput = null, disposeFocus = null;
+  // focus subscription. `dragDirty` records that a drag moved the body without saving;
+  // `lastWritten` is the frame text the screen currently holds.
+  let dragY, dragDirty = false, lastWritten = null, disposeInput = null, disposeFocus = null;
   let saving = Promise.resolve();
   let heartbeatTail = Promise.resolve();
 
@@ -341,12 +342,17 @@ export async function startViewer(options, {
     writeFrame();
   }
 
-  // Both the 1 s paint and the spinner use this writer: `\x1b[H` plus per-line `\x1b[K`
-  // only. A full-screen clear (`\x1b[2J`) belongs to entering the screen, never to an
-  // eight-times-a-second redraw (it makes the pane visibly flicker).
+  // Every writer (the 1 s paint, the spinner, the key and pointer paths) goes through
+  // here: `\x1b[H`, per-line `\x1b[K` and a trailing `\x1b[J` only. A full-screen clear
+  // (`\x1b[2J`) belongs to entering the screen, never to a redraw (it makes the pane
+  // visibly flicker). An unchanged frame is not written at all, so an idle dashboard
+  // sends no bytes. `lastWritten` is reset by the screen enter and by a resize, because
+  // both leave the terminal content in an unknown state.
   function writeFrame() {
     if (!isInteractive || closing || disposed || !frame) return;
-    output.write?.(`\x1b[H${frame.text.replaceAll("\n", "\x1b[K\r\n")}\x1b[K`);
+    if (frame.text === lastWritten) return;
+    lastWritten = frame.text;
+    output.write?.(`\x1b[H${frame.text.replaceAll("\n", "\x1b[K\r\n")}\x1b[K\x1b[J`);
   }
 
   // The 1s timer and resize re-read slot, owner and projection before drawing; repainting the
@@ -361,6 +367,7 @@ export async function startViewer(options, {
   // pointer modes on; leaving has to undo exactly that, or the pane is left unusable.
   const enterScreen = () => {
     if (!isInteractive) return;
+    lastWritten = null;
     output.write?.(`\x1b[?1049h\x1b[?25l${enablePointer}`);
   };
   const leaveScreen = () => {
@@ -600,11 +607,13 @@ export async function startViewer(options, {
       // prefs on disk stay exactly as they were (contract: not saved).
       detail = !detail;
       draw();
+      writeFrame();
       events.emit("frame", frame);
       return Promise.resolve();
     } else return Promise.resolve();
     const saved = savePrefs();
     draw();
+    writeFrame();
     events.emit("frame", frame);
     return saved;
   }
@@ -614,11 +623,13 @@ export async function startViewer(options, {
   // frame drawn after a resize is the one it clamps against.
   const maxScrollOf = () => Math.max(0, (frame ?? draw()).maxScroll ?? 0);
 
-  // The shared tail of every pointer action: the frame is redrawn and the new scroll and
-  // follow state are persisted before the caller sees them.
-  function commit() {
-    const saved = savePrefs();
+  // The shared tail of every pointer action: the frame is redrawn and written before the
+  // caller sees it. A drag motion passes `{ save: false }` and the scroll it produced is
+  // persisted once, on release, so panning never writes a temp file per pointer report.
+  function commit({ save = true } = {}) {
+    const saved = save ? savePrefs() : Promise.resolve();
     draw();
+    writeFrame();
     events.emit("frame", frame);
     return saved;
   }
@@ -630,7 +641,15 @@ export async function startViewer(options, {
   // over, so follow turns OFF. Non-left buttons are ignored entirely.
   function onPointer(mouse) {
     if (closing || disposed) return;
-    if (mouse.release) { dragY = undefined; return; }
+    if (mouse.release) {
+      dragY = undefined;
+      // The drag panned without saving; the release is where that position lands on disk.
+      if (dragDirty) {
+        dragDirty = false;
+        void savePrefs();
+      }
+      return;
+    }
     // The drawn frame owns the scroll position the user sees: follow, resize and a list that
     // shrank all correct it, so every pointer step starts from it, not from the stored pref.
     const shown = frame ?? draw();
@@ -638,16 +657,21 @@ export async function startViewer(options, {
     if (mouse.button & 64) {
       prefs.scroll = Math.min(Math.max(0, at + (mouse.button & 1 ? 3 : -3)), maxScrollOf());
       prefs.follow = false;
+      // The wheel step is itself a save, so it also carries any drag it interrupted.
+      dragDirty = false;
       void commit();
       return;
     }
     if ((mouse.button & 3) !== 0) return;
     if (mouse.button & 32) {
       if (dragY === undefined) return;
-      prefs.scroll = Math.min(Math.max(0, at + dragY - mouse.y), maxScrollOf());
+      const next = Math.min(Math.max(0, at + dragY - mouse.y), maxScrollOf());
       dragY = mouse.y;
       prefs.follow = false;
-      void commit();
+      // Only a motion that really moved the body leaves prefs to persist on release.
+      if (next !== prefs.scroll) dragDirty = true;
+      prefs.scroll = next;
+      void commit({ save: false });
       return;
     }
     // Left press. Only a body row can hit a card; every press (hit, miss or a header,
@@ -668,16 +692,20 @@ export async function startViewer(options, {
     prefs.scroll = at;
     dragY = mouse.y;
     prefs.follow = false;
+    // The press writes the whole snapshot, so anything a previous drag left pending is gone.
+    dragDirty = false;
     void commit();
   }
 
   // AC3.2: losing the pane focus returns follow ON (which also pulls the selected card
   // back into view), closes the transient `d` detail view and ends any drag, so the pane
   // is back on the live selection the moment it is left. Gaining focus does nothing.
-  // Prefs are only written when the follow state changed.
+  // Prefs are only written when the follow state changed; that commit persists the whole
+  // snapshot, so an unfinished drag's position rides along with it and needs no save.
   function onFocus(focused) {
     if (focused || closing || disposed) return;
     dragY = undefined;
+    dragDirty = false;
     detail = false;
     if (prefs.follow === false) {
       prefs.follow = true;
@@ -685,6 +713,7 @@ export async function startViewer(options, {
       return;
     }
     draw();
+    writeFrame();
     events.emit("frame", frame);
   }
 
@@ -699,6 +728,7 @@ export async function startViewer(options, {
       const notice = t(language.language, "focusSubscriptionFailed", { error: message(cause) });
       if (!notices.includes(notice)) notices.push(notice);
       draw();
+      writeFrame();
       events.emit("frame", frame);
     };
     let started;
@@ -718,7 +748,8 @@ export async function startViewer(options, {
     }, (cause) => { report(cause); });
   }
 
-  const onResize = () => { void paint(); };
+  // A resize leaves stale cells outside the new frame, so the next write must not be skipped.
+  const onResize = () => { lastWritten = null; void paint(); };
 
   try {
     if (isInteractive) {

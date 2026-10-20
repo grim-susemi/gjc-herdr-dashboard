@@ -10,8 +10,7 @@
 //     'closing-q'. First match wins, in R2 order: unreadable/mismatched file -> none,
 //     closing:'q' -> closing-q, ESRCH -> dead, hbAge >= 15000 -> unresponsive, else ready.
 //   isO(record, paneList)               -> boolean. `O` = the recording pane still appears in
-//                                          `pane list` with the exact label for its role and
-//                                          matching paneId + tabId.
+//                                          `pane list` with the same paneId and the same tab id.
 //   isOPlus(record, paneList, processInfo) -> boolean. `O` and the pane shell is the one the
 //                                          record was created from, or the pane has no shell.
 //   heartbeatAgeMs(record, now) / ageMs(pendingSince, now) -> clamped to >= 0 (future stamps).
@@ -59,13 +58,12 @@ export function viewerState({ ready, record, now = Date.now(), pidAlive: probe =
 
 const paneIdOf = pane => pane?.pane_id ?? pane?.paneId ?? null;
 const tabIdOf = pane => pane?.tab_id ?? pane?.tabId ?? null;
-const labelOf = pane => pane?.label ?? null;
 
+// Panes carry no manual label (see slot.mjs): ownership is paneId + tabId alone.
 export function isO(record, paneList) {
   if (!record || !Array.isArray(paneList)) return false;
-  if (typeof record.paneId !== 'string' || typeof record.label !== 'string') return false;
+  if (typeof record.paneId !== 'string') return false;
   return paneList.some(pane => paneIdOf(pane) === record.paneId &&
-    labelOf(pane) === record.label &&
     tabIdOf(pane) === record.tabId);
 }
 

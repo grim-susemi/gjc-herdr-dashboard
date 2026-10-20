@@ -14,7 +14,7 @@ import { join, relative, sep } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { createDataWriter } from '../../src/core/data.mjs';
-import { PANE_LABELS, dataPaths, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
+import { dataPaths, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
 import { createInstance as createInstanceRaw, REGISTRY_KEY } from '../../src/host/instance.mjs';
 import { writeJson } from '../../src/storage.mjs';
 import { createFakeClock, createFakeHerdr, createFakeProcesses, createPassTracer } from './fake-herdr.mjs';
@@ -169,15 +169,16 @@ async function makeWorld(t, options = {}) {
     owner: async () => JSON.parse(await readFile(slotPaths(stateDir, world.layoutKey).owner, 'utf8')),
     files: () => listFiles(stateDir),
     // A slot the product itself would have written, for the rows that need an existing record.
+    // The record carries no label: a pane is identified by paneId + tabId, so those are the fields.
     writeSlot: ({ state = 'ready', sessionId = 's-1', scopeKey = 'pre-scope', role = 'todo',
-      label = null, paneId = 'w1:p2', shellPid = 500, pendingSince = START, token = 'tok-1' } = {}) =>
+      paneId = 'w1:p2', shellPid = 500, pendingSince = START, token = 'tok-1' } = {}) =>
       writeJson(world.slotPath(), {
         schema: 'gjc-herdr-dashboard/slot/1', layoutKey: world.layoutKey,
         parent: { socket: SOCKET, paneId: PARENT, tabId: 'w1:t1' },
         herdr: ['herdr.exe'],
         scope: { sessionId, scopeKey, scopeEpoch: 1, language: 'en' },
         roles: { [role]: { state, token, paneId, tabId: 'w1:t1', shellPid,
-          label: label ?? PANE_LABELS[role] ?? PANE_LABELS.todo, pendingSince, closedBy: null } },
+          pendingSince, closedBy: null } },
       }),
   };
   t.after(async () => {
@@ -411,7 +412,7 @@ test('LT-4 list failure: a failing pane list is reported once as a coded failure
   const world = await makeWorld(t);
   await mkdir(slotPaths(world.stateDir, world.layoutKey).dir, { recursive: true });
   await world.writeSlot({ state: 'ready' });
-  world.fake.addPane('w1:p2', { label: PANE_LABELS.todo, shell: 500 });
+  world.fake.addPane('w1:p2', { shell: 500 });
   const pi = piOf();
   const handle = createInstance(pi, world.deps());
   const { ctx } = world.ctx();
@@ -449,7 +450,7 @@ test('LT-4 partial:timeout: a split that never answers reports partial once', as
   assert.equal(result.code, 'partial:timeout');
   assert.equal(handle.state().lastResultCode, 'partial:timeout');
   // The pane may exist, so the run target is never fabricated for a split that never answered.
-  assert.equal(world.fake.calls.filter(call => ['rename', 'run'].includes(call.argv[1])).length, 0);
+  assert.equal(world.fake.calls.filter(call => call.argv[1] === 'run').length, 0);
 });
 
 test('LT-4 normal: one opened notify, one pane, and the single notify carries the gen token', async t => {
@@ -465,7 +466,12 @@ test('LT-4 normal: one opened notify, one pane, and the single notify carries th
   assert.equal(handle.state().owner, true);
   assert.equal(handle.state().gen, 'dev');
   assert.equal(world.notifications[0].level, 'info');
-  assert.equal(world.fake.paneIds().filter(id => world.fake.labelOf(id) === PANE_LABELS.todo).length, 1);
+  // The Todo record names the pane it opened, and no pane in the tab carries a manual label.
+  const todoPaneId = (await world.slot()).roles.todo.paneId;
+  assert.equal(world.fake.paneIds().filter(id => id === todoPaneId).length, 1);
+  // Neither pane the pass created carries a manual label: only the parent keeps the fixture's own.
+  assert.deepEqual(world.fake.paneIds().filter(id => id !== PARENT)
+    .filter(id => world.fake.paneLabel(id) !== null), []);
 });
 
 test('LT-4 duplicate: a second install delegates and appends its warning to the single result line', async t => {
@@ -740,8 +746,9 @@ test('AC1.4: three /dashboard calls leave exactly one Todo pane', async t => {
   assert.equal(splitsAfterFirst, 2, `L2 opens the band: ${JSON.stringify(world.fake.paneIds())}`);
   await pi.commands.get('dashboard').handler({}, ctx);
   await pi.commands.get('dashboard').handler({}, ctx);
-  const label = PANE_LABELS.todo;
-  const ours = world.fake.paneIds().filter(id => world.fake.labelOf(id) === label);
+  // "Ours" is the pane the Todo record names: there is no pane label to count any more.
+  const recordedPaneId = (await world.slot()).roles.todo.paneId;
+  const ours = world.fake.paneIds().filter(id => id === recordedPaneId);
   assert.equal(ours.length, 1, `panes: ${JSON.stringify(world.fake.paneIds())}`);
   assert.equal(world.fake.calls.filter(call => call.argv[1] === 'split').length, splitsAfterFirst,
     'the repeat calls may not split');
@@ -1351,4 +1358,91 @@ test("L5b: a goal_updated burst folds into at most one running and one trailing 
   assert.ok(ran >= 1 && ran <= 2, `30 goal events ran ${ran} passes`);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).goal.tokensUsed, 30,
     'the newest goal wins the fold');
+});
+
+// ----------------------------------------------------------------- native Todo panel mask ----
+// The chat-side Todo panel is hidden only while the dashboard Todo viewer is provably alive, and
+// handed back in every other situation. The mask is injected so the decision is observable.
+function maskSpy() {
+  const calls = [];
+  const factory = () => ({
+    apply: (ctx, wanted) => { calls.push(wanted); return wanted ? 'hidden' : 'shown'; },
+    release: () => { calls.push('release'); return 'shown'; },
+    state: () => ({ hidden: false, failure: null }),
+  });
+  return { calls, factory };
+}
+
+async function openWithViewer(t, extraDeps = {}) {
+  const world = await makeWorld(t, { processes: { alive: [] } });
+  const spy = maskSpy();
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps({ nativeTodoMaskFactory: spy.factory, ...extraDeps }));
+  const { ctx } = world.ctx();
+  await pi.commands.get('dashboard').handler({}, ctx);
+  const slot = await world.slot();
+  const record = slot.roles.todo;
+  const readyPath = slotPaths(world.stateDir, world.layoutKey).ready('todo');
+  const writeReady = async (extra = {}) => {
+    world.fake.processes?.add?.(9001);
+    return writeJson(readyPath, { pid: 9001, token: record.token, paneId: record.paneId, gen: 'dev',
+      startedAt: START, heartbeatAt: world.clock.now(), ...extra });
+  };
+  return { world, spy, pi, handle, ctx, record, readyPath, writeReady };
+}
+
+test('native Todo mask: a freshly opened pane that has no ready viewer yet keeps the native panel', async t => {
+  const { spy } = await openWithViewer(t);
+  assert.ok(spy.calls.length >= 1, 'the explicit pass decided once');
+  assert.deepEqual([...new Set(spy.calls)], [false], 'pending is not proof of a viewer: never hidden');
+});
+
+test('native Todo mask: a ready, alive viewer hides it; a stale heartbeat or a dead pid shows it again', async t => {
+  const { world, spy, pi, ctx, writeReady } = await openWithViewer(t, { pidAlive: () => true });
+  await writeReady();
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), true, 'the live viewer hides the native panel');
+
+  world.clock.advance(60_000);
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), false, 'a heartbeat older than the ready window restores it');
+
+  await writeReady({ heartbeatAt: world.clock.now() });
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), true);
+  await writeReady({ closing: 'q', heartbeatAt: world.clock.now() });
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), false, 'a viewer that is closing restores it');
+});
+
+test('native Todo mask: a ready file for another pane or token never hides it', async t => {
+  const { pi, spy, ctx, writeReady } = await openWithViewer(t, { pidAlive: () => true });
+  await writeReady({ token: 'someone-else' });
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), false);
+  await writeReady({ paneId: 'w9:p9' });
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), false);
+});
+
+test('native Todo mask: shutting the instance down hands the native panel back', async t => {
+  const { pi, spy, ctx, writeReady, handle } = await openWithViewer(t, { pidAlive: () => true });
+  await writeReady();
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.equal(spy.calls.at(-1), true);
+  await pi.handlers.get('session_shutdown')({}, ctx);
+  assert.equal(spy.calls.at(-1), 'release');
+  assert.equal(handle.armed(), false);
+});
+
+test('native Todo mask: a fault inside the mask is recorded and never reaches the host', async t => {
+  const boom = () => ({ apply() { throw new Error('mask exploded'); }, release() {}, state: () => ({}) });
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps({ nativeTodoMaskFactory: boom }));
+  const { ctx } = world.ctx();
+  await pi.commands.get('dashboard').handler({}, ctx);
+  await pi.handlers.get('turn_end')({}, ctx);
+  assert.ok(handle.state().errors.some(entry => entry.where === 'native-todo'),
+    JSON.stringify(handle.state().errors));
 });

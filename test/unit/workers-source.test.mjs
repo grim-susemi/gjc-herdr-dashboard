@@ -4,7 +4,8 @@
 //
 // Every shape here is the measured L0 G5 shape: the main bus emits
 // `task:subagent:lifecycle` / `task:subagent:progress` payloads straight out of the host's
-// task/types.ts, and `ctx.getJobs()` answers `{running, recent, delivery}`. No live GJC, no
+// task/types.ts, and `ctx.getJobs()` answers `{running, recent, delivery}`. `task:subagent:event`
+// carries one raw child event per payload; only its model evidence is read. No live GJC, no
 // live Herdr, no owner file.
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -48,7 +49,7 @@ test("the module exports the contract schema, cap and vocabularies", () => {
     "paused"]);
   const tracker = trackerOf();
   assert.deepEqual(Object.keys(tracker).sort(),
-    ["fail", "onLifecycle", "onProgress", "reset", "snapshot", "syncJobs"]);
+    ["fail", "onEvent", "onLifecycle", "onProgress", "reset", "snapshot", "syncJobs"]);
   // An empty scope is a valid, explicit projection, not a missing file.
   assert.deepEqual(tracker.snapshot(), { schema: WORKERS_SCHEMA, updatedAt: 1_001_000,
     empty: true, sourceError: null, cards: [], ignored: 0 });
@@ -248,9 +249,9 @@ test("assignment text, transcripts and session files never reach the projection"
   assert.equal(snapshot.cards[0].title, "Safe description");
   // The card shape is exactly the contract's, with no room for an accidental field.
   assert.deepEqual(Object.keys(snapshot.cards[0]),
-    ["id", "agent", "title", "status", "background", "currentTool", "lastIntent", "lastOutput",
-      "toolCount", "tokens", "contextPercent", "cost", "durationMs", "retry", "startedAt",
-      "endedAt"]);
+    ["id", "agent", "title", "status", "background", "model", "currentTool", "lastIntent",
+      "lastOutput", "toolCount", "tokens", "contextPercent", "cost", "durationMs", "retry",
+      "startedAt", "endedAt"]);
   // The description is the title source; the task text is only a fallback when the host sent
   // no description at all.
   const fallback = trackerOf();
@@ -314,6 +315,144 @@ test("retry state maps attempt and delayMs when present, else stays null", () =>
   const snapshot = tracker.snapshot();
   snapshot.cards.find((card) => card.id === "r1").retry.attempt = 99;
   assert.equal(tracker.snapshot().cards.find((card) => card.id === "r1").retry.attempt, 2);
+});
+
+test("a card always carries a model key, unknown until a source names one", () => {
+  const tracker = trackerOf();
+  // A lifecycle-only card, a progress-only card and a background job card all project the
+  // field: `null` is "unknown", never a missing key.
+  tracker.onLifecycle(lifecycle("m0", "started"));
+  tracker.onProgress(progress("m1", "running"));
+  tracker.syncJobs({ running: [{ id: "m2", label: "job", type: "task", status: "running",
+    startTime: 1 }], recent: [] });
+  const cards = tracker.snapshot().cards;
+  assert.deepEqual(cards.map((card) => card.id), ["m2", "m1", "m0"]);
+  for (const card of cards) {
+    assert.ok(Object.hasOwn(card, "model"), JSON.stringify(card));
+    assert.equal(card.model, null, JSON.stringify(card));
+  }
+});
+
+// `task:subagent:event` is the only source of the model a run actually uses. It carries no card
+// id, so the card is the newest running/pending card of that `agent` + `index`; an event never
+// creates a card, and the ordinary event firehose is dropped without touching `ignored`.
+const subagentEvent = (event, extra = {}) => ({ index: 0, agent: "loader",
+  agentSource: "bundled", task: "work", assignment: SENTINEL, event, ...extra });
+const assistantEnd = (provider, model) => ({ type: "message_end",
+  message: { role: "assistant", provider, model, content: SENTINEL } });
+
+test("onEvent reads the model from message_end and model_fallback_switched", () => {
+  const tracker = trackerOf();
+  tracker.onLifecycle(lifecycle("e1", "started"));
+  tracker.onEvent(subagentEvent(assistantEnd("openai", "gpt-5.5")));
+  assert.equal(tracker.snapshot().cards[0].model, "openai/gpt-5.5");
+  // A fallback switch replaces it with the host's own provider/model target.
+  tracker.onEvent(subagentEvent({ type: "model_fallback_switched", from: "openai/gpt-5.5",
+    to: "anthropic/claude-sonnet-4.6" }));
+  assert.equal(tracker.snapshot().cards[0].model, "anthropic/claude-sonnet-4.6");
+  // Privacy: the event bodies and the assignment never reach the projection, and the field is a
+  // single sanitized, bounded line even for a hostile model name.
+  tracker.onEvent(subagentEvent(assistantEnd("openai", "gpt\u001b[2Jx\n/y".repeat(80))));
+  const snapshot = tracker.snapshot();
+  const serialized = JSON.stringify(snapshot);
+  assert.ok(!serialized.includes(SENTINEL), serialized);
+  assert.ok(!serialized.includes("assignment"), serialized);
+  const model = snapshot.cards[0].model;
+  assert.ok(model.length <= 120, String(model.length));
+  assert.doesNotMatch(model, /\u001b|\n/);
+  assert.ok(model.startsWith("openai/gpt[2Jx /y"), model);
+  assert.equal(tracker.snapshot().ignored, 0);
+});
+
+test("onEvent ignores unrelated events and malformed payloads without inventing cards", () => {
+  const tracker = trackerOf();
+  tracker.onLifecycle(lifecycle("i1", "started"));
+  // The normal firehose: every other event kind, and a message_end that is not an assistant
+  // message carrying both strings, is dropped silently (never counted).
+  for (const event of [
+    { type: "message_start", message: { role: "assistant" } },
+    { type: "tool_call", name: "bash", arguments: { command: SENTINEL } },
+    { type: "message_end", message: { role: "user", provider: "openai", model: "gpt-5.5" } },
+    { type: "message_end", message: { role: "assistant", provider: 7, model: "gpt-5.5" } },
+    { type: "message_end", message: { role: "assistant", provider: "openai" } },
+    { type: "message_end", message: "not a message" },
+    { type: "model_fallback_switched", to: 7 },
+    { type: "model_fallback_switched" },
+    {},
+  ]) tracker.onEvent(subagentEvent(event));
+  const quiet = tracker.snapshot();
+  assert.equal(quiet.ignored, 0, "the firehose is not counted");
+  assert.equal(quiet.cards[0].model, null);
+  // A payload with no usable `event` object is structurally malformed and is counted.
+  for (const payload of [null, "nope", [], { index: 0, agent: "loader" },
+    { index: 0, agent: "loader", event: null }]) {
+    tracker.onEvent(payload);
+  }
+  assert.equal(tracker.snapshot().ignored, 5);
+  assert.equal(tracker.snapshot().cards.length, 1, "an event never creates a card");
+  // An event that names no known card is ignored silently too: it is not malformed.
+  tracker.onEvent(subagentEvent(assistantEnd("openai", "gpt-5.5"), { agent: "stranger" }));
+  tracker.onEvent(subagentEvent(assistantEnd("openai", "gpt-5.5"), { index: 9 }));
+  tracker.onEvent(subagentEvent(assistantEnd("openai", "gpt-5.5"), { index: undefined }));
+  const unmatched = tracker.snapshot();
+  assert.equal(unmatched.ignored, 5);
+  assert.equal(unmatched.cards.length, 1);
+  assert.equal(unmatched.cards[0].model, null);
+});
+
+test("onEvent matches the newest live card and never a finished one", () => {
+  const tracker = trackerOf();
+  // Two cards of the same agent at the same index: the newest (highest order) is the target.
+  tracker.onLifecycle(lifecycle("n1", "started", { description: "older" }));
+  tracker.onLifecycle(lifecycle("n2", "started", { description: "newer" }));
+  tracker.onEvent(subagentEvent(assistantEnd("openai", "gpt-5.5")));
+  const byId = new Map(tracker.snapshot().cards.map((card) => [card.id, card.model]));
+  assert.equal(byId.get("n2"), "openai/gpt-5.5");
+  assert.equal(byId.get("n1"), null);
+  // A terminal card is not live: the next switch goes to the remaining running card, and the
+  // finished run keeps the model it actually ended on.
+  tracker.onLifecycle(lifecycle("n2", "completed"));
+  tracker.onEvent(subagentEvent({ type: "model_fallback_switched", to: "openai/o4" }));
+  const after = new Map(tracker.snapshot().cards.map((card) => [card.id, card.model]));
+  assert.equal(after.get("n1"), "openai/o4");
+  assert.equal(after.get("n2"), "openai/gpt-5.5");
+  // A pending card counts as live, and a fractional payload index is floored to the card row.
+  const pending = trackerOf();
+  pending.onProgress(progress("p1", "pending", { index: 3 }));
+  pending.onEvent(subagentEvent(assistantEnd("anthropic", "claude-sonnet-4.6"),
+    { index: 3.9 }));
+  assert.equal(pending.snapshot().cards[0].model, "anthropic/claude-sonnet-4.6");
+  assert.equal(pending.snapshot().cards[0].id, "p1");
+});
+
+test("modelOverride fills a card until an event-derived model overrides it", () => {
+  const tracker = trackerOf();
+  // A non-empty string shows the model before the first assistant message ends.
+  tracker.onProgress(progress("o1", "running", { modelOverride: "openai/gpt-5.5" }));
+  assert.equal(tracker.snapshot().cards[0].model, "openai/gpt-5.5");
+  // The event-derived model always wins, and a later weaker override never degrades it.
+  tracker.onEvent(subagentEvent(assistantEnd("anthropic", "claude-sonnet-4.6")));
+  assert.equal(tracker.snapshot().cards[0].model, "anthropic/claude-sonnet-4.6");
+  tracker.onProgress(progress("o1", "running", { modelOverride: "openai/gpt-5.5" }));
+  assert.equal(tracker.snapshot().cards[0].model, "anthropic/claude-sonnet-4.6");
+  // A non-empty array yields its first string element; an empty or non-string one is no
+  // evidence, and neither is a blank string.
+  const list = trackerOf();
+  list.onProgress(progress("o2", "running", { modelOverride: ["openai/gpt-5.5", "x"] }));
+  assert.equal(list.snapshot().cards[0].model, "openai/gpt-5.5");
+  const none = trackerOf();
+  for (const [id, modelOverride] of [["o3", []], ["o4", [7]], ["o5", ""], ["o6", 7],
+    ["o7", [""]], ["o8", null], ["o9", ["  "]]]) {
+    none.onProgress(progress(id, "running", { modelOverride }));
+  }
+  for (const card of none.snapshot().cards) assert.equal(card.model, null, JSON.stringify(card));
+  // A hostile override is sanitized and bounded like any other text.
+  const hostile = trackerOf();
+  hostile.onProgress(progress("o10", "running",
+    { modelOverride: `openai/${"m".repeat(300)}\u001b[2J` }));
+  const model = hostile.snapshot().cards[0].model;
+  assert.ok(model.length <= 120, String(model.length));
+  assert.doesNotMatch(model, /\u001b/);
 });
 
 test("titles prefer the description and fall back to the task text", () => {
@@ -394,11 +533,17 @@ test("malformed payloads are ignored and counted instead of guessed at", () => {
     ["jobs", { running: "nope" }],
     ["jobs", { running: [null] }],
     ["jobs", { running: [{ label: "no id", type: "task", status: "running" }] }],
+    // An event payload without an `event` object carries nothing to read.
+    ["event", null],
+    ["event", "not a payload"],
+    ["event", { index: 0, agent: "loader" }],
+    ["event", { index: 0, agent: "loader", event: null }],
   ];
   let expected = 0;
   for (const [channel, payload] of malformed) {
     if (channel === "lifecycle") tracker.onLifecycle(payload);
     else if (channel === "progress") tracker.onProgress(payload);
+    else if (channel === "event") tracker.onEvent(payload);
     else tracker.syncJobs(payload);
     // Each rejected payload adds exactly one to the counter and changes nothing else.
     expected += 1;

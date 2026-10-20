@@ -8,8 +8,14 @@
 // matter are asserted independently: AC2.2 (failed `×`/`failed` versus aborted
 // `⊘`/`aborted`), the amended AC-F4 at 24 columns, AC2.6 (background on row 2),
 // K1 (an unknown cost is never `$0.0000`), and the caller's never-truncated footer
-// (AC-F1/AC-F3). Fixture titles are neutral so only an emitted status suffix can
-// satisfy a status-word assertion.
+// (AC-F1/AC-F3). The model is the card's `provider/modelId` with the provider
+// dropped: it rides after the `[agent]` badge when it fits, leads the metrics row
+// otherwise, and never appears on a collapsed one-row completed card. Fixture
+// titles are neutral so only an emitted status suffix can satisfy a status-word
+// assertion.
+//
+// Ink comes from GJC's `red-claw` palette: 24-bit SGR bodies (`SGR` below), which is
+// why the colour assertions spell full `38;2;R;G;B` bodies rather than 16-colour codes.
 //
 // Adapted from omo-herdr-dashboard @3242ad4 `packages/dag/test/dashboard-b.test.mjs`.
 import assert from "node:assert/strict";
@@ -19,9 +25,9 @@ import { fit, width, wrap } from "../../src/viewers/common.mjs";
 import { renderWorkers, stepSelection, SPINNER } from "../../src/viewers/workers/render.mjs";
 
 const card = (id, extra = {}) => ({ id, agent: "subagent", title: `card ${id}`, status: "running",
-  background: false, currentTool: null, lastIntent: null, lastOutput: null, toolCount: 0,
-  tokens: 0, contextPercent: null, cost: null, durationMs: 0, retry: null, startedAt: null,
-  endedAt: null, ...extra });
+  background: false, model: null, currentTool: null, lastIntent: null, lastOutput: null,
+  toolCount: 0, tokens: 0, contextPercent: null, cost: null, durationMs: 0, retry: null,
+  startedAt: null, endedAt: null, ...extra });
 
 const projection = (cards, extra = {}) => ({ schema: "gjc-herdr-dashboard/workers/1",
   updatedAt: 1, empty: cards.length === 0, sourceError: null, cards, ...extra });
@@ -41,6 +47,13 @@ const WORDS = {
 };
 const GLYPHS = { pending: "○", running: SPINNER[0], completed: "✓", failed: "×",
   aborted: "⊘", paused: "Ⅱ" };
+// GJC's red-claw palette (24-bit SGR bodies). `paint` emits `\x1b[<body>m` with the
+// header's bold `1;` prefix, so these strings are the whole body.
+const SGR = { accent: "38;2;255;106;61", completed: "38;2;110;231;183",
+  failed: "38;2;255;77;94", aborted: "38;2;255;138;101",
+  paused: "38;2;245;184;75", muted: "38;2;185;143;134",
+  badge: "38;2;255;138;101", model: "38;2;125;211;199",
+  time: "38;2;255;215;168", dim: "38;2;111;71;67" };
 
 // One running card, so the frame is exactly header + divider + three card rows +
 // divider + footer at a tall enough pane.
@@ -78,6 +91,20 @@ test("status glyphs are one cell each and keep the six states apart", () => {
   assert.doesNotMatch(line("aborted"), /failed/);
   assert.notEqual(WORDS.ko.failed, WORDS.ko.aborted);
   assert.notEqual(WORDS.en.failed, WORDS.en.aborted);
+  // AC2.2 also holds in ink: failed, aborted and paused are three different colours, and
+  // every state takes its red-claw body.
+  const inked = (status) => {
+    const line = frameOf([card("c1", { title: "item one", status })],
+      { color: true, view: { follow: false, showCompleted: true } }).bodyLines[0];
+    return /\x1b\[([0-9;]+)m/.exec(line)?.[1] ?? "";
+  };
+  assert.equal(inked("failed"), SGR.failed);
+  assert.equal(inked("aborted"), SGR.aborted);
+  assert.equal(inked("paused"), SGR.paused);
+  assert.equal(new Set([inked("failed"), inked("aborted"), inked("paused")]).size, 3,
+    "failed, aborted and paused keep three distinct colours");
+  assert.equal(inked("running"), SGR.accent);
+  assert.equal(inked("completed"), SGR.completed);
 });
 
 // Q3=A: running and done carry the glyph only; every other state keeps its word.
@@ -196,9 +223,9 @@ test("the empty, waiting and source-error states use the OMO empty shape", () =>
   }
   // Only the two hint rows are dim; the ○ row itself is plain (OMO :612-616).
   const colored = body(projection([]), "en", true);
-  assert.ok(!colored[1].includes("\x1b[2m"), colored[1]);
-  assert.ok(colored[3].includes("\x1b[2m"), colored[3]);
-  assert.ok(colored[4].includes("\x1b[2m"), colored[4]);
+  assert.ok(!colored[1].includes(`\x1b[${SGR.dim}m`), colored[1]);
+  assert.ok(colored[3].includes(`\x1b[${SGR.dim}m`), colored[3]);
+  assert.ok(colored[4].includes(`\x1b[${SGR.dim}m`), colored[4]);
 });
 
 test("connection is derived from the projection, and the caller's link outranks it", () => {
@@ -211,14 +238,17 @@ test("connection is derived from the projection, and the caller's link outranks 
   assert.equal(connection(one(), { connection: { kind: "disconnected", at: 0 } }), "disconnected");
   assert.equal(connection(projection([]), { connection: { kind: "disconnected", at: 0 } }), "disconnected");
   assert.equal(connection(one(), { connection: { kind: "bogus" } }), "live", "unknown kinds fall back");
-  // The link decides the footer colour: live and EMPTY are connected (cyan), the
-  // other states are yellow. The inset sits outside the colour sequence.
+  // The link decides the footer colour: live and EMPTY share the accent, the other
+  // states take the sand warning tone. The inset sits outside the colour sequence.
   const footer = (proj, link) => renderWorkers(proj, { columns: 60, rows: 6, color: true,
     connection: link, footer: ["Follow ON · LIVE"] }).lines.at(-1);
-  assert.equal(footer(one(), { kind: "live", at: 0 }), " \x1b[36mFollow ON · LIVE\x1b[0m");
-  assert.equal(footer(projection([]), { kind: "empty", at: 0 }), " \x1b[36mFollow ON · LIVE\x1b[0m");
-  assert.equal(footer(one(), { kind: "disconnected", at: 0 }), " \x1b[33mFollow ON · LIVE\x1b[0m");
-  assert.equal(footer(one(), { kind: "source-error", at: 0 }), " \x1b[33mFollow ON · LIVE\x1b[0m");
+  assert.equal(footer(one(), { kind: "live", at: 0 }), ` \x1b[${SGR.accent}mFollow ON · LIVE\x1b[0m`);
+  assert.equal(footer(projection([]), { kind: "empty", at: 0 }),
+    ` \x1b[${SGR.accent}mFollow ON · LIVE\x1b[0m`);
+  assert.equal(footer(one(), { kind: "disconnected", at: 0 }),
+    ` \x1b[${SGR.time}mFollow ON · LIVE\x1b[0m`);
+  assert.equal(footer(one(), { kind: "source-error", at: 0 }),
+    ` \x1b[${SGR.time}mFollow ON · LIVE\x1b[0m`);
   // A host source error outranks the cards it kept: the row says so above the body and
   // the surviving cards stay selectable and still render.
   const failed = renderWorkers(projection([card("c1", { title: "kept", status: "running" })],
@@ -261,25 +291,27 @@ test("completed cards hide behind `done N ▸`, show as one row under `▾`, and
   const all = frame({ showCompleted: true });
   assert.equal(all.bodyLines.length, 5);
   assert.equal(all.ranges.c1.end - all.ranges.c1.start, 1);
-  assert.doesNotMatch(all.bodyLines[0], /finished/, "a folded card has no detail rows");
+  assert.doesNotMatch(all.bodyLines.join("\n"), /finished/, "a folded card has no detail rows");
   assert.equal(all.lines[0], " Workers [1/2]  run 0 · failed 1 · done 1 ▾");
-  assert.deepEqual(all.selectable, ["c1", "c2"]);
+  assert.deepEqual(all.selectable, ["c2", "c1"], "the failed card is listed above the completed one");
   // An explicit expand draws the full completed card.
   const expanded = frame({ expanded: { c1: true } });
   assert.equal(expanded.bodyLines.length, 7);
   assert.equal(expanded.ranges.c1.end - expanded.ranges.c1.start, 3);
-  assert.match(expanded.bodyLines[1], /\[subagent\]/);
-  assert.match(expanded.bodyLines[2], /0 tok/);
+  // The completed card is stacked below the failed one, so its rows start at its own range.
+  assert.match(expanded.bodyLines[expanded.ranges.c1.start + 1], /\[subagent\]/);
+  assert.match(expanded.bodyLines[expanded.ranges.c1.start + 2], /0 tok/);
   // A selected card that completes stays drawn while it is selected, and Space's expand
   // flag then opens that same id; the header still says the group is hidden.
   const selected = frame({ selection: "c1" });
   assert.equal(selected.selection, "c1");
-  assert.deepEqual(selected.selectable, ["c1", "c2"]);
-  assert.equal(selected.bodyLines[0][0], " ", "no marker column: a folded card starts with its no-bar space");
-  assert.doesNotMatch(selected.bodyLines[0], /^>/);
-  assert.match(selected.bodyLines[0], /done one/);
+  assert.deepEqual(selected.selectable, ["c2", "c1"]);
+  const doneRow = selected.bodyLines[selected.ranges.c1.start];
+  assert.equal(doneRow[0], " ", "no marker column: a folded card starts with its no-bar space");
+  assert.doesNotMatch(doneRow, /^>/);
+  assert.match(doneRow, /done one/);
   // A collapsed completed card carries OMO's per-card chevron, selected or not.
-  assert.match(selected.bodyLines[0], /✓ ▸ done one/);
+  assert.match(doneRow, /✓ ▸ done one/);
   assert.equal(selected.ranges.c1.end - selected.ranges.c1.start, 1);
   assert.equal(selected.lines[0].endsWith("done 1 ▸"), true);
   const opened = frame({ selection: "c1", expanded: { c1: true } });
@@ -345,6 +377,83 @@ test("the metrics row is tokens, tools, context and omits every missing value", 
     "1 tok · 1 tools · ctx 1%");
 });
 
+// The card's model is its `provider/modelId` with the provider dropped: the id alone is
+// what fits a card row. It rides after the `[agent]` badge when it fits there, leads the
+// metrics row when it does not, and a collapsed one-row completed card never shows it.
+test("the model rides after the badge when it fits, otherwise it leads the metrics row", () => {
+  const lines = (extra, options = {}) => frameOf([card("c1", { title: "alpha",
+    status: "running", agent: "subagent", ...extra })], options).bodyLines.map(plainLine);
+  // Ordinary shortcut path: badge, model and tail all fit on row 2, so the metrics row
+  // keeps exactly its old shape.
+  const wide = lines({ model: "openai/gpt-5.5", tokens: 48000, toolCount: 12,
+    contextPercent: 41 });
+  assert.equal(wide[1], "▌[subagent] gpt-5.5");
+  assert.equal(wide[2], "▌48K tok · 12 tools · ctx 41%");
+  // The same row with a background mark: the mark stays last.
+  assert.equal(lines({ model: "openai/gpt-5.5", background: true })[1],
+    "▌[subagent] gpt-5.5 background");
+  // A narrow pane cannot hold badge plus model, so the model leads row 3.
+  const narrow = lines({ model: "anthropic/claude-sonnet-4.6", tokens: 48000, toolCount: 12 },
+    { columns: 24 });
+  assert.equal(narrow[1], "▌[subagent]");
+  assert.match(narrow[2], /^▌claude-sonnet-4\.6 · 4…$/, "the model leads and the row still fits");
+  // No agent row at all: the model leads the metrics row, and a model alone still makes
+  // that row exist.
+  const bare = lines({ agent: "", model: "openai/gpt-5.5" }, { columns: 60 });
+  assert.match(bare[1], /^▌gpt-5\.5 · 0 tok · 0 tools$/);
+  // A model alone still makes the metrics row exist, even with no metric values at all.
+  const only = lines({ agent: "", model: "openai/gpt-5.5", tokens: null, toolCount: null,
+    contextPercent: null }, { columns: 60 });
+  assert.equal(only[1], "▌gpt-5.5");
+  assert.equal(only.length, 2);
+  // A long agent identity keeps its wrapped rows and pushes the model down instead of
+  // widening row 2.
+  const wrapped = lines({ agent: "a".repeat(40), model: "anthropic/claude-sonnet-4.6",
+    tokens: 48000 }, { columns: 34 });
+  assert.ok(wrapped.slice(1, -1).every((line) => !line.includes("claude-sonnet-4.6")),
+    JSON.stringify(wrapped));
+  assert.match(wrapped.at(-1), /^▌claude-sonnet-4\.6 · 48K tok/);
+  // The metric cell is the model id only: the host's `provider/` prefix never reaches it,
+  // and only the FIRST slash is a provider separator.
+  assert.equal(lines({ model: "openrouter/anthropic/claude" })[1],
+    "▌[subagent] anthropic/claude");
+  assert.equal(lines({ model: "gpt-5.5" })[1], "▌[subagent] gpt-5.5");
+  // No model, empty model and hostile model: the row is exactly the old row, and a
+  // control sequence or newline can never paint or split a card.
+  for (const model of [undefined, null, "", 7, {}, ["openai/gpt-5.5"]]) {
+    assert.deepEqual(lines({ model }), lines({}), JSON.stringify(model));
+  }
+  const hostile = lines({ model: "openai/a\u001b[2Jb\nc" })[1];
+  assert.doesNotMatch(hostile, /\u001b/);
+  assert.equal(hostile, "▌[subagent] ab c");
+  // The model is painted with its own token, so it never borrows the badge colour.
+  const colored = frameOf([card("c1", { title: "alpha", model: "openai/gpt-5.5" })],
+    { color: true }).bodyLines[1];
+  assert.match(colored, /\x1b\[38;2;255;138;101m\[subagent\]\x1b\[0m/);
+  assert.match(colored, /\x1b\[38;2;125;211;199m gpt-5\.5\x1b\[0m/);
+});
+
+test("a collapsed completed card never shows the model; the detail view names it in full", () => {
+  // One row: no model, whatever the projection carries.
+  const folded = frameOf([card("c1", { title: "done one", status: "completed",
+    model: "openai/gpt-5.5", tokens: 900 })],
+  { view: { follow: false, showCompleted: true } });
+  assert.equal(folded.bodyLines.length, 1);
+  assert.doesNotMatch(plainLine(folded.bodyLines[0]), /gpt-5\.5/);
+  // Expanded, that same card draws the full rows and shows it again.
+  const expanded = frameOf([card("c1", { title: "done one", status: "completed",
+    model: "openai/gpt-5.5", tokens: 900 })],
+  { view: { follow: false, expanded: { c1: true } } });
+  assert.equal(plainLine(expanded.bodyLines[1]), "▌[subagent] gpt-5.5");
+  // `d` prints the host form, provider included, and `?` when the model is unknown.
+  const detail = (model, language = "en") => plainLine(frameOf([card("c1", { title: "alpha",
+    model })], { language, view: { follow: false, detail: true } }).bodyLines.join("\n"));
+  assert.match(detail("openai/gpt-5.5"), /model: openai\/gpt-5\.5/);
+  assert.match(detail(null), /model: \?/);
+  assert.match(detail(undefined, "ko"), /model: \?/);
+  assert.match(detail("openai/gpt-5.5", "zh-cn"), /模型: openai\/gpt-5\.5/);
+});
+
 // AC2.6: the background mark rides on row 2, never on the title row, and a neutral
 // title means only the emitted mark can satisfy the assertion.
 test("AC2.6: `background` rides on card row 2", () => {
@@ -363,8 +472,8 @@ test("AC2.6: `background` rides on card row 2", () => {
 });
 
 // Owner #259: an existing long role/agent identity continues on indented rows under
-// the badge instead of being ellipsis-cut. Only card.agent and background are used;
-// there is no model field in the workers projection.
+// the badge instead of being ellipsis-cut. Only card.agent and background are used on
+// those rows; a card's model never rides a wrapped identity (G7) and leads row 3.
 test("owner #259: a long agent identity continues under the badge and keeps TAIL", () => {
   const agent = "architect-role-" + "long-role-name-".repeat(6) + "TAIL";
   const long = card("c1", { title: "alpha", status: "running", agent, background: true,
@@ -641,21 +750,21 @@ test("a running card's duration follows startedAt; a finished card keeps its own
   assert.doesNotMatch(plainLine(moved.bodyLines[0]), /⧖/);
   assert.match(plainLine(moved.bodyLines[2]), /⧖ 3h 1m 1s · 0 tok/);
   assert.match(plainLine(moved.bodyLines[2]), /…$/);
-  // The time is yellow while running and grey otherwise.
+  // The time is sand while running and muted otherwise.
   const running = frameOf([card("c1", { title: "t", status: "running", durationMs: 61000 })],
     { columns: 60, color: true });
-  assert.match(running.bodyLines[0], /\x1b\[33m · ⧖ 1m 1s\x1b\[0m/);
+  assert.match(running.bodyLines[0], new RegExp(`\\x1b\\[${SGR.time}m · ⧖ 1m 1s\\x1b\\[0m`));
   const finished = frameOf([card("c1", { title: "t", status: "completed", durationMs: 61000 })],
     { columns: 60, color: true, view: { follow: false, showCompleted: true } });
-  assert.match(finished.bodyLines[0], /\x1b\[90m · ⧖ 1m 1s\x1b\[0m/);
+  assert.match(finished.bodyLines[0], new RegExp(`\\x1b\\[${SGR.muted}m · ⧖ 1m 1s\\x1b\\[0m`));
 });
 
-test("a retry adds one alert row in yellow and the detail keeps the retry field", () => {
+test("a retry adds one alert row in sand and the detail keeps the retry field", () => {
   const cards = [card("c1", { title: "alpha", status: "failed", retry: { attempt: 2, delayMs: 3000 } })];
   const list = frameOf(cards);
   assert.equal(list.bodyLines.length, 4, "title, role, metrics, alert");
   assert.equal(plainLine(list.bodyLines[3]).slice(1), "↻ 2 · 3s");
-  assert.match(frameOf(cards, { color: true }).bodyLines[3], /\x1b\[33m/);
+  assert.match(frameOf(cards, { color: true }).bodyLines[3], new RegExp(`\\x1b\\[${SGR.time}m`));
   const detail = frameOf(cards, { view: { follow: false, detail: true } });
   assert.match(plainLine(detail.bodyLines.join("\n")), /retry: 2 \(3s\)/);
   // No retry object, no alert row; an unknown attempt still names the row.
@@ -716,8 +825,8 @@ test("the selection resolves against drawn cards without a marker column", () =>
   assert.doesNotMatch(frame("c2").bodyLines.join("\n"), /^>/m);
   // The selected title keeps the one selection visual the renderer has: bold ink.
   const colored = frame("c2", { color: true });
-  assert.match(colored.bodyLines[4], /\x1b\[1;36molder\x1b\[0m/);
-  assert.doesNotMatch(colored.bodyLines[0], /\x1b\[1;36mnewest\x1b\[0m/);
+  assert.match(colored.bodyLines[4], new RegExp(`\\x1b\\[1;${SGR.accent}molder\\x1b\\[0m`));
+  assert.doesNotMatch(colored.bodyLines[0], new RegExp(`\\x1b\\[1;${SGR.accent}mnewest\\x1b\\[0m`));
   assert.equal(frame("gone").selection, "c1");
   assert.equal(frame(null).selection, "c1");
   assert.equal(frame(7).selection, "c1");
@@ -860,10 +969,10 @@ test("the caller's footer rows are appended verbatim and are the only rows allow
   // A control sequence in a caller's footer row cannot repaint the pane.
   const escaped = frameOf([card("c1")], { rows: 6, footer: ["\x1b[2Jgone"] });
   assert.equal(escaped.lines.at(-1), " gone");
-  // The footer divider is the OMO dim divider (ANSI 2), not the Todo grey (90).
+  // The footer divider is the shared dim divider, not the Todo grey.
   const colored = frameOf([card("c1")], { rows: 6, footer: ["F"], color: true });
-  assert.equal(colored.lines[1], "\x1b[2m" + "─".repeat(79) + "\x1b[0m");
-  assert.equal(colored.lines.at(-2), "\x1b[2m" + "─".repeat(79) + "\x1b[0m");
+  assert.equal(colored.lines[1], `\x1b[${SGR.dim}m` + "─".repeat(79) + "\x1b[0m");
+  assert.equal(colored.lines.at(-2), `\x1b[${SGR.dim}m` + "─".repeat(79) + "\x1b[0m");
 });
 
 test("the header is `Workers [done/total]` with an always-present run count and the fold mark", () => {
@@ -918,13 +1027,13 @@ test("a narrow mixed header drops secondary tallies before the completed fold", 
   assert.equal(five, " Workers [1/5]  run 1 · failed 1 · done 1 ▸");
 });
 
-test("the header name is bold cyan in every state, the tally is bold yellow, the summary dim", () => {
+test("the header name is bold accent in every state, the tally is bold sand, the summary dim", () => {
   const frame = frameOf([card("c1")], { columns: 60, color: true });
-  assert.ok(frame.lines[0].startsWith(" \x1b[1;36mWorkers\x1b[0m \x1b[1;33m["));
+  assert.ok(frame.lines[0].startsWith(` \x1b[1;${SGR.accent}mWorkers\x1b[0m \x1b[1;${SGR.time}m[`));
   // A disconnected pane keeps the same header colours (the link colours the footer).
   const offline = frameOf([card("c1")], { columns: 60, color: true,
     connection: { kind: "disconnected", at: 0 } });
-  assert.ok(offline.lines[0].startsWith(" \x1b[1;36mWorkers\x1b[0m \x1b[1;33m["));
+  assert.ok(offline.lines[0].startsWith(` \x1b[1;${SGR.accent}mWorkers\x1b[0m \x1b[1;${SGR.time}m[`));
 });
 
 test("the spinner cycles the ten OMO frames and normalises a bad spin value", () => {

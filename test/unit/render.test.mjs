@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
 import { test } from "node:test";
 import { clean, fit, width, wrap } from "../../src/viewers/common.mjs";
-import { counts, isClosedPhase, marks, renderFrame, taskKeys } from "../../src/viewers/todo/render.mjs";
+import { counts, isClosedPhase, marks, phaseRomanNumeral, renderFrame, taskKeys }
+  from "../../src/viewers/todo/render.mjs";
 
 // Independent cell oracle for the ASCII/Hangul fixtures, not renderer.width.
 const cells = (line) => Array.from(stripVTControlCharacters(line))
@@ -51,7 +52,10 @@ test("counts and closed-phase classification follow the shared status vocabulary
   assert.equal(isClosedPhase({ tasks: [{ status: "completed" }, { status: "abandoned" }] }), true);
   assert.equal(isClosedPhase({ tasks: [] }), false);
   assert.equal(isClosedPhase({ tasks: [{ status: "pending" }] }), false);
-  assert.equal(marks.abandoned, "[×]");
+  assert.equal(marks.pending, "☐");
+  assert.equal(marks.in_progress, "☐");
+  assert.equal(marks.completed, "☑");
+  assert.equal(marks.abandoned, "☐");
 });
 
 for (const [columns, rows] of [[80, 24], [52, 23], [40, 16], [34, 18], [24, 8], [12, 4], [1, 1]]) {
@@ -76,18 +80,23 @@ test("phase shells, fold ranges and every status stay reachable by body scroll",
   assert.equal(Object.keys(full.phaseRanges).length, 3);
   assert.equal(Object.keys(full.taskRanges).length, 5);
   assert.equal(Object.values(full.taskRanges).filter((range) => range.status === "in_progress").length, 2);
-  assert.equal(full.bodyLines.filter((line) => line.includes("[•]")).length, 2);
+  assert.equal(full.bodyLines.filter((line) => /^── (I|II|III)\. /.test(stripVTControlCharacters(line))).length, 3,
+    "each drawn phase starts with its divider row");
+  assert.equal(full.bodyLines.filter((line) => /^[├└]─ [☐☑] /.test(stripVTControlCharacters(line))).length, 5,
+    "every task row starts with a branch glyph");
+  assert.equal(full.bodyLines.filter((line) => /^└─ [☐☑] /.test(stripVTControlCharacters(line))).length, 2,
+    "the last task of a phase closes the branch with └─");
   assert.equal(full.selectableKeys.length, 5);
   assert.deepEqual(full.selectableKeys, taskKeys(snapshot));
   for (const [, phase] of snapshot.phases.entries()) {
     const range = Object.values(full.phaseRanges).find((value) => full.bodyLines[value.start].includes(phase.name));
     assert.ok(range, `phase ${phase.name} has a body row`);
     const frame = renderFrame(snapshot, { columns: 40, rows: 16, scroll: range.start,
-      color: false, expanded: true });
+      color: false, expanded: true, follow: false });
     assert.ok(frame.lines.some((line) => line.includes(phase.name)));
   }
   const shell = renderFrame(projection([{ name: "Empty", tasks: [] }]), { columns: 40, rows: 16, color: false, language: "en" });
-  assert.match(shell.text, /Empty 0\/0/);
+  assert.match(shell.text, /── I\. Empty  0\/0/);
   assert.match(shell.text, /\(empty phase\)/);
 });
 
@@ -98,7 +107,9 @@ test("a fully closed phase folds away entirely until 'c' expands it", () => {
   { name: "Open", tasks: [{ content: "LIVE_KEEP", status: "in_progress" }] }]);
   const original = structuredClone(snapshot);
   const folded = renderFrame(snapshot, { columns: 80, rows: 40, color: false, language: "en" });
-  const expanded = renderFrame(snapshot, { columns: 80, rows: 40, color: false, language: "en", expanded: true });
+  // Follow OFF keeps every drawn phase in the window; follow ON pins the live phase to the top.
+  const expanded = renderFrame(snapshot, { columns: 80, rows: 40, color: false, language: "en",
+    expanded: true, follow: false });
   // Auto-collapsed: the closed phase contributes no body row at all, and its counts
   // survive only in the header, which is what keeps the frame truthful.
   assert.doesNotMatch(folded.text, /DONE_HIDE|DROP_HIDE|Closed/);
@@ -106,8 +117,8 @@ test("a fully closed phase folds away entirely until 'c' expands it", () => {
   assert.equal(Object.keys(folded.phaseRanges).length, 2);
   assert.match(expanded.text, /DONE_HIDE/);
   assert.match(expanded.text, /DROP_HIDE/);
-  assert.match(expanded.text, /Closed 2\/2 drop:1/);
-  assert.match(expanded.text, /Empty 0\/0/);
+  assert.match(expanded.text, /^── I\. Closed  2\/2 drop:1/m);
+  assert.match(expanded.text, /^── II\. Empty  0\/0/m);
   assert.equal(Object.keys(expanded.phaseRanges).length, 3);
   assert.ok(expanded.bodyLines.length > folded.bodyLines.length);
   // The renderer never mutates its input.
@@ -118,16 +129,26 @@ test("a phase that still holds pending work is never hidden; only closed phases 
   const snapshot = projection([{ name: "Waiting", tasks: [{ content: "QUEUED_VISIBLE", status: "pending" }] },
     { name: "Running", tasks: [{ content: "ACTIVE_KEEP", status: "in_progress" }] },
     { name: "Finished", tasks: [{ content: "DONE_HIDDEN", status: "completed" }] }]);
-  const folded = renderFrame(snapshot, { columns: 60, rows: 20, color: false });
+  const folded = renderFrame(snapshot, { columns: 60, rows: 20, color: false, follow: false });
   // Pending work is the whole point of a todo list: it is listed without pressing 'c'.
   assert.match(folded.text, /QUEUED_VISIBLE/);
   assert.match(folded.text, /ACTIVE_KEEP/);
-  assert.match(folded.text, /Waiting 0\/1/);
+  assert.match(folded.text, /^── I\. Waiting  0\/1/m);
   // A fully closed phase is the only thing that starts folded, and 'c' reveals it.
   assert.doesNotMatch(folded.text, /DONE_HIDDEN/);
-  const expanded = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true });
+  // Follow ON pins the phase that holds the live task, so the pending phase above it is out of
+  // view for that frame but still drawn, and follow OFF brings it back.
+  const pinned = renderFrame(snapshot, { columns: 60, rows: 20, color: false });
+  assert.doesNotMatch(pinned.text, /QUEUED_VISIBLE/);
+  assert.match(pinned.text, /ACTIVE_KEEP/);
+  const expanded = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true,
+    follow: false });
   assert.match(expanded.text, /DONE_HIDDEN/);
   assert.ok(expanded.bodyLines.length > folded.bodyLines.length);
+  // With follow OFF the closed phase is drawn above the live one and the numerals stay put.
+  const shown = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true, follow: false });
+  assert.match(shown.text, /^── I\. Waiting  0\/1/m);
+  assert.match(shown.text, /^── III\. Finished  1\/1/m);
 });
 
 test("waiting, empty, disconnected and source error have distinct labels", () => {
@@ -173,14 +194,15 @@ test("the selection resolves against the requested key without drawing a marker 
   const explicit = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true,
     selection: keys[4] });
   const plain = stripVTControlCharacters(explicit.text);
-  // G12: the task row starts at column 0 with its mark, and no row carries a marker.
-  assert.match(plain, /^\[ \] Verify source$/m);
+  // G12: the task row starts with its branch glyph, its checkbox and a space, and no row
+  // carries a marker.
+  assert.match(plain, /^└─ ☐ Verify source$/m);
   assert.doesNotMatch(plain, /^>/m);
   assert.equal(explicit.selection, keys[4]);
   assert.equal(explicit.selectionIndex, 4);
-  // The first task row starts with its mark; wrapped continuation rows are the only
-  // body rows that begin with spaces, and nothing begins with the old marker.
-  assert.ok(explicit.bodyLines.some((line) => stripVTControlCharacters(line).startsWith("[•] ")));
+  // The first task row opens the branch; wrapped continuation rows are the only
+  // body rows that start with a rail or blanks, and nothing starts with the old marker.
+  assert.ok(explicit.bodyLines.some((line) => stripVTControlCharacters(line).startsWith("├─ ☐ ")));
   assert.doesNotMatch(plain, /^> /m);
   // No selection requested: the first in-progress task is the resolved selection.
   const inferred = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true });
@@ -227,9 +249,8 @@ test("the footer carries follow and connection but no keyboard legend in every l
   }
 });
 
-// OMO packages/todo/src/render.mjs:202 at 3242ad4 paints the header name with
-// warning for last-known/disconnected and error for a source error, and accent otherwise.
-test("the Todo header name mirrors OMO's state colours: cyan, yellow offline, red source error", () => {
+// GJC's red-claw palette: claw accent live, warning amber offline, dangerRed source error.
+test("the Todo header name takes the GJC red-claw connection ink: claw, amber offline, dangerRed source error", () => {
   const input = projection([{ name: "Build", tasks: [{ content: "work", status: "in_progress" }] }]);
   const waiting = renderFrame(null, { columns: 80, rows: 14, color: true, language: "en" });
   const live = renderFrame(input, { columns: 80, rows: 14, color: true, language: "en" });
@@ -238,10 +259,103 @@ test("the Todo header name mirrors OMO's state colours: cyan, yellow offline, re
     connection: { kind: "disconnected", at: 0 } });
   const failed = renderFrame({ ...input, sourceError: "todo_write failed" },
     { columns: 80, rows: 14, color: true, language: "en" });
-  for (const frame of [waiting, live, empty]) assert.ok(frame.lines[0].includes("\x1b[1;36mTodo"), "accent cyan");
-  assert.ok(offline.lines[0].includes("\x1b[1;33mTodo"), "disconnected is warning yellow");
-  assert.ok(failed.lines[0].includes("\x1b[1;31mTodo"), "source error is error red");
-  assert.equal(failed.lines[0].includes("\x1b[1;33mTodo"), false, "source error is not warning yellow");
+  for (const frame of [waiting, live, empty]) {
+    assert.ok(frame.lines[0].includes("\x1b[1;38;2;255;106;61mTodo"), "live/waiting/empty is bold claw");
+  }
+  assert.ok(offline.lines[0].includes("\x1b[1;38;2;245;184;75mTodo"), "disconnected is warning amber");
+  assert.ok(failed.lines[0].includes("\x1b[1;38;2;255;77;94mTodo"), "source error is dangerRed");
+  assert.equal(failed.lines[0].includes("\x1b[1;38;2;245;184;75mTodo"), false, "source error is not amber");
+});
+
+// GJC's own todo list numbers phases with ASCII roman numerals by their one-based
+// position among ALL phases; the numeral is display-only state (no key carries it).
+test("phaseRomanNumeral spells I..XII and nothing below one", () => {
+  const expected = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+  assert.deepEqual(expected.map((unused, index) => phaseRomanNumeral(index + 1)), expected);
+  assert.equal(phaseRomanNumeral(0), "");
+  assert.equal(phaseRomanNumeral(-3), "");
+});
+
+test("phase numbering is stable when an earlier phase is folded closed", () => {
+  const snapshot = projection([
+    { name: "Closed", tasks: [{ content: "DONE", status: "completed" }] },
+    { name: "Open", tasks: [{ content: "LIVE", status: "in_progress" }] },
+    { name: "Later", tasks: [{ content: "QUEUED", status: "pending" }] }]);
+  const folded = renderFrame(snapshot, { columns: 52, rows: 14, color: false, language: "en" });
+  const expanded = renderFrame(snapshot, { columns: 52, rows: 14, color: false, language: "en",
+    expanded: true, follow: false });
+  // Folding removes rows but never renumbers: `Open` stays II and `Later` stays III.
+  assert.match(folded.text, /^── II\. Open  0\/1/m);
+  assert.match(folded.text, /^── III\. Later  0\/1/m);
+  assert.doesNotMatch(folded.text, /I\. Closed/);
+  assert.match(expanded.text, /^── I\. Closed  1\/1/m);
+  assert.match(expanded.text, /^── II\. Open  0\/1/m);
+  assert.match(expanded.text, /^── III\. Later  0\/1/m);
+  // The selection keys are the phase name and occurrence, so they are numeral-free. A folded
+  // phase drops its rows but the keys of the remaining tasks do not change.
+  assert.deepEqual(taskKeys(snapshot), ["[\"Closed\",0,\"DONE\",0]",
+    "[\"Open\",0,\"LIVE\",0]", "[\"Later\",0,\"QUEUED\",0]"].map((key) => key));
+  assert.deepEqual(folded.selectableKeys, taskKeys(snapshot).slice(1));
+  assert.deepEqual(expanded.selectableKeys, taskKeys(snapshot));
+  for (const key of taskKeys(snapshot)) {
+    assert.doesNotMatch(key, /\b(I|II|III|IV|V)\b/, "no numeral in a selection key");
+  }
+});
+
+test("task rows build a tree: ├─ for a later task, └─ for the phase's last, │ on wrapped lines", () => {
+  const content = "align the continuation rows under the task text so a long sentence still reads well";
+  const snapshot = projection([{ name: "Build", tasks: [
+    { content, status: "in_progress" }, { content: "second task", status: "pending" }] }]);
+  const frame = renderFrame(snapshot, { columns: 34, rows: 24, color: false, language: "en" });
+  const rows = frame.bodyLines.slice(1).map(stripVTControlCharacters);
+  // The first task opens the branch; its continuation rows keep the rail (`│  ` plus blanks)
+  // so the wrapped text starts in the same column as the first row's text.
+  const textColumn = width("├─ ☐ ");
+  assert.equal(textColumn, 6);
+  assert.match(rows[0], /^├─ ☐ align the/);
+  const continuation = rows.slice(1).filter((row) => !row.startsWith("└─ ☐ "));
+  assert.ok(continuation.length >= 2, "the long task wraps onto continuation rows");
+  for (const row of continuation) {
+    assert.equal(row.slice(0, textColumn), `│${" ".repeat(textColumn - 1)}`, row);
+  }
+  // The last task of the phase closes the branch and blank continuation rows line up too.
+  assert.match(rows.at(-1), /^└─ ☐ second task$/);
+  assert.equal(rows.filter((row) => row.includes("├")).length, 1,
+    "only a task with a later sibling opens the branch");
+  assert.equal(rows.filter((row) => row.includes("└")).length, 1,
+    "only the phase's last task closes the branch");
+  // Every row still fits a 34-column pane.
+  for (const line of frame.lines) assert.ok(width(line) <= 34, JSON.stringify(line));
+});
+
+test("GJC task ink: kelp done, dangerRed strike dropped, claw bold live, mutedShell pending", () => {
+  const snapshot = projection([{ name: "Build", tasks: [
+    { content: "done work", status: "completed" },
+    { content: "dropped work", status: "abandoned" },
+    { content: "live work", status: "in_progress" },
+    { content: "queued work", status: "pending" }] }]);
+  const frame = renderFrame(snapshot, { columns: 52, rows: 14, color: true, language: "en" });
+  const row = (needle) => frame.bodyLines.find((line) => stripVTControlCharacters(line).includes(needle));
+  // Completed work is kelp with no strike; only dropped work is struck through.
+  assert.equal(row("done work"), "\x1b[38;2;110;231;183m├─ ☑ done work\x1b[0m");
+  assert.equal(row("dropped work"), "\x1b[9;38;2;255;77;94m├─ ☐ dropped work\x1b[0m");
+  assert.equal(row("live work"), "\x1b[1;38;2;255;106;61m├─ ☐ live work\x1b[0m");
+  assert.equal(row("queued work"), "\x1b[38;2;185;143;134m└─ ☐ queued work\x1b[0m");
+  // The phase row is a dimShell divider around a bold claw title for the live phase.
+  assert.equal(frame.bodyLines[0], "\x1b[38;2;111;71;67m── \x1b[0m" +
+    "\x1b[1;38;2;255;106;61mI. Build  2/4 drop:1\x1b[0m" +
+    `\x1b[38;2;111;71;67m ${"─".repeat(27)}\x1b[0m`);
+  // A closed phase title is mutedShell and not bold, and an open non-current phase is bold coral.
+  const closed = renderFrame(projection([{ name: "Done", tasks: [{ content: "d", status: "completed" }] },
+    { name: "Queued", tasks: [{ content: "q", status: "pending" }] }]),
+  { columns: 52, rows: 14, color: true, language: "en", expanded: true, follow: false });
+  assert.ok(closed.bodyLines[0].includes("\x1b[38;2;185;143;134mI. Done  1/1\x1b[0m"), closed.bodyLines[0]);
+  assert.ok(closed.bodyLines[2].includes("\x1b[1;38;2;255;138;101mII. Queued  0/1\x1b[0m"), closed.bodyLines[2]);
+  // With colour off the same rows are plain and carry no strike or escape at all.
+  const plain = renderFrame(snapshot, { columns: 52, rows: 14, color: false, language: "en" });
+  assert.doesNotMatch(plain.text, /\x1b/, "color:false stays escape-free");
+  assert.doesNotMatch(plain.text, /\u001b\[9m|\u001b\[0m/);
+  assert.match(plain.text, /^├─ ☑ done work$/m);
 });
 
 // Short panes: present optional rows (goal, error, header divider) fill the room
@@ -303,3 +417,148 @@ for (const entry of shortCases) {
     });
   }
 }
+
+// Follow keeps the active task's phase title on screen. Without it a window that starts on the
+// active task alone shows an anonymous row, and a title scrolled off the top is the symptom the
+// owner reported (the group title was hidden for a moment).
+const longPhases = (activePhase, activeTask) => projection(Array.from({ length: 5 }, (unused, p) => ({
+  name: `Group${p}`,
+  tasks: Array.from({ length: 6 }, (unusedTask, i) => ({ content: `g${p}t${i}`,
+    status: p === activePhase && i === activeTask ? 'in_progress' : 'pending' })),
+})));
+
+test('follow keeps the active task phase title visible across every position and pane height', () => {
+  for (const rows of [8, 10, 12, 16]) {
+    for (let phase = 0; phase < 5; phase += 1) {
+      for (let task = 0; task < 6; task += 1) {
+        const snapshot = longPhases(phase, task);
+        const active = taskKeys(snapshot)[phase * 6 + task];
+        const frame = renderFrame(snapshot, { columns: 52, rows, color: false, language: 'en',
+          selection: active, revealSelection: true, expanded: true });
+        const text = stripVTControlCharacters(frame.text);
+        assert.ok(text.includes(`g${phase}t${task}`), `rows=${rows} task visible`);
+        assert.ok(text.includes(`${phaseRomanNumeral(phase + 1)}. Group${phase}`),
+          `rows=${rows} title of Group${phase} visible with g${phase}t${task}`);
+      }
+    }
+  }
+});
+
+test('a selection that is already fully visible does not move the window', () => {
+  const snapshot = longPhases(0, 1);
+  const keys = taskKeys(snapshot);
+  const near = renderFrame(snapshot, { columns: 52, rows: 14, color: false, selection: keys[3], scroll: 0 });
+  assert.equal(near.scroll, 0, 'a visible later task keeps the current scroll');
+});
+
+test('a tall phase cannot hold its title and the selection together: the title is pinned on top', () => {
+  const big = projection([{ name: 'Huge', tasks: Array.from({ length: 30 }, (unused, i) => ({
+    content: `row${i}`, status: i === 20 ? 'in_progress' : 'pending' })) }]);
+  const frame = renderFrame(big, { columns: 52, rows: 10, color: false, language: 'en',
+    selection: taskKeys(big)[20], expanded: true });
+  const body = frame.lines.slice(frame.bodyStart, frame.bodyStart + frame.bodyRows)
+    .map((line) => stripVTControlCharacters(line));
+  assert.ok(body[0].includes('I. Huge'), `title pinned: ${body[0]}`);
+  assert.ok(body.some((line) => line.includes('row20')), 'the selected task stays visible');
+});
+
+// The phase row is a divider: `── <ROMAN>. <name>  <closed>/<total>` then dashes to the pane's
+// edge. It stays one row, so phaseRanges, click and scroll arithmetic are unchanged.
+test("phase rows are divider rows that fill the pane and never exceed it", () => {
+  const snapshot = projection([
+    { name: "준비", tasks: [{ content: "계획", status: "completed" }] },
+    { name: "워커 실행", tasks: [{ content: "워커 A", status: "in_progress" },
+      { content: "워커 B", status: "pending" }] }]);
+  for (const columns of [80, 52, 40, 34, 24, 20]) {
+    const frame = renderFrame(snapshot, { columns, rows: 20, color: false, language: "ko",
+      expanded: true, follow: false });
+    const rows = Object.values(frame.phaseRanges)
+      .map((range) => stripVTControlCharacters(frame.bodyLines[range.start]));
+    assert.equal(rows.length, 2, `${columns}: one row per drawn phase`);
+    for (const row of rows) {
+      assert.match(row, /^── [IVX]+\. /, `${columns}: the divider lead and numeral: ${row}`);
+      assert.ok(cells(row) <= columns, `${columns}: ${JSON.stringify(row)} fits ${columns} cells`);
+    }
+    // The wide panes fill the row exactly; the narrow ones give up the dashes first.
+    if (columns >= 34) {
+      assert.equal(cells(rows[0]), columns - 1, `${columns}: filler dashes reach the edge`);
+    }
+    assert.match(rows[0], /── I\. 준비  1\/1 ─/);
+  }
+  // A title that eats the whole pane leaves no dashes at all, and still fits.
+  const tight = renderFrame(projection([{ name: "가".repeat(12) + " 나다라마바사아자차",
+    tasks: [{ content: "x", status: "pending" }] }]),
+  { columns: 20, rows: 12, color: false, language: "ko", follow: false });
+  const head = stripVTControlCharacters(tight.bodyLines[0]);
+  assert.ok(cells(head) <= 20, JSON.stringify(head));
+  assert.match(head, /^── I\. /);
+});
+
+// The example the owner asked for: follow ON with phase I closed puts phase II's divider row
+// at the top of the body, and follow OFF brings phase I back.
+test("follow pins the phase holding the live task to body row 0, and follow OFF shows the closed phase", () => {
+  const snapshot = projection([
+    { name: "준비", tasks: [{ content: "계획 읽기", status: "completed" }] },
+    { name: "워커 실행", tasks: [{ content: "워커 A 실행", status: "in_progress" },
+      { content: "워커 B 실행", status: "pending" }, { content: "워커 C 실행", status: "pending" }] },
+    { name: "검증", tasks: [{ content: "결과 확인", status: "pending" }] }]);
+  const options = { columns: 40, rows: 16, color: false, language: "ko", expanded: true };
+  const pinned = renderFrame(snapshot, options);
+  const first = stripVTControlCharacters(pinned.lines[pinned.bodyStart]);
+  assert.match(first, /^── II\. 워커 실행  0\/3 ─+$/, first);
+  assert.equal(pinned.bodyStart, 2, "the header and its divider sit above the body");
+  const body = pinned.lines.slice(pinned.bodyStart, pinned.bodyStart + pinned.bodyRows)
+    .map((line) => stripVTControlCharacters(line));
+  // The frame reserves the last terminal cell, so the filler dashes reach `columns - 1`.
+  const divider = (label) => `${label} ${"─".repeat(39 - width(`${label} `))}`;
+  assert.deepEqual(body.slice(0, 5), [divider("── II. 워커 실행  0/3"),
+    "├─ ☐ 워커 A 실행", "├─ ☐ 워커 B 실행", "└─ ☐ 워커 C 실행",
+    divider("── III. 검증  0/1")]);
+  // Follow ON does not clamp to the end of the body: the scroll is the anchor row even when the
+  // list is shorter than the window, and the empty rows below are padded blanks.
+  assert.equal(pinned.scroll, pinned.phaseRanges[JSON.stringify(["워커 실행", 0])].start);
+  assert.equal(body.at(-1), "");
+  assert.doesNotMatch(stripVTControlCharacters(pinned.text), /준비|계획 읽기/);
+  // Follow OFF keeps the passed scroll and shows the closed phase first.
+  const free = renderFrame(snapshot, { ...options, follow: false });
+  assert.equal(free.scroll, 0);
+  assert.match(stripVTControlCharacters(free.lines[free.bodyStart]), /^── I\. 준비  1\/1 ─+$/);
+});
+
+test("follow ON raises the window to the selected task but never lower than the anchor", () => {
+  const snapshot = projection([{ name: "Huge", tasks: Array.from({ length: 30 }, (unused, index) => ({
+    content: `row${index}`, status: index === 20 ? "in_progress" : "pending" })) }]);
+  const keys = taskKeys(snapshot);
+  const frame = renderFrame(snapshot, { columns: 52, rows: 10, color: false, language: "en",
+    expanded: true, selection: keys[24] });
+  const selected = frame.taskRanges[keys[24]];
+  assert.ok(selected.end <= frame.scroll + frame.bodyRows, "the selected task is inside the window");
+  const body = frame.lines.slice(frame.bodyStart, frame.bodyStart + frame.bodyRows)
+    .map((line) => stripVTControlCharacters(line));
+  assert.match(body[0], /^── I\. Huge  0\/30 /, `the anchor row stays on top: ${body[0]}`);
+  assert.ok(body.some((line) => line.includes("row24")), "the selected row is drawn");
+});
+
+test("a follow-ON frame keeps the pinned divider on row 0 when the selection is far down", () => {
+  const snapshot = projection([{ name: "Huge", tasks: Array.from({ length: 40 }, (unused, index) => ({
+    content: `row${index}`, status: index === 0 ? "in_progress" : "pending" })) }]);
+  const frame = renderFrame(snapshot, { columns: 52, rows: 8, color: false, language: "en",
+    expanded: true, selection: taskKeys(snapshot)[39] });
+  const body = frame.lines.slice(frame.bodyStart, frame.bodyStart + frame.bodyRows)
+    .map((line) => stripVTControlCharacters(line));
+  assert.match(body[0], /^── I\. Huge  0\/40 /, body[0]);
+  assert.ok(body.some((line) => line.includes("row39")), "the selected task is still revealed");
+});
+
+// With color false there is no escape anywhere, including the divider ink and the tree rows.
+test("the divider and tree rows stay escape-free with color false", () => {
+  const snapshot = projection([{ name: "Build", tasks: [
+    { content: "done", status: "completed" }, { content: "dropped", status: "abandoned" },
+    { content: "live", status: "in_progress" }, { content: "queued", status: "pending" }] }]);
+  for (const follow of [true, false]) {
+    const frame = renderFrame(snapshot, { columns: 52, rows: 20, color: false, language: "en", follow });
+    assert.doesNotMatch(frame.text, /\x1b/, `follow=${follow}: no ESC`);
+    assert.match(frame.text, /^── I\. Build  2\/4 drop:1 /m);
+    assert.match(frame.text, /^└─ ☐ queued$/m);
+  }
+});

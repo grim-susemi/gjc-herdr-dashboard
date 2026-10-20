@@ -123,7 +123,9 @@ await runScript("l6-drills (D1-D4)", async () => {
     const deadline = Date.now() + 45_000;
     let pane = null;
     while (pane === null && Date.now() < deadline) {
-      pane = viewerPanes(fixture, "todo")[0] ?? null;
+      // The drill writes its own state directory, and our panes are only findable through
+      // the slot records there (panes carry no manual label).
+      pane = viewerPanes(fixture, "todo", { stateDir: STATE_DIR })[0] ?? null;
       if (pane === null) await sleep(1_000);
     }
     assert(pane !== null, "a Todo viewer pane exists", { panes: fixture.listPanes() });

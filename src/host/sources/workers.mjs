@@ -8,8 +8,13 @@
 //   * `task:subagent:progress` `{agent, agentSource, assignment, index, progress, sessionFile, task}`
 //     where `progress` is the host's `AgentProgress`. A payload is matched to a card by
 //     `progress.id`; the `agent` + `index` pair is the fallback for a row that carries no id, and
-//     it only matches when it names exactly one card.
-//   * `task:subagent:event` carries raw child events and is deliberately not consumed.
+//     it only matches when it names exactly one card. `progress.modelOverride` is the model the
+//     run was told to use, and it is the weakest model source: any event-derived model wins.
+//   * `task:subagent:event` `{index, agent, agentSource, task, assignment, event}` carries one raw
+//     child event and no card id. Only the model is read from it: an assistant `message_end`
+//     (`provider` + `model`) or a `model_fallback_switched` (`to`). Every other event is the
+//     normal firehose and is dropped silently; the card is matched by `agent` + `index` among
+//     running/pending cards, newest first. An event never creates a card.
 //   * `ctx.getJobs()` (`{running, recent, delivery}`) fills in work the sub bus cannot see: a
 //     `task` job whose id the bus has not reported becomes a `background: true` card titled by
 //     its label, and a later pass updates that same card in place from the job's own frozen
@@ -19,9 +24,14 @@
 // reads. The owner (src/host/instance.mjs) feeds the bus payloads and the retained ctx, then
 // publishes `snapshot()`; a 200 ms merge upstream keeps the bus burst off the disk.
 //
+// Each card carries `model: string | null`, the model the subagent actually runs on in host form
+// `provider/modelId` (or the fallback target). It is filled from the raw child event stream
+// first and from `modelOverride` only until an event arrives, then sanitized like any other text
+// (`lineText`, 120 chars) so a model string can never paint a pane.
+//
 // Malformed payloads are ignored and counted in `snapshot().ignored` instead of being guessed
 // at. The counter is per snapshot, so a consumer can tell "no cards yet" from "cards arrived
-// and we could not read them". `snapshot()` itself never throws. The three ingest methods can
+// and we could not read them". `snapshot()` itself never throws. The four ingest methods can
 // throw on a genuinely hostile payload (a getter that raises), which is deliberate: the host
 // wraps each bus handler in try/catch and records the exception with `fail()`, and that is how
 // AC2.7's source-error label appears. Swallowing it here would hide the fault instead.
@@ -29,7 +39,8 @@
 // Privacy (AC-G4 / AC2.5): `assignment`, transcripts, `sessionFile`, tool arguments and every
 // message body other than `lastIntent`/`lastOutput` are dropped at this boundary. Only the
 // task description (or, when the host supplies none, the task text) becomes the card title, and
-// control sequences are stripped so untrusted child output can never retitle a pane.
+// control sequences are stripped so untrusted child output can never retitle a pane. The raw
+// child event stream contributes exactly one value, the model string; nothing else is read.
 //
 // Cost (K1, VERIFICATION.md G5): the host reports `cost: 0` at every point for subscription
 // models, so a reported 0 is indistinguishable from "unknown" and is projected as `null`.
@@ -41,7 +52,7 @@
 //   WORKERS_STATUSES: readonly string[]                 // card status vocabulary
 //   LIFECYCLE_STATUSES: readonly string[]              // bus lifecycle vocabulary
 //   createWorkersTracker({ now?, max? }): Tracker
-//     Tracker = { onLifecycle, onProgress, syncJobs, fail, snapshot, reset }
+//     Tracker = { onLifecycle, onProgress, onEvent, syncJobs, fail, snapshot, reset }
 //     snapshot() = { schema, updatedAt, empty, sourceError, cards, ignored }
 
 export const WORKERS_SCHEMA = "gjc-herdr-dashboard/workers/1";
@@ -70,6 +81,7 @@ const OUTPUT_LIMIT = 200;
 const TOOL_LIMIT = 80;
 const INTENT_LIMIT = 200;
 const AGENT_LIMIT = 80;
+const MODEL_LIMIT = 120;
 
 // Title = `description ?? task` (or the job label for a background card). The rank records which
 // source produced the title, so a description arriving after the task-text fallback still
@@ -155,6 +167,14 @@ function setTitle(card, text, rank) {
   card.titleRank = rank;
 }
 
+// `modelOverride` is `string | string[]`. A non-empty string, or a non-empty array whose first
+// element is a non-empty string, is the model the host asked for; anything else is no evidence.
+function overrideModelOf(value) {
+  const first = Array.isArray(value) ? value[0] : value;
+  if (typeof first !== "string") return null;
+  return lineText(first, MODEL_LIMIT);
+}
+
 export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX } = {}) {
   const limit = finite(max) !== null && max >= 1 ? Math.floor(max) : WORKERS_MAX;
   // Keyed by card id. Display order comes from `order` (a creation sequence, newest first), not
@@ -181,6 +201,7 @@ export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX
   function blank(id) {
     sequence += 1;
     return { id, agent: "", title: "", titleRank: 0, status: "pending", background: false,
+      model: null,
       currentTool: null, lastIntent: null, lastOutput: null, toolCount: 0, tokens: 0,
       contextPercent: null, cost: null, reportedDurationMs: null, retry: null, startedAt: null,
       endedAt: null, index: null, order: sequence };
@@ -296,11 +317,50 @@ export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX
     card.contextPercent = contextPercentOf(progress);
     card.cost = costOf(progress.cost);
     card.retry = retryOf(progress.retryState);
+    // The weakest model source: it shows the model before the first assistant message ends, and
+    // an event-derived model (below) always overrides it, so it only fills an empty card.
+    const override = overrideModelOf(progress.modelOverride);
+    if (override !== null && card.model === null) card.model = override;
     const reported = finite(progress.durationMs);
     card.reportedDurationMs = reported !== null && reported >= 0 ? reported : null;
     if (progress.status === "running" || progress.status === "pending") card.endedAt = null;
     else if (card.endedAt === null) card.endedAt = stamp();
     prune();
+  }
+
+  // `task:subagent:event` is the raw child event stream: one payload per child event, with no
+  // card id. Only two kinds carry a model, and everything else is the normal firehose, so it is
+  // dropped silently (never counted). A payload with no `event` object is malformed and counted.
+  // The card is matched by `agent` + `index` among live cards; an event never creates a card.
+  function onEvent(payload) {
+    if (!record(payload) || !record(payload.event)) {
+      ignored += 1;
+      return;
+    }
+    const event = payload.event;
+    let model = null;
+    if (event.type === "message_end") {
+      const message = event.message;
+      if (record(message) && message.role === "assistant" &&
+        typeof message.provider === "string" && typeof message.model === "string") {
+        model = lineText(`${message.provider}/${message.model}`, MODEL_LIMIT);
+      }
+    } else if (event.type === "model_fallback_switched" && typeof event.to === "string") {
+      model = lineText(event.to, MODEL_LIMIT);
+    }
+    if (model === null) return;
+    const agent = lineText(payload.agent, AGENT_LIMIT);
+    const index = finite(payload.index);
+    if (agent === null || index === null) return;
+    const row = Math.floor(index);
+    let target = null;
+    for (const card of cards.values()) {
+      if (card.agent !== agent || card.index !== row) continue;
+      if (card.status !== "running" && card.status !== "pending") continue;
+      if (target === null || card.order > target.order) target = card;
+    }
+    if (target === null) return;
+    target.model = model;
   }
 
   // `jobsState` is `ctx.getJobs()` or undefined. An absent surface is not a malformed payload:
@@ -379,7 +439,8 @@ export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX
 
   function project(card, nowMs) {
     return { id: card.id, agent: card.agent, title: card.title, status: card.status,
-      background: card.background, currentTool: card.currentTool, lastIntent: card.lastIntent,
+      background: card.background, model: card.model, currentTool: card.currentTool,
+      lastIntent: card.lastIntent,
       lastOutput: card.lastOutput, toolCount: card.toolCount, tokens: card.tokens,
       contextPercent: card.contextPercent, cost: card.cost, durationMs: durationOf(card, nowMs),
       retry: card.retry === null ? null : { ...card.retry }, startedAt: card.startedAt,
@@ -402,5 +463,5 @@ export function createWorkersTracker({ now = () => Date.now(), max = WORKERS_MAX
     sequence = 0;
   }
 
-  return { onLifecycle, onProgress, syncJobs, fail, snapshot, reset };
+  return { onLifecycle, onProgress, onEvent, syncJobs, fail, snapshot, reset };
 }

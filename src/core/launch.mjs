@@ -17,22 +17,23 @@
 // Sequence (plan 7.3 item 2; the FP table in plan 8 is defined against these exact steps):
 //   1 preflight  2 lock (the caller holds it)  3 intent.json  4 pane split --no-focus
 //   5 pane process-info (shell_pid)  6 pending record in slot.json  7 delete intent.json
-//   8 pane rename  9 pane run (viewer)  10 focus check
-// U12 would fuse 4/8/9 into one command; L0 G7/U12 measured no such command (split has no
-// `--label`/direct-command option), so this module issues the separate calls.
+//   8 pane run (viewer)  9 focus check
+// The pane is deliberately NOT renamed: Herdr draws a manual label on the pane border with a
+// leading and trailing space, which leaves a gap in the border line, so identity is paneId + tabId
+// (plus shell_pid in `isOPlus`). U12 would fuse 4/8 into one command; L0 G7/U12 measured no such
+// command (split has no `--label`/direct-command option), so this module issues the separate calls.
 //
-// Crash failpoints (FP1-FP5) are simulated through GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT so the
-// unit tests can stop the sequence exactly where a process death would, and then assert what a
-// later pass inherits (plan 8 FP table):
-//   fp1 after split, before the record        -> label-less pane + intent, next pass T19
-//   fp2 after the record, before rename       -> default-label pane + pending, next pass T5
-//   fp3 after rename, before run              -> our-label empty shell, next pass T9/T10/T11
+// Crash failpoints (fp1, fp2, fp4, fp5) are simulated through GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT
+// so the unit tests can stop the sequence exactly where a process death would, and then assert
+// what a later pass inherits (plan 8 FP table):
+//   fp1 after split, before the record        -> record-less pane + intent, next pass T19
+//   fp2 after the record, before run          -> unlabelled pending pane, next pass T5
 //   fp4 after run, before the focus check     -> viewer starting, next pass T13
 //   fp5 viewer ready 25 s late (R3)            -> `--failpoint ready-delay-25s`, next pass T10/T13
 // Failures that are not crashes clean up after themselves where that is provably safe: a
 // preflight or split failure leaves no pane, so the intent file is removed and the next pass
 // starts from T1 (LT-1). A failure after the split keeps the intent (or relies on the pending
-// record) so the next pass sees T19 / T5 / T9 exactly as the FP table says.
+// record) so the next pass sees T19 / T5 exactly as the FP table says.
 //
 // Focus (plan 7.3 item 8): the split is `--no-focus`, so focus normally never moves and no focus
 // command is issued. When another client did move the focus inside the parent tab, the pass
@@ -48,7 +49,7 @@
 //   resolveRoleViewerPath({viewerPath, role}) -> absolute path | throws {code:'viewer'}
 //   preflight(options)             -> {ok:true, nodePath, viewerPath, vector, crash, viewerFailpoint}
 //                                  | {ok:false, code, detail}
-//   launchRole(options)            -> {ok, code, paneId?, tabId?, shellPid?, token, label, record?,
+//   launchRole(options)            -> {ok, code, paneId?, tabId?, shellPid?, token, record?,
 //                                      slot?, splitPaneIds, focus, detail?}
 //     L2 adds `anchorPaneId` (default: the parent pane), `direction` (default 'right') and `ratio`
 //     (default null = no `--ratio` flag). The reconciler passes the band geometry explicitly:
@@ -62,7 +63,7 @@ import { clearIntent, intentRecord, writeIntent, writeSlot } from './slot.mjs';
 
 export const LAUNCH_FAILPOINT_ENV = 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT';
 export const VIEWER_FAILPOINT_ENV = 'GJC_HERDR_DASHBOARD_VIEWER_FAILPOINT';
-export const CRASH_FAIL_POINTS = ['fp1', 'fp2', 'fp3', 'fp4', 'fp5'];
+export const CRASH_FAIL_POINTS = ['fp1', 'fp2', 'fp4', 'fp5'];
 export const VIEWER_FAILPOINTS = ['ready-delay-25s'];
 // The L1 default: Todo is the first role, it is split to the right of the parent, and a direct
 // caller that passes no ratio gets Herdr's own default (0.5). The reconciler always states the
@@ -191,7 +192,7 @@ export function directionBetween(from, to) {
 export async function launchRole(options = {}) {
   const {
     herdr, paths, parent = {}, scope = {}, role = 'todo', layoutKey,
-    slot = null, stateDir, viewerPath, nodePath = null, language = null, label, token,
+    slot = null, stateDir, viewerPath, nodePath = null, language = null, token,
     env = process.env, now = () => Date.now(), platform = process.platform,
     checkNode, viewerAccess, resolveVector, vector = null,
     failpoint = undefined, focusCheck = true,
@@ -207,7 +208,7 @@ export async function launchRole(options = {}) {
   } = options;
   const splitPaneIds = [];
   const focus = { before: null, after: null, restored: true };
-  const abort = (code, detail, extra = {}) => ({ ok: false, code, detail, token, label,
+  const abort = (code, detail, extra = {}) => ({ ok: false, code, detail, token,
     splitPaneIds, focus, ...extra });
   const pre = await preflight({ env, checkNode, nodePath, viewerPath, vector, resolveVector, viewerAccess });
   if (!pre.ok) return abort(pre.code, pre.detail);
@@ -248,7 +249,7 @@ export async function launchRole(options = {}) {
   // 3. intent.json before the split (plan 7.3; T19 depends on it). It is a slot-state write like
   // the record, so it fails under the same code: without it a later pass could not tell an
   // interrupted launch from a plain T1, and the launch must not split first and ask later.
-  try { await writeIntentFn(paths.intent, intentRecord({ role, label, tabId: parentTabId, now: at() })); }
+  try { await writeIntentFn(paths.intent, intentRecord({ role, tabId: parentTabId, now: at() })); }
   catch (error) {
     if (isControlFailure(error)) throw error;
     return abort('failed:herdr-record', error.code ?? error.message, { step: 'intent' });
@@ -296,8 +297,7 @@ export async function launchRole(options = {}) {
   }
 
   // 6. the pending record.
-  const record = { state: 'pending', token, paneId, tabId, shellPid,
-    label: label ?? null, pendingSince: at() };
+  const record = { state: 'pending', token, paneId, tabId, shellPid, pendingSince: at() };
   const base = slot && typeof slot === 'object' ? slot : {
     schema: 'gjc-herdr-dashboard/slot/1', layoutKey,
     parent: { socket: parent?.socket ?? null, paneId: parentPaneId, tabId: parentTabId },
@@ -323,19 +323,7 @@ export async function launchRole(options = {}) {
   if (crash === 'fp2') return abort('failed:failpoint', 'fp2:after-record',
     { paneId, tabId, shellPid, record, slot: nextSlot });
 
-  // 8. rename to the role label. The label is a real, exact string because isO/O+ compare it with
-  // the record on every later pass (slot.mjs uses an invisible role marker: Herdr renders no title
-  // for it, but the equality fence is unchanged).
-  try { await herdr('pane', 'rename', paneId, label); }
-  catch (error) {
-    if (isControlFailure(error)) throw error;
-    return abort('failed:herdr-rename', error.code ?? error.message,
-      { paneId, tabId, shellPid, record, slot: nextSlot });
-  }
-  if (crash === 'fp3') return abort('failed:failpoint', 'fp3:after-rename',
-    { paneId, tabId, shellPid, record, slot: nextSlot });
-
-  // 9. run the viewer. Only ever on `paneId` from THIS pass's split result (LT-8).
+  // 8. run the viewer. Only ever on `paneId` from THIS pass's split result (LT-8).
   const command = viewerCommand({ nodePath: pre.nodePath, viewerPath: pre.viewerPath, stateDir,
     layoutKey, role, token, paneId, language, failpoint: viewerFailpoint }, platform);
   try { await herdr('pane', 'run', paneId, command); }
@@ -347,7 +335,7 @@ export async function launchRole(options = {}) {
   if (crash === 'fp4') return abort('failed:failpoint', 'fp4:after-run',
     { paneId, tabId, shellPid, record, slot: nextSlot });
 
-  // 10. focus: restore only when the focused pane of the parent tab actually changed.
+  // 9. focus: restore only when the focused pane of the parent tab actually changed.
   if (focusCheck) {
     try {
       const listed = await herdr('pane', 'list');
@@ -373,6 +361,6 @@ export async function launchRole(options = {}) {
     }
   }
 
-  return { ok: true, code: 'opened', paneId, tabId, shellPid, token, label, record,
+  return { ok: true, code: 'opened', paneId, tabId, shellPid, token, record,
     slot: nextSlot, splitPaneIds, focus };
 }

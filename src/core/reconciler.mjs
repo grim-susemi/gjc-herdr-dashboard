@@ -59,7 +59,7 @@ import { readJson } from '../storage.mjs';
 import { BAND_LAYOUT, foreignPanes, isBandShape, planBand } from './layout.mjs';
 import { launchRole } from './launch.mjs';
 import { ageMs, isO, isOPlus, pidAlive as probePid, viewerState } from './liveness.mjs';
-import { OWNER_SCHEMA, acquireLock, clearIntent, generationIsCurrent, labelOf, layoutKeyOf,
+import { OWNER_SCHEMA, acquireLock, clearIntent, generationIsCurrent, layoutKeyOf,
   lockPaths, ownerRecord, quarantineSlot, readIntent, readOwner, readSlot, releaseLock, scopeKeyOf,
   slotPaths, writeIntent, writeOwner as writeOwnerFile, writeSlot } from './slot.mjs';
 import { decideOwnerPhase, decideRole } from './transitions.mjs';
@@ -276,7 +276,7 @@ export function createReconciler(deps = {}) {
       const listed = await call('pane', 'list');
       const panes = listed?.panes ?? [];
       // Presence is paneId membership in the parent tab's list (R2); O additionally needs the
-      // exact label and the matching tab, which is what separates T5 from T4/T20.
+      // matching tab, which is what separates T5 from T4/T20.
       const present = typeof record.paneId === 'string' &&
         panes.some(pane => paneIdOf(pane) === record.paneId);
       const O = isO(record, panes);
@@ -628,10 +628,9 @@ export function createReconciler(deps = {}) {
               continue;
             }
             const token = newToken();
-            const label = labelOf(role);
             const scope = applyScope(slot ?? { scope: {} }, binding);
             const launch = await launchRole({
-              herdr: call, paths, layoutKey, stateDir, role, token, label, language,
+              herdr: call, paths, layoutKey, stateDir, role, token, language,
               parent: { socket: binding.socket, paneId: binding.parentPaneId, tabId: binding.tabId },
               // Todo anchors on the parent and states the band's chat share (2/3, leaving the
               // dashboard 1/3 of the tab); every other role states its anchor, direction and ratio

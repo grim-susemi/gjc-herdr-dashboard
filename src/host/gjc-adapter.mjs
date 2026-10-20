@@ -260,7 +260,7 @@ const WHY_KEYS = { size: "notify.why.size", shape: "notify.why.shape", timeout: 
 const FAILURE_KEYS = { node: "notify.failure.node", viewer: "notify.failure.viewer",
   herdr: "notify.failure.herdr", "herdr-split": "notify.failure.herdr-split",
   "herdr-close": "notify.failure.herdr-close", "herdr-process-info": "notify.failure.herdr-process-info",
-  "herdr-record": "notify.failure.herdr-record", "herdr-rename": "notify.failure.herdr-rename",
+  "herdr-record": "notify.failure.herdr-record",
   "herdr-run": "notify.failure.herdr-run", "lock-io": "notify.failure.lock-io",
   internal: "notify.failure.internal", failpoint: "notify.failure.failpoint",
   unknown: "notify.failure.unknown" };

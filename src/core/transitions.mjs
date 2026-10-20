@@ -12,11 +12,11 @@
 //
 // Exports:
 //   decideRole({record, observation, mode, ownerPhase, slotStatus, intent}) -> decision
-//     record:      {state:'pending'|'ready'|'closed', token, paneId, tabId, label, shellPid,
+//     record:      {state:'pending'|'ready'|'closed', token, paneId, tabId, shellPid,
 //                   pendingSince, closedBy?} | null
 //     observation: {O, Oplus, V, age, pane?}
-//                   O      owner evidence: pane in the parent tab's pane list with the exact
-//                          label for its role and matching paneId + tabId
+//                   O      owner evidence: pane in the parent tab's pane list with the same
+//                          paneId and matching tabId
 //                   Oplus  O and (process-info shell_pid === record.shellPid, or no shell)
 //                   V      'none' | 'closing-q' | 'ready' | 'unresponsive' | 'dead'
 //                   age    ms since record.pendingSince (clamped to >= 0 by the caller or here)
@@ -87,7 +87,6 @@ function toCase(input) {
     token: 'token-A',
     paneId: 'w1:p9',
     tabId: 'w1:t1',
-    label: 'GJC Todo · aaaaaaaa',
     shellPid: 4242,
     pendingSince: 0,
   };

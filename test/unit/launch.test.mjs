@@ -1,5 +1,6 @@
 // Unit tests for src/core/launch.mjs — the plan 7.3 launch sequence, its preflight failures, the
-// FP1..FP5 crash failpoints, the shell quoting/trailer and the LT-8 run-target rule.
+// FP1/FP2/FP4/FP5 crash failpoints (there is no FP3: the launch never renames a pane), the shell
+// quoting/trailer and the LT-8 run-target rule.
 //
 // Every test drives a real temporary state directory plus the shared fake Herdr/clock/process
 // table from ./fake-herdr.mjs. No real Herdr, no real clock, no real pane, no owner home.
@@ -9,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { labelOf, readSlot, slotPaths } from '../../src/core/slot.mjs';
+import { readSlot, slotPaths } from '../../src/core/slot.mjs';
 import { CRASH_FAIL_POINTS, directionBetween, launchRole, preflight, readFailpoints,
   resolveRoleViewerPath, shellTrailer, viewerArgs, viewerCommand } from '../../src/core/launch.mjs';
 import { createFakeClock, createFakeHerdr, createPassTracer } from './fake-herdr.mjs';
@@ -35,7 +36,6 @@ function fixture({ stateDir, clock = createFakeClock(), fake = null, failpoint =
     layoutKey: KEY,
     stateDir,
     role: 'todo',
-    label: labelOf('todo', KEY.slice(0, 8)),
     token: 'tok-1',
     parent: { socket: binding.socket, paneId: binding.parentPaneId, tabId: binding.tabId },
     scope: { sessionId: 's-1', scopeKey: 'k'.repeat(24), scopeEpoch: 1, language: 'ko' },
@@ -116,7 +116,8 @@ test('readFailpoints rejects unknown values before the split (stage-05 R3) and a
   assert.equal(bad.ok, false);
   assert.match(bad.detail, /fp9/);
   assert.equal(readFailpoints({ GJC_HERDR_DASHBOARD_VIEWER_FAILPOINT: 'nope' }).ok, false);
-  assert.deepEqual(CRASH_FAIL_POINTS, ['fp1', 'fp2', 'fp3', 'fp4', 'fp5']);
+  // The rename step is gone, so the crash list has no point after it any more.
+  assert.deepEqual(CRASH_FAIL_POINTS, ['fp1', 'fp2', 'fp4', 'fp5']);
 });
 
 test('viewer args, quoting and trailer cover the required flags and a Korean path with spaces', () => {
@@ -156,7 +157,7 @@ test('directionBetween reads the axis that actually differs and stays silent whe
 });
 
 // ---------------------------------------------------------------------- happy path ---------
-test('the launch sequence issues split, process-info, rename and run in plan 7.3 order', async t => {
+test('the launch sequence issues split, process-info and run in plan 7.3 order', async t => {
   const stateDir = await scratch(t);
   const clock = createFakeClock();
   const fx = fixture({ stateDir, clock });
@@ -168,8 +169,11 @@ test('the launch sequence issues split, process-info, rename and run in plan 7.3
   const order = verbs.map((verb, index) => ({ verb, index }));
   const at = verb => order.find(entry => entry.verb === verb)?.index;
   assert.ok(at('pane split') < at('pane process-info'));
-  assert.ok(at('pane process-info') < at('pane rename'));
-  assert.ok(at('pane rename') < at('pane run'));
+  assert.ok(at('pane process-info') < at('pane run'));
+  // No manual pane label: Herdr would draw it on the border and leave a gap, so the launch never
+  // issues `pane rename` and the pane keeps Herdr's own null label.
+  assert.equal(verbs.includes('pane rename'), false);
+  assert.equal(fx.fake.paneLabel(result.paneId), null);
   // --no-focus is mandatory (plan 7.3 item 8) and the run target is the split's pane.
   const splitCall = fx.tracer.trace.find(entry => entry.argv[1] === 'split');
   assert.ok(splitCall.argv.includes('--no-focus'));
@@ -194,15 +198,30 @@ test('the launch sequence issues split, process-info, rename and run in plan 7.3
   assert.equal(record.pendingSince, clock.now());
   assert.equal(await readFilePath(fx.paths.intent), null);
   // The parent pane was never renamed, never closed and never had a command run in it.
-  assert.equal(fx.fake.labelOf('w1:p1'), 'shell');
+  assert.equal(fx.fake.paneLabel('w1:p1'), 'shell');
   assert.equal(fx.fake.commandOf('w1:p1'), null);
-  // The pane name is still the recorded identity label, but it is a zero-width marker: Herdr's
-  // border renderer trims Unicode whitespace (U+200B is not whitespace) and draws no visible text,
-  // so the viewer's own header is the only visible title. The exact string is what isO compares.
-  const paneLabel = fx.fake.labelOf(result.paneId);
-  assert.equal(paneLabel, labelOf('todo', KEY.slice(0, 8)));
-  assert.equal(paneLabel, '\u200b');
-  assert.equal(paneLabel.trim(), paneLabel);
+  // The record is the whole identity: paneId + tabId (+ shellPid for O+), no label field.
+  assert.deepEqual(Object.keys(record).sort(),
+    ['paneId', 'pendingSince', 'shellPid', 'state', 'tabId', 'token']);
+  assert.equal(record.tabId, 'w1:t1');
+  assert.equal('label' in result.record, false, 'the record carries no label field');
+});
+
+test('a launch never issues pane rename and leaves the pane label null', async t => {
+  const stateDir = await scratch(t);
+  const fx = fixture({ stateDir });
+  const result = await fx.launch();
+  assert.equal(result.ok, true, JSON.stringify(result));
+  // Panes carry no manual label: Herdr draws it on the pane border as " " + label + " ", which
+  // punches a gap into the border line, so the label is gone and paneId + tabId is the identity.
+  assert.deepEqual(fx.tracer.verbs().filter(verb => verb === 'pane rename'), []);
+  assert.equal(fx.fake.paneLabel(result.paneId), null, 'Herdr keeps its own (absent) label');
+  assert.equal(result.label, undefined, 'the result carries no label field');
+  // The pane is still identifiable the way the product now identifies it.
+  assert.equal(result.record.paneId, result.paneId);
+  assert.equal(result.record.tabId, 'w1:t1');
+  const listed = (await fx.fake.herdr('pane', 'list')).panes.find(pane => pane.pane_id === result.paneId);
+  assert.equal(listed.tab_id, result.record.tabId);
 });
 
 test('a split failure is one failed:herdr-split with no pane and no leftover intent (LT-1)', async t => {
@@ -255,38 +274,34 @@ test('a split that never answers keeps the intent and reports partial:timeout', 
   // The fake did create the pane (a real Herdr may or may not have); the point is that this pass
   // never claims it, never labels it and never records it, so the next pass must resolve it from
   // the intent, not from a record.
-  assert.equal(fake.labelOf('w1:p2'), null, 'the unclaimed pane carries no label');
+  assert.equal(fake.paneLabel('w1:p2'), null, 'the unclaimed pane carries no label');
   assert.equal(fake.commandOf('w1:p2'), null, 'and no command');
 });
 
 test('a failure after the split keeps the evidence the FP table names and never re-enters a pane', async t => {
   const stateDir = await scratch(t);
   const clock = createFakeClock();
-  // fp1: pane without label, intent left behind -> the next pass sees T19.
+  // fp1: a record-less, label-less pane plus the intent -> the next pass sees T19.
   const fp1 = fixture({ stateDir, clock, failpoint: 'fp1' });
   const one = await fp1.launch();
   assert.equal(one.code, 'failed:failpoint');
   assert.equal(one.detail, 'fp1:after-split');
   assert.notEqual(await readFilePath(fp1.paths.intent), null);
   assert.equal(await readFilePath(fp1.paths.slot), null);
-  assert.equal(fp1.fake.labelOf(one.paneId), null);
-  // fp2: record written, pane still has no label.
+  assert.equal(fp1.fake.paneLabel(one.paneId), null);
+  // fp2: the record is written and the intent is gone; the pane still carries no label.
   const fp2 = fixture({ stateDir: await scratch(t), clock, failpoint: 'fp2' });
   const two = await fp2.launch();
   assert.equal(two.detail, 'fp2:after-record');
-  assert.equal(fp2.fake.labelOf(two.paneId), null);
+  assert.equal(fp2.fake.paneLabel(two.paneId), null);
   assert.equal((await readSlot(fp2.paths.slot)).slot.roles.todo.state, 'pending');
   assert.equal(await readFilePath(fp2.paths.intent), null);
-  // fp3: renamed shell with no viewer command; fp4: viewer started.
-  const fp3 = fixture({ stateDir: await scratch(t), clock, failpoint: 'fp3' });
-  const three = await fp3.launch();
-  assert.equal(three.detail, 'fp3:after-rename');
-  assert.equal(fp3.fake.labelOf(three.paneId), labelOf('todo', KEY.slice(0, 8)));
-  assert.equal(fp3.fake.commandOf(three.paneId), null);
+  // fp4: the viewer command is in the pane and the pane still carries no label of ours.
   const fp4 = fixture({ stateDir: await scratch(t), clock, failpoint: 'fp4' });
   const four = await fp4.launch();
   assert.equal(four.detail, 'fp4:after-run');
   assert.notEqual(fp4.fake.commandOf(four.paneId), null);
+  assert.equal(fp4.fake.paneLabel(four.paneId), null);
   // fp5: a normal launch whose viewer is told to be 25 s late (R3).
   const fp5 = fixture({ stateDir: await scratch(t), clock, failpoint: 'fp5' });
   const five = await fp5.launch();
@@ -294,13 +309,14 @@ test('a failure after the split keeps the evidence the FP table names and never 
   const command = fp5.fake.commandOf(five.paneId);
   assert.ok(command.includes('--failpoint'));
   assert.ok(command.includes('ready-delay-25s'));
-  // The run target is the same pass's split pane wherever a run happened (LT-8); fp3 never runs.
+  // The run target is the same pass's split pane wherever a run happened (LT-8).
   for (const [tracer, result] of [[fp4.tracer, four], [fp5.tracer, five]]) {
     assert.deepEqual(tracer.record.runTargets, tracer.record.splitPaneIds);
     assert.deepEqual(result.splitPaneIds, [result.paneId]);
   }
-  assert.deepEqual(fp3.tracer.record.splitPaneIds, [three.paneId]);
-  assert.deepEqual(fp3.tracer.record.runTargets, []);
+  // fp1/fp2 crashed before any run, and no pass ever renamed a pane.
+  assert.deepEqual(fp1.tracer.record.runTargets, []);
+  assert.deepEqual(fp2.tracer.record.runTargets, []);
   assert.deepEqual(one.splitPaneIds, [one.paneId]);
   assert.deepEqual(two.splitPaneIds, [two.paneId]);
 });
@@ -368,7 +384,7 @@ test('a pre-existing slot keeps its scope key unless the sessionId differs (plan
   assert.equal(stored.roles.todo.paneId, result.paneId);
 });
 
-test('a process-info or rename failure leaves the record (or the intent) for the next pass', async t => {
+test('a process-info or run failure leaves the record (or the intent) for the next pass', async t => {
   const stateDir = await scratch(t);
   const info = fixture({ stateDir,
     fake: createFakeHerdr({ failures: { 'process-info': { code: 'herdr_error', times: 1 } } }) });
@@ -377,18 +393,16 @@ test('a process-info or rename failure leaves the record (or the intent) for the
   assert.equal(await readFilePath(info.paths.slot), null);
   assert.notEqual(await readFilePath(info.paths.intent), null);
 
-  const rename = fixture({ stateDir: await scratch(t),
-    fake: createFakeHerdr({ failures: { rename: { code: 'pane_not_found' } } }) });
-  const second = await rename.launch();
-  assert.equal(second.code, 'failed:herdr-rename');
-  assert.equal((await readSlot(rename.paths.slot)).slot.roles.todo.paneId, second.paneId);
-  assert.equal(rename.fake.commandOf(second.paneId), null);
-
   const run = fixture({ stateDir: await scratch(t),
     fake: createFakeHerdr({ failures: { run: { code: 'herdr_error' } } }) });
   const third = await run.launch();
   assert.equal(third.code, 'failed:herdr-run');
-  assert.equal((await readSlot(run.paths.slot)).slot.roles.todo.state, 'pending');
-  assert.equal(run.fake.labelOf(third.paneId), labelOf('todo', KEY.slice(0, 8)));
+  const stored = (await readSlot(run.paths.slot)).slot.roles.todo;
+  assert.equal(stored.state, 'pending');
+  // The record is the pane's only identity; the pane was never relabelled on the way.
+  assert.equal(stored.paneId, third.paneId);
+  assert.equal('label' in stored, false);
+  assert.equal(run.fake.paneLabel(third.paneId), null);
+  assert.equal(run.fake.commandOf(third.paneId), null);
 });
 

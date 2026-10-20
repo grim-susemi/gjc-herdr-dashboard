@@ -24,7 +24,7 @@ const slotFor = ({ layoutKey = "a".repeat(24), scopeKey = "b".repeat(24), role =
   schema: "gjc-herdr-dashboard/slot/1", layoutKey,
   parent: { socket: "sock", paneId: "w1:p1", tabId: "t1" }, herdr: ["herdr"],
   scope: { sessionId: "sess", scopeKey, scopeEpoch: 1, language: "ko" },
-  roles: { [role]: { state, token, paneId: pane, tabId: "t1", shellPid: 12, label: "GJC Workers · aaaaaaaa" } },
+  roles: { [role]: { state, token, paneId: pane, tabId: "t1", shellPid: 12 } },
 });
 
 const card = (id, extra = {}) => ({ id, agent: "subagent", title: `card ${id}`, status: "running",

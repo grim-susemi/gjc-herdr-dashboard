@@ -2,6 +2,19 @@
 
 증거는 `.evidence/` 아래에 있고 git에서 제외된다. 아래 기록은 실제로 실행한 명령의 결과만 적는다.
 
+## 2026-10-20 Dashboard polish (owner test findings)
+
+owner 테스트에서 나온 아래 항목을 고쳤다. 아래 당시 기록은 고치지 않고 새 변경만 추가한다.
+
+- **Todo follow-pin**: follow ON이면 진행 중 작업이 있는 phase(없으면 첫 열린 phase, 모두 닫혔으면 마지막 phase)의 구분선 행이 body 첫 줄에 고정된다. 끝난 phase는 위로 밀려 화면 밖으로 나가며 지워지지 않는다(휠/`j`/`k`로 follow OFF 후 다시 보임). follow ON 프레임은 body 끝을 넘는 scroll을 가질 수 있어 viewer는 저장할 때 `maxScrollOf()`로 다시 자른다.
+- **Todo 구분선과 트리**: phase 행은 `── II. 워커 실행  0/3 ────` 구분선 행이고, 작업 행은 `├─`/`└─` 트리이며 왼쪽 들여쓰기 없이 column 0에서 시작한다(`taskIndent` 빈 문자열, `taskInset` 6칸). 이어지는 줄은 `│` 레일 또는 공백.
+- **Todo 색**: 대기 항목 dimShell(대비 부족) → mutedShell, 완료 항목은 kelp 취소선 제거, 취소(dropped)만 취소선 유지, phase 제목은 굵게(진행 중 claw, 열림 coral, 닫힘 mutedShell).
+- **Workers 정렬**: 실행/대기/일시정지 카드가 위, failed/aborted가 중간, completed가 아래에 쌓인다. 같은 구간 안에서는 기존 최신순을 유지하며 `selectable`(Tab/`n`/`p`)도 같은 순서를 따른다. 완료 카드가 마지막 행이 되므로 기존 테스트의 `\t` 이동은 `p`로 바꿨다.
+- **Workers 클릭 즉시 반영**: `commit()`/`key()`/`onFocus()`가 `draw()` 뒤 `writeFrame()`을 바로 호출한다(이전에는 1 s 타이머 또는 spinner 틱을 기다려 약 1초 지연). 같은 프레임은 다시 쓰지 않고(`lastWritten`), 드래그 모션은 즉시 그리되 prefs 저장은 놓을 때 한 번만 한다.
+- **패널 테두리 왼쪽 위 빈칸**: 원인은 Herdr `pane_border_title`이 라벨을 `" " + label + " "`로 그려서 제로폭 라벨(U+200B/C/D)에도 양쪽 공백이 남는 것이었다(`src/ui/panes.rs`, v0.9.5). 공백만 있는 라벨은 trim되어 "라벨 없음"이 되므로 보이지 않는 라벨은 존재할 수 없다. 그래서 `pane rename` 호출과 `PANE_LABELS`/`labelOf`를 제거했고 pane 식별은 `paneId + tabId`(+ shell pid)이다. `launch.mjs`의 fp3(rename 직후)와 `failed:herdr-rename` 코드·번역 키도 삭제했다. 이미 떠 있는 기존 pane에는 예전 라벨이 남아 있으므로 새 generation에서 pane을 다시 열어야 빈칸이 사라진다.
+
+검증: 전체 `node scripts/test.mjs` **728/728** 통과(fail 0, skipped 0). 렌더 확인은 follow ON/OFF Todo 프레임과 Workers 정렬 프레임을 `color:false`로 출력해 눈으로 확인했다. 설치: `node scripts/install.mjs`로 `generation-000009`(이전 `generation-000008` 유지)를 설치했고 `--doctor`는 mismatches 0, exit 0이다. 실제 Herdr 화면에서 테두리 빈칸이 사라지는지는 아직 확인하지 않았다(새 세션에서 pane을 다시 열어야 한다).
+
 ## 2026-10-20 Final-wave follow-up (rows 11-17)
 
 F4/F1/F3 final-wave 지적 중 rows 11, 12, 13, 17, 16을 고쳤다. 이 절은 아래의 당시 기록을 고치지 않고 새 변경만 추가한다.

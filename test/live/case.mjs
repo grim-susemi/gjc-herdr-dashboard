@@ -17,16 +17,14 @@
 //   launchGjc(fixture, paneId, options)        -> the typed command string
 //   notifyLines(frame)                         -> ['ext dev · …', …]
 //   waitForNotify(fixture, paneId, pattern, options) -> {frame, line, all}
-//   viewerPanes(fixture, role = 'todo')       -> panes carrying the role's invisible identity label
-//                                                (role null = every dashboard pane)
-//   isDashboardPaneLabel(label)               -> true for one of the three invisible role labels
+//   viewerPanes(fixture, role = 'todo', {stateDir}) -> the panes the slot records of this case name
+//                                                (role null = every dashboard role)
 //   assert(condition, message, details?)
 //   evidenceDirFor(level, lv)
 //   runScript(name, fn)                        -> never returns; exits 0 or 1
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { PANE_LABELS } from '../../src/core/slot.mjs';
 import { EVIDENCE, REPO, SANDBOX } from './fixture.mjs';
 
 export const LAUNCH_CLEAR_ENV = ['GJC_HERDR_PANE_OWNER', 'GJC_SESSION_CWD', 'HERDR_CONFIG_PATH'];
@@ -52,6 +50,7 @@ export function evidenceDirFor(level, lv) {
 // gjc loads (its cwd is the case dir).
 export function createCase({ caseId, root = SANDBOX, state = null, herdr, viewerFailpoint = null }) {
   const paths = casePaths({ caseId, root, state });
+  lastStateDir = paths.stateDir;
   const argv = ['scripts/dev-shim.mjs', '--case', caseId, '--state', paths.stateDir];
   if (herdr) argv.push('--herdr', JSON.stringify(herdr));
   if (viewerFailpoint) argv.push('--viewer-failpoint', viewerFailpoint);
@@ -162,14 +161,56 @@ export async function expectNoNotify(fixture, paneId, pattern, {
   return true;
 }
 
-// The pane labels are load-bearing identity but deliberately invisible (zero-width role markers), so
-// the live scripts discover our panes by the exact label rather than by a rendered `GJC …` prefix.
-// `role === null` means every dashboard role. `role` filters by role; the default is the Todo pane.
-export const isDashboardPaneLabel = label => Object.values(PANE_LABELS).includes(label);
-export const viewerPanes = (fixture, role = 'todo') => fixture.listPanes().filter((pane) => {
-  if (role === null) return isDashboardPaneLabel(pane.label);
-  return pane.label === PANE_LABELS[role];
-});
+// Panes carry NO manual label (Herdr would draw it on the border and leave a gap), so a live script
+// discovers our panes exactly the way the product does: the paneId (plus tabId) of every role record
+// the case's slot.json carries. A record whose pane is gone simply matches nothing, which is what a
+// caller waiting for a pane wants to see.
+//
+// `stateDir` defaults to the last directory `createCase` returned, because a live script owns one
+// case per run; a script that opens more than one passes it explicitly.
+let lastStateDir = null;
+
+function slotPaneRecords(stateDir) {
+  const slots = join(stateDir ?? '', 'slots');
+  let keys;
+  try { keys = readdirSync(slots); }
+  catch {
+    // outcome: no slot directory yet means the dashboard has not written a record, so no pane is ours.
+    return [];
+  }
+  const out = [];
+  for (const key of keys) {
+    let slot;
+    try { slot = JSON.parse(readFileSync(join(slots, key, 'slot.json'), 'utf8')); }
+    catch {
+      // outcome: an absent or half-written slot identifies no pane on this poll.
+      continue;
+    }
+    for (const [role, record] of Object.entries(slot?.roles ?? {})) {
+      if (typeof record?.paneId === 'string' && record.state !== 'closed') {
+        out.push({ role, paneId: record.paneId, tabId: record.tabId ?? null });
+      }
+    }
+  }
+  return out;
+}
+
+export const viewerPanes = (fixture, role = 'todo', { stateDir = lastStateDir } = {}) => {
+  // Never answer "no pane" for a caller that could not name the state directory: an assertion like
+  // `viewerPanes(fixture).length === 0` would then pass for the wrong reason.
+  if (typeof stateDir !== 'string' || stateDir === '') {
+    throw coded('live-case-state', 'viewerPanes needs the case stateDir (createCase sets it)');
+  }
+  const records = slotPaneRecords(stateDir).filter(record => role === null || record.role === role);
+  const panes = fixture.listPanes();
+  const found = [];
+  for (const record of records) {
+    const pane = panes.find(entry => (entry.pane_id ?? entry.paneId) === record.paneId &&
+      (record.tabId === null || (entry.tab_id ?? entry.tabId) === record.tabId));
+    if (pane !== undefined) found.push(pane);
+  }
+  return found;
+};
 
 export function assert(condition, message, details = null) {
   if (condition !== true) throw coded('live-assertion', message, details);

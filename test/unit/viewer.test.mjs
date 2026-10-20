@@ -560,11 +560,17 @@ test("interactive mode: pointer modes, raw mode, a repaint timer and the slot wa
   f.input.emit("data", "f");
   await new Promise((done) => setImmediate(done));
   assert.equal(viewer.state.prefs.follow, false);
-  // The timer repaints the current frame into the alternate screen.
+  // The key already painted its frame, so an idle tick writes nothing (no redundant repaint).
+  assert.ok(f.output.writes.at(-1).includes("Follow OFF"));
   const before = f.output.writes.length;
   f.clock.tick(1000);
+  assert.equal(f.output.writes.length, before, "an unchanged frame is not written again");
+  // A data change reaches the screen on the next tick, and never through a full-screen clear.
+  f.writeProjection(projectionFor([{ name: "P", tasks: [{ content: "changed row", status: "pending" }] }]));
+  f.clock.tick(1000);
   assert.ok(f.output.writes.length > before);
-  assert.ok(f.output.writes.at(-1).includes("Follow OFF"));
+  assert.ok(f.output.writes.at(-1).includes("changed row"));
+  assert.ok(!f.output.writes.slice(before).some((text) => text.includes("\x1b[2J")), "no full clear");
   // q writes closing, closes the pane, restores the terminal and releases the watcher.
   f.input.emit("data", "q");
   const closed = await viewer.closed;
@@ -633,4 +639,35 @@ test("a usage error is reported on stderr and returns 2 without starting a viewe
   const code = await main(["--state", "relative"], { stderr: { write: (text) => errors.push(text) } });
   assert.equal(code, 2);
   assert.match(errors.join(""), /Usage: node viewer\.mjs/);
+});
+
+// Follow ON pins the phase that holds the in-progress task, so the frame's scroll can be larger
+// than the body's own maximum for a short list. Prefs must never store that off-body value: j/k
+// persists the clamped scroll, which is what the follow-OFF frame redraws from.
+test("a follow-ON pinned scroll is not persisted as an out-of-range preference", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([
+    { name: "Closed", tasks: [{ content: "done one", status: "completed" },
+      { content: "done two", status: "completed" }] },
+    { name: "Open", tasks: [{ content: "first", status: "in_progress" }] },
+    { name: "Later", tasks: [{ content: "second", status: "pending" }] }]));
+  const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
+    output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
+  t.after(() => viewer.stop());
+  // Phase I is closed, so the pinned anchor is phase II's divider row, past the body's end.
+  const frame = viewer.frame;
+  assert.match(stripVTControlCharacters(frame.lines[frame.bodyStart]), /^── II\. Open  0\/1 /);
+  assert.equal(frame.scroll, frame.phaseRanges["[\"Open\",0]"].start);
+  assert.ok(frame.scroll > Math.max(0, frame.bodyLines.length - frame.bodyRows),
+    "the pinned scroll sits past the body's end");
+  // 'f' turns follow OFF and the frame falls back to the ordinary clamp; the pref stays in range.
+  f.writePrefs({ schema: "gjc-herdr-dashboard/prefs/1", scopeKey: f.scopeKey, scroll: 0,
+    collapsed: false, selection: null });
+  await viewer.key("j");
+  const saved = f.readPrefs();
+  assert.equal(saved.scroll, 0, "the persisted scroll is clamped against the body");
+  assert.equal(viewer.state.prefs.follow, false);
+  assert.match(stripVTControlCharacters(viewer.text), /Follow OFF/);
+  assert.match(stripVTControlCharacters(viewer.text), /── I\. Closed  2\/2 /);
 });

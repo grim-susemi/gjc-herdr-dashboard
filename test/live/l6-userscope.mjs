@@ -125,14 +125,16 @@ await runScript("l6-userscope (AC6.2/AC6.3)", async () => {
     let todo = null;
     const until = Date.now() + 45_000;
     while (todo === null && Date.now() < until) {
-      todo = viewerPanes(fixture, "todo")[0] ?? null;
+      // A user-scope install writes STATE_DIR; panes carry no label, so the slot records in
+      // that directory are the only way to find ours.
+      todo = viewerPanes(fixture, "todo", { stateDir: STATE_DIR })[0] ?? null;
       if (todo === null) await sleep(1_000);
     }
     assert(todo !== null, "AC6.2: a Todo viewer pane exists", { panes: fixture.listPanes() });
     await fixture.waitFor(todo.pane_id, (value) => stripAnsi(value).includes("Follow ON"),
       { timeoutMs: 45_000, label: "Todo viewer footer" });
     fixture.snapshot(EVID, "frame-todo", todo.pane_id);
-    const workers = viewerPanes(fixture, "workers")[0] ?? null;
+    const workers = viewerPanes(fixture, "workers", { stateDir: STATE_DIR })[0] ?? null;
     assert(workers !== null, "AC6.2: a Workers viewer pane exists", { panes: fixture.listPanes() });
     fixture.snapshot(EVID, "frame-workers", workers.pane_id);
     summary.ac62 = { line: open.line, todoPane: todo.pane_id, workersPane: workers.pane_id };

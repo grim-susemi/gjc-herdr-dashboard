@@ -10,11 +10,14 @@
 //      (`partial:shape`, AC2.8) but it must never touch, rename, close or move a foreign pane.
 // In both, the id, label and shell pid of every foreign pane are compared before and after.
 //
+// Our own panes are found through the slot records (`viewerPanes`), not through a pane label: the
+// dashboard puts no manual label on a pane, because Herdr draws it on the border and leaves a gap.
+//
 // Run: node test/live/l4-coexist.mjs
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { createFixture, REPO, SANDBOX } from './fixture.mjs';
-import { assert, createCase, evidenceDirFor, isDashboardPaneLabel, launchGjc, notifyLines,
+import { assert, createCase, evidenceDirFor, launchGjc, notifyLines,
   runScript, sendSlash, viewerPanes, writeEvidence, writeEvidenceJson } from './case.mjs';
 
 const LV = 'LV-9';
@@ -78,18 +81,22 @@ async function scenario(how, evidence) {
     assert(JSON.stringify(after) === JSON.stringify(before),
       `AC4.5 (${how}): id, label, tab and shell process of the three foreign panes are unchanged`, { before, after });
     const created = fixture.listPanes().map((p) => p.pane_id).filter((id) => !panesBefore.includes(id));
-    const ours = created.map((id) => fixture.listPanes().find((p) => p.pane_id === id)?.label ?? '');
+    const ours = viewerPanes(fixture, null, { stateDir: paths.stateDir }).map((pane) => pane.pane_id);
     writeEvidenceJson(evidence, `${how}-created.json`, { created, ours, panes: fixture.listPanes() });
-    assert(ours.every(isDashboardPaneLabel),
-      `AC4.5 (${how}): every pane the pass created is one of ours`, { created, ours });
-    const todo = viewerPanes(fixture, 'todo').length;
-    const workers = viewerPanes(fixture, 'workers').length;
+    assert(created.every((id) => ours.includes(id)),
+      `AC4.5 (${how}): every pane the pass created is one the slot records name`, { created, ours });
+    // No pane of ours carries a manual label: the label is exactly what Herdr would draw on the
+    // border, so the dashboard must leave every pane label as Herdr set it.
+    const labelled = fixture.listPanes().filter((pane) => ours.includes(pane.pane_id) && pane.label !== null);
+    assert(labelled.length === 0, `AC4.5 (${how}): our panes carry no manual label`, { labelled });
+    const todo = viewerPanes(fixture, 'todo', { stateDir: paths.stateDir }).length;
+    const workers = viewerPanes(fixture, 'workers', { stateDir: paths.stateDir }).length;
     if (how === 'other-tab') {
       assert(todo === 1 && workers === 1, 'other-tab: the band opened (one Todo, one Workers)', { todo, workers });
     } else {
       assert(todo <= 1 && workers <= 1, 'same-tab: at most one pane per role', { todo, workers });
     }
-    return { notify: pass.line, todo, workers, created: ours };
+    return { notify: pass.line, todo, workers, created, ours };
   } finally {
     const cleanup = await fixture.cleanup();
     writeEvidenceJson(evidence, `${how}-cleanup.json`, cleanup);

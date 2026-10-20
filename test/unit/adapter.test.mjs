@@ -302,7 +302,7 @@ test("every code the reconciler can emit has its own wording, not a raw fallback
   const emitted = ["partial:size", "partial:shape", "partial:timeout",
     "partial:ownership-unproven", "partial:no-anchor", "replaced:dead", "replaced:stalled", "failed:node",
     "failed:viewer", "failed:herdr", "failed:herdr-split", "failed:herdr-close",
-    "failed:herdr-process-info", "failed:herdr-record", "failed:herdr-rename",
+    "failed:herdr-process-info", "failed:herdr-record",
     "failed:herdr-run", "failed:lock-io", "failed:internal", "failed:failpoint",
     "busy", "busy:other-owner", "opened", "adopted", "ready", "pending", "pending-slow",
     "unresponsive"];

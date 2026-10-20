@@ -22,7 +22,7 @@ const slotFor = ({ layoutKey = "a".repeat(24), scopeKey = "b".repeat(24), role =
   schema: "gjc-herdr-dashboard/slot/1", layoutKey,
   parent: { socket: "sock", paneId: "w1:p1", tabId: "t1" }, herdr: ["herdr"],
   scope: { sessionId: "sess", scopeKey, scopeEpoch: 1, language: "ko" },
-  roles: { [role]: { state, token, paneId: pane, tabId: "t1", shellPid: 12, label: "GJC Todo · aaaaaaaa" } },
+  roles: { [role]: { state, token, paneId: pane, tabId: "t1", shellPid: 12 } },
 });
 
 // 30 one-line pending tasks: 31 body lines against 21 body rows, so the body really

@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { createDataWriter } from '../../src/core/data.mjs';
 import { BAND_LAYOUT } from '../../src/core/layout.mjs';
 import { createReconciler } from '../../src/core/reconciler.mjs';
-import { dataPaths, key8Of, labelOf, layoutKeyOf, PANE_LABELS, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
+import { dataPaths, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
 import { createInstance, REGISTRY_KEY } from '../../src/host/instance.mjs';
 import { createWorkersTracker, WORKERS_SCHEMA } from '../../src/host/sources/workers.mjs';
 import { writeJson } from '../../src/storage.mjs';
@@ -80,7 +80,8 @@ async function bandWorld(t, options = {}) {
     // Split argv across the whole world lifetime: `inPass` resets the per-pass trace, so a test that
     // compares two passes needs the fake's own permanent call log.
     allSplits: () => fake.calls.filter(call => call.argv[1] === 'split').map(call => call.argv),
-    // The label of the pane a role row owns, read from the slot the pass wrote.
+    // The pane id a role row owns, read from the slot the pass wrote. The record carries no label:
+    // a pane is identified by paneId + tabId, so this is the whole identity.
     paneOf: async role => (await readJsonFile(paths.slot))?.roles?.[role]?.paneId ?? null,
   };
 }
@@ -116,13 +117,19 @@ test('AC2.1: an explicit pass opens Todo then Workers, anchored on the Todo pane
   assert.ok(Math.abs(todo.width / layout.area.width - 1 / 3) <= 1 / layout.area.width,
     'the dashboard is within one cell of one third of the tab');
 
-  // Both records are pending in the slot, with the labels the contract names.
+  // Both records are pending in the slot and carry the whole identity: paneId + tabId, no label.
   const slot = await world.slot();
   assert.equal(slot.roles.todo.state, 'pending');
   assert.equal(slot.roles.workers.state, 'pending');
-  assert.equal(slot.roles.todo.label, labelOf('todo', key8Of(world.layoutKey)));
-  assert.equal(slot.roles.workers.label, labelOf('workers', key8Of(world.layoutKey)));
-  assert.equal(slot.roles.workers.label, PANE_LABELS.workers);
+  for (const role of ['todo', 'workers']) {
+    assert.deepEqual(Object.keys(slot.roles[role]).sort(),
+      ['paneId', 'pendingSince', 'shellPid', 'state', 'tabId', 'token']);
+    assert.equal(slot.roles[role].tabId, 'w1:t1');
+    assert.equal('label' in slot.roles[role], false, 'no manual pane label is ever written');
+  }
+  // And no pane in the fake was renamed: Herdr's own null label stays.
+  assert.equal(world.fake.paneLabel(todoPaneId), null);
+  assert.equal(world.fake.paneLabel(pass.roles.workers.paneId), null);
   // The run target of each split is that split's own pane (LT-8), and nothing foreign was touched.
   assert.deepEqual(world.tracer.record.runTargets, world.tracer.record.splitPaneIds);
   assert.deepEqual(world.fake.paneIds().sort(), [PARENT, todoPaneId, pass.roles.workers.paneId].sort());
@@ -140,15 +147,15 @@ test('AC2.1 existing-Todo case: a missing Workers pane is added below the live T
   const world = await bandWorld(t);
   // Todo is already open (its record is pending and its pane is in the layout); workers is missing.
   // `w1:p7` is deliberately outside the id range the fixture generates for splits.
-  const todoPaneId = world.fake.addPane('w1:p7', { label: labelOf('todo', key8Of(world.layoutKey)),
-    shell: 500, rect: { x: 200, y: 0, width: 200, height: 80 } });
+  const todoPaneId = world.fake.addPane('w1:p7', { shell: 500,
+    rect: { x: 200, y: 0, width: 200, height: 80 } });
   world.fake.setPaneRect(PARENT, { x: 0, y: 0, width: 200, height: 80 });
   await writeJson(world.paths.slot, {
     schema: 'gjc-herdr-dashboard/slot/1', layoutKey: world.layoutKey,
     parent: { socket: SOCKET, paneId: PARENT, tabId: 'w1:t1' }, herdr: ['herdr.exe'],
     scope: { sessionId: 's-1', scopeKey: 'pre-scope', scopeEpoch: 1, language: 'ko' },
     roles: { todo: { state: 'pending', token: 'tok-t', paneId: todoPaneId, tabId: 'w1:t1',
-      shellPid: 500, label: labelOf('todo', key8Of(world.layoutKey)), pendingSince: START } },
+      shellPid: 500, pendingSince: START } },
   });
   const pass = await world.explicit();
   // Todo is adopted untouched (T9), Workers is created where the floors allow it.
@@ -158,7 +165,7 @@ test('AC2.1 existing-Todo case: a missing Workers pane is added below the live T
   assert.deepEqual(world.allSplits(), [['pane', 'split', todoPaneId, '--direction', 'down',
     '--ratio', '0.35', '--no-focus']], 'the only split anchors on the EXISTING Todo pane');
   // No pane was closed or renamed: the existing Todo pane is left exactly as it was.
-  assert.equal(world.fake.labelOf(todoPaneId), labelOf('todo', key8Of(world.layoutKey)));
+  assert.equal(world.fake.paneLabel(todoPaneId), null, 'the adopted pane was never relabelled');
   assert.deepEqual(world.tracer.verbs('explicit').filter(verb => ['pane close'].includes(verb)), []);
   const slot = await world.slot();
   assert.equal(slot.roles.todo.state, 'pending');
@@ -175,7 +182,7 @@ test('AC2.1: a Workers create whose Todo anchor has no measured rect creates not
     parent: { socket: SOCKET, paneId: PARENT, tabId: 'w1:t1' }, herdr: ['herdr.exe'],
     scope: { sessionId: 's-1', scopeKey: 'pre-scope', scopeEpoch: 1, language: 'ko' },
     roles: { todo: { state: 'pending', token: 'tok-t', paneId: 'w1:p9', tabId: 'w1:t1',
-      shellPid: 550, label: labelOf('todo', key8Of(world.layoutKey)), pendingSince: START } },
+      shellPid: 550, pendingSince: START } },
   });
   const pass = await world.explicit({ roles: ['workers'] });
   assert.equal(pass.roles.workers.code, 'partial:size', JSON.stringify(pass.roles.workers));
@@ -235,7 +242,7 @@ test('AC2.1: a region below a floor lowers the ladder and reports partial:size n
 test('AC2.8: a foreign sibling yields partial:shape and is never closed, moved, resized or renamed', async t => {
   const world = await bandWorld(t);
   world.fake.addPane('w1:p9', { label: 'DAG · x', shell: 6060 });
-  const before = { label: world.fake.labelOf('w1:p9'), shell: world.fake.shellOf('w1:p9'),
+  const before = { label: world.fake.paneLabel('w1:p9'), shell: world.fake.shellOf('w1:p9'),
     command: world.fake.commandOf('w1:p9'), rect: world.fake.rects.get('w1:p9') };
   const pass = await world.explicit();
   assert.equal(pass.roles.todo.code, 'partial:shape', JSON.stringify(pass.roles.todo));
@@ -247,7 +254,7 @@ test('AC2.8: a foreign sibling yields partial:shape and is never closed, moved, 
   assert.equal(pass.roles.workers.paneId !== null, true);
   assert.equal(world.allSplits().length, 2);
   // The foreign pane is byte-identical afterwards, and no mutation verb was ever aimed at it.
-  assert.deepEqual({ label: world.fake.labelOf('w1:p9'), shell: world.fake.shellOf('w1:p9'),
+  assert.deepEqual({ label: world.fake.paneLabel('w1:p9'), shell: world.fake.shellOf('w1:p9'),
     command: world.fake.commandOf('w1:p9'), rect: world.fake.rects.get('w1:p9') }, before);
   for (const entry of world.tracer.trace) {
     if (['split', 'rename', 'run', 'close', 'focus'].includes(entry.argv[1])) {
@@ -270,19 +277,18 @@ test('AC2.8: a layout our panes do not form a band with is reported as partial:s
     parent: { socket: SOCKET, paneId: PARENT, tabId: 'w1:t1' }, herdr: ['herdr.exe'],
     scope: { sessionId: 's-1', scopeKey: 'pre-scope', scopeEpoch: 1, language: 'ko' },
     roles: { todo: { state: 'pending', token: 'tok-t', paneId: 'w1:p5', tabId: 'w1:t1',
-      shellPid: 550, label: labelOf('todo', key8Of(world.layoutKey)), pendingSince: START } },
+      shellPid: 550, pendingSince: START } },
   });
-  world.fake.addPane('w1:p5', { label: labelOf('todo', key8Of(world.layoutKey)), shell: 550,
-    rect: { x: 100, y: 0, width: 200, height: 80 } });
+  world.fake.addPane('w1:p5', { shell: 550, rect: { x: 100, y: 0, width: 200, height: 80 } });
   const pass = await world.explicit({ roles: ['workers'] });
   assert.equal(pass.roles.workers.id, 'T1');
   assert.equal(pass.roles.workers.code, 'partial:shape', JSON.stringify(pass.roles.workers));
   assert.equal(pass.roles.workers.detail, 'shape:not-a-band');
   // Nothing was done TO the mis-shaped pane to make the shape true: no rename, close, focus or run
-  // was ever aimed at it, and it keeps its label and shell. (Its rect moves only because it is the
-  // split ANCHOR of the Workers create that just happened, which is the documented existing-Todo
-  // case - the fixture now applies the 0.35 ratio the reconciler passes.)
-  assert.equal(world.fake.labelOf('w1:p5'), labelOf('todo', key8Of(world.layoutKey)));
+  // was ever aimed at it, and it keeps its (absent) label and its shell. Its rect moves only
+  // because it is the split ANCHOR of the Workers create that just happened, which is the
+  // documented existing-Todo case - the fixture applies the 0.35 ratio the reconciler passes.
+  assert.equal(world.fake.paneLabel('w1:p5'), null, 'the mis-shaped pane was never relabelled');
   assert.equal(world.fake.shellOf('w1:p5'), 550);
   for (const entry of world.tracer.trace) {
     if (['rename', 'close', 'focus', 'run'].includes(entry.argv[1])) {
@@ -313,7 +319,7 @@ test('Roles/ordering: Workers without a non-closed Todo record creates nothing (
     parent: { socket: SOCKET, paneId: PARENT, tabId: 'w1:t1' }, herdr: ['herdr.exe'],
     scope: { sessionId: 's-1', scopeKey: 'pre-scope', scopeEpoch: 1, language: 'ko' },
     roles: { todo: { state: 'closed', token: 'tok-0', paneId: 'w1:p2', tabId: 'w1:t1', shellPid: 500,
-      label: labelOf('todo', key8Of(world.layoutKey)), pendingSince: START, closedBy: 't20' } },
+      pendingSince: START, closedBy: 't20' } },
   });
   const closedAnchor = await world.explicit({ roles: ['workers'] });
   assert.equal(closedAnchor.roles.workers.code, 'partial:no-anchor');
@@ -410,8 +416,7 @@ async function instanceWorld(t, options = {}) {
       scope: { sessionId, scopeKey, scopeEpoch: 1, language: 'ko' }, roles,
     });
   world.workerRecord = ({ state = 'pending', paneId = 'w1:p3', token = 'tok-w' } = {}) => ({
-    state, token, paneId, tabId: 'w1:t1', shellPid: 700,
-    label: labelOf('workers', key8Of(world.layoutKey)), pendingSince: START, closedBy: null });
+    state, token, paneId, tabId: 'w1:t1', shellPid: 700, pendingSince: START, closedBy: null });
   world.handles = handles;
   world.workersFile = () => join(stateDir, 'data', world.scopeKeyOf(), 'workers.json');
   world.scopeKeyOf = (sessionId = 's-1') =>
@@ -583,7 +588,7 @@ test('§7.1 item 5 for workers: the projection exists only while a non-closed wo
 
   await world.writeSlot({ roles: {
     todo: { state: 'closed', token: 'tok-t', paneId: 'w1:p2', tabId: 'w1:t1', shellPid: 500,
-      label: labelOf('todo', key8Of(world.layoutKey)), pendingSince: START, closedBy: 't20' },
+      pendingSince: START, closedBy: 't20' },
     workers: world.workerRecord({ state: 'closed' }),
   } });
   await pi.handlers.get('turn_end')({}, ctx);

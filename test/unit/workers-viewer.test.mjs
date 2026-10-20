@@ -379,7 +379,8 @@ test("a selected card that completes stays drawn, and Space expands that same id
   f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed",
     agent: "alpha-agent", lastIntent: "done" }), card("c2", { title: "beta" })]));
   viewer.refresh();
-  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"], "the selected completed card stays drawn");
+  assert.deepEqual(viewer.frame.selectable, ["c2", "c1"],
+    "the selected completed card stays drawn, below the card that is still running");
   assert.equal(viewer.frame.selection, "c1");
   const row = stripVTControlCharacters(viewer.frame.lines.find((line) => line.includes("alpha")));
   assert.equal(row[0], " ", "a folded completed card starts with its no-bar space at column 0");
@@ -430,7 +431,8 @@ test("a completed default card stays drawn while another card keeps running", as
   f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed",
     agent: "alpha-agent" }), card("c2", { title: "beta" })]));
   viewer.refresh();
-  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"], "the completion does not drop the card");
+  assert.deepEqual(viewer.frame.selectable, ["c2", "c1"],
+    "the completion does not drop the card, it sinks below the running one");
   assert.equal(viewer.frame.selection, "c1");
   assert.equal(stripVTControlCharacters(
     viewer.frame.lines.find((line) => line.includes("alpha")))[0], " ",
@@ -455,12 +457,13 @@ test("Tab away from a completed default card folds it again", async (t) => {
   f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed" }),
     card("c2", { title: "beta" })]));
   viewer.refresh();
-  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
+  assert.deepEqual(viewer.frame.selectable, ["c2", "c1"]);
   await viewer.key("c");
   assert.equal(viewer.state.prefs.showCompleted, false, "hide the completed group first");
-  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"], "the selected completed card stays drawn");
-  await viewer.key("\t");
-  assert.equal(viewer.state.prefs.selection, "c2", "Tab steps off the completed card");
+  assert.deepEqual(viewer.frame.selectable, ["c2", "c1"], "the selected completed card stays drawn");
+  // The completed card is now the LAST row, so stepping off it means going back up (`p`).
+  await viewer.key("p");
+  assert.equal(viewer.state.prefs.selection, "c2", "p steps off the completed card to the running one");
   assert.deepEqual(viewer.frame.selectable, ["c2"], "the completed card folds once it is no longer selected");
   assert.equal(viewer.frame.selection, "c2");
   assert.doesNotMatch(plain(viewer), /alpha/, "the completed card is hidden again");
@@ -908,6 +911,126 @@ async function interactiveViewer(t, f, { options: optionExtra = {}, deps: depExt
   return viewer;
 }
 
+// The exact bytes one full frame is written as. A key or pointer test asserts against
+// this instead of a substring, so a frame that reached the screen through any other
+// path (a timer tick, a stale frame) cannot pass.
+const frameWrite = (viewer) =>
+  `\x1b[H${viewer.frame.text.replaceAll("\n", "\x1b[K\r\n")}\x1b[K\x1b[J`;
+
+const clickAt = (y, x = 5) => `\x1b[<0;${x};${y}M`;
+const releaseAt = (y, x = 5) => `\x1b[<0;${x};${y}m`;
+const motionAt = (y, x = 5) => `\x1b[<32;${x};${y}M`;
+
+// The SGR row that lands on a card, derived from the frame the viewer actually drew
+// (1-based y = bodyLines index - scroll + bodyStart + 1).
+const rowOfCard = (viewer, id) => {
+  const frame = viewer.frame;
+  return frame.ranges[id].start - frame.scroll + frame.bodyStart + 1;
+};
+
+const flush = () => new Promise((done) => setImmediate(done));
+
+// Preference writes are real atomic files (temp + rename) queued on the viewer's own
+// promise chain, so a count is only meaningful after that chain has landed.
+const settle = async (pending) => {
+  // The save chain is microtasks, so a macrotask boundary is enough to run it; two
+  // passes also catch a write that the previous pass started after the snapshot.
+  for (let pass = 0; pass < 2; pass++) {
+    await flush();
+    await Promise.all(pending.splice(0));
+  }
+};
+
+test("a click on a card body row writes the new frame before the report returns", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", agent: "alpha-agent" }),
+    card("c2", { title: "beta", agent: "beta-agent" })]));
+  const viewer = await interactiveViewer(t, f);
+  const target = "c2";
+  const y = rowOfCard(viewer, target);
+  const writes = f.output.writes.length, clockAt = f.clock.now();
+  f.input.emit("data", clickAt(y));
+  assert.equal(f.clock.now(), clockAt, "no timer had to fire");
+  assert.equal(f.output.writes.length, writes + 1, "the press wrote exactly one frame");
+  assert.equal(viewer.frame.selection, target, "the press selected the card under the cursor");
+  assert.equal(f.output.writes.at(-1), frameWrite(viewer), "the write is the frame the press drew");
+  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /beta-agent/,
+    "the unfolded card is on screen without waiting for the 1 s paint");
+  assert.ok(!f.output.writes.at(-1).includes("\x1b[2J"), "no full-screen clear");
+});
+
+test("a wheel step and the j key write their frame before they return", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor(Array.from({ length: 12 }, (unused, index) => card(`c${index}`))));
+  const viewer = await interactiveViewer(t, f);
+  const writes = f.output.writes.length;
+  f.input.emit("data", "\x1b[<65;5;10M");
+  assert.equal(f.output.writes.length, writes + 1, "the wheel step wrote one frame");
+  assert.equal(viewer.frame.scroll, 3);
+  assert.equal(f.output.writes.at(-1), frameWrite(viewer));
+  // The key writes before it awaits its preference save, so the frame is on screen
+  // without waiting for the write to land.
+  const pending = viewer.key("j");
+  assert.equal(f.output.writes.length, writes + 2, "the key wrote one frame");
+  assert.equal(viewer.frame.scroll, 4);
+  assert.equal(f.output.writes.at(-1), frameWrite(viewer));
+  await pending;
+  assert.ok(!f.output.writes.slice(writes).some((text) => text.includes("\x1b[2J")),
+    "no full-screen clear");
+});
+
+test("the 1 s tick does not rewrite an unchanged frame", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  // A pending card keeps the spinner disarmed, so a tick can only write through paint().
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "pending" })]));
+  const viewer = await interactiveViewer(t, f);
+  f.clock.tick(1000);
+  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /alpha/, "the tick painted the frame");
+  const before = f.output.writes.length;
+  f.clock.tick(1000);
+  assert.equal(f.output.writes.length, before, "an unchanged frame is not written again");
+  assert.equal(f.output.writes.at(-1), frameWrite(viewer));
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "pending" }),
+    card("c2", { title: "late row", status: "pending" })]));
+  f.clock.tick(1000);
+  assert.equal(f.output.writes.length, before + 1, "a changed frame is written once");
+  assert.match(stripVTControlCharacters(f.output.writes.at(-1)), /late row/);
+  assert.ok(!f.output.writes.slice(before).some((text) => text.includes("\x1b[2J")), "no full clear");
+});
+
+test("a multi-step drag redraws every step but persists prefs once, on release", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor(Array.from({ length: 12 }, (unused, index) => card(`c${index}`))));
+  const prefsWrites = [], pending = [];
+  const port = { read: f.port.read, readRaw: f.port.readRaw,
+    write: (path, value) => {
+      const done = f.port.write(path, value);
+      if (path.split(/[\\/]/).includes("prefs")) {
+        prefsWrites.push(path);
+        pending.push(done);
+      }
+      return done;
+    } };
+  const viewer = await interactiveViewer(t, f, { deps: { port } });
+  const y = rowOfCard(viewer, "c4");
+  f.input.emit("data", clickAt(y));
+  await settle(pending);
+  const prefsBase = prefsWrites.length, frameBase = f.output.writes.length;
+  for (const step of [2, 4, 6]) f.input.emit("data", motionAt(y - step));
+  assert.equal(viewer.frame.scroll, 6, "the drag panned six rows");
+  assert.equal(f.output.writes.length, frameBase + 3, "every motion redrew immediately");
+  await settle(pending);
+  assert.equal(prefsWrites.length, prefsBase, "panning wrote no preference file");
+  f.input.emit("data", releaseAt(y - 6));
+  await settle(pending);
+  assert.equal(prefsWrites.length, prefsBase + 1, "the release persisted the position once");
+  assert.equal(f.readPrefs().scroll, 6, "the released position is what landed on disk");
+});
+
 test("a running card arms one 125 ms spinner and each tick advances the glyph without a file read", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
@@ -930,7 +1053,7 @@ test("a running card arms one 125 ms spinner and each tick advances the glyph wi
     assert.match(stripVTControlCharacters(write), /alpha/, "a tick redraws the card");
     assert.ok(write.includes(SPINNER[index]), `tick ${index} advances the glyph: ${JSON.stringify(write)}`);
     assert.ok(write.startsWith("\x1b[H"), "the tick homes the cursor");
-    assert.ok(write.endsWith("\x1b[K"), "the row is erased, not the screen");
+    assert.ok(write.endsWith("\x1b[K\x1b[J"), "the tail is erased, not the screen");
     assert.ok(write.includes("\x1b[K\r\n"), "per-line erase instead of a full clear");
     assert.ok(!write.includes("\x1b[2J"), "no full-screen clear on a tick");
   }
@@ -984,19 +1107,24 @@ test("a disconnected link clears the spinner timer", async (t) => {
 });
 
 test("an offline connection paints the Workers footer in the offline colour", async (t) => {
+  // GJC's red-claw bodies: the live footer takes the accent (claw), the offline footer the
+  // sand tone the footer has always used for a non-live link.
+  const accent = "\x1b[38;2;255;106;61m", sand = "\x1b[38;2;255;215;168m";
   const f = fixture(t);
   f.writeSlot(slotFor());
   // A neutral title means only the connection decides the footer colour.
   f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "pending" })]));
   await interactiveViewer(t, f);
   f.clock.tick(1000);
-  assert.match(f.output.writes.at(-1), /\x1b\[36mFollow ON · LIVE\x1b\[0m/, "live is cyan");
+  assert.ok(f.output.writes.at(-1).includes(`${accent}Follow ON · LIVE\x1b[0m`),
+    "live is the accent colour");
   f.writeOwner({ schema: "gjc-herdr-dashboard/owner/1", pid: 4321,
     heartbeatAt: f.clock.now(), stoppedAt: f.clock.now() });
   f.clock.tick(1000);
   const footer = f.output.writes.at(-1);
-  assert.match(footer, /\x1b\[33mFollow ON · OFFLINE \d{2}:\d{2}\x1b\[0m/, "offline is yellow");
-  assert.ok(!footer.includes("\x1b[36m"), "no cyan footer while offline");
+  assert.ok(footer.includes(`${sand}Follow ON · OFFLINE `), "offline is the sand tone");
+  assert.match(stripVTControlCharacters(footer), /Follow ON · OFFLINE \d{2}:\d{2}/);
+  assert.ok(!footer.includes(`${accent}Follow ON`), "no live accent while offline");
   assert.match(stripVTControlCharacters(footer), /Follow ON · OFFLINE/);
 });
 
@@ -1073,14 +1201,22 @@ test("interactive mode: pointer modes, raw mode, a repaint timer and the slot wa
     "the pointer modes come from src/terminal-input.mjs");
   assert.equal(f.clock.intervalCount(1000), 2, "one repaint timer and one slot poll");
   assert.equal(f.clock.intervalCount(5000), 1, "one heartbeat timer");
-  // A key arriving on stdin reaches the same handler as the direct API.
+  // A key arriving on stdin reaches the same handler as the direct API, and the key
+  // already wrote its frame synchronously; an idle tick therefore sends no bytes.
   f.input.emit("data", "f");
   await new Promise((done) => setImmediate(done));
   assert.equal(viewer.state.prefs.follow, false);
+  assert.ok(f.output.writes.at(-1).includes("Follow OFF"));
   const before = f.output.writes.length;
   f.clock.tick(1000);
-  assert.ok(f.output.writes.length > before);
-  assert.ok(f.output.writes.at(-1).includes("Follow OFF"));
+  assert.equal(f.output.writes.length, before, "an unchanged frame is not rewritten");
+  // A projection that lands after the last paint still reaches the screen on the next tick.
+  f.writeProjection(projectionFor([card("c1", { title: "watch me" }),
+    card("c2", { title: "later row" })]));
+  f.clock.tick(1000);
+  assert.ok(f.output.writes.length > before, "the timer tick re-reads the projection");
+  assert.ok(f.output.writes.at(-1).includes("later row"));
+  assert.ok(!f.output.writes.slice(before).some((text) => text.includes("\x1b[2J")), "no full clear");
   // q writes closing, closes the pane, restores the terminal and releases the watcher.
   f.input.emit("data", "q");
   const closed = await viewer.closed;

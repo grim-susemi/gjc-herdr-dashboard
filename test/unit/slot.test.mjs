@@ -7,8 +7,8 @@ import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { HEARTBEAT_MS, LOCK_FILE_PATTERN, OWNER_SCHEMA, PANE_LABELS, SLOT_SCHEMA, acquireLock,
-  classifyGeneration, clearIntent, dataPaths, generationIsCurrent, intentRecord, key8Of, labelOf,
+import { HEARTBEAT_MS, LOCK_FILE_PATTERN, OWNER_SCHEMA, ROLE_LABELS, SLOT_SCHEMA, acquireLock,
+  classifyGeneration, clearIntent, dataPaths, generationIsCurrent, intentRecord, key8Of,
   layoutKeyOf, lockFileName, maxGeneration, ownerRecord, prefsPaths, quarantineSlot, readIntent,
   readOwner, readSlot, releasedFileName, releaseLock, scopeKeyOf, slotPaths, validateSlot,
   writeIntent, writeOwner, writeSlot } from '../../src/core/slot.mjs';
@@ -46,7 +46,7 @@ async function scratch(t) {
 
 const alive = alivePids => pid => (alivePids.has(pid) ? true : false);
 
-test('keys are the first 24 hex chars of sha256 over the JSON tuple, and labels are invisible role markers', () => {
+test('keys are the first 24 hex chars of sha256 over the JSON tuple, and labels are human names', () => {
   const layout = layoutKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1' });
   const scope = scopeKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1', sessionId: 's-1' });
   const same = layoutKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1' });
@@ -58,27 +58,10 @@ test('keys are the first 24 hex chars of sha256 over the JSON tuple, and labels 
   assert.notEqual(layout, layoutKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p2' }));
   assert.notEqual(scope, scopeKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1', sessionId: 's-2' }));
   assert.equal(key8Of(layout), layout.slice(0, 8));
-  // The pane label is a real, exact string (identity), but no longer embeds key8: it is a
-  // zero-width character that Herdr's border renderer draws as nothing.
-  assert.equal(labelOf('todo', key8Of(layout)), PANE_LABELS.todo);
-  assert.equal(labelOf('workers', 'deadbeef'), PANE_LABELS.workers);
-  assert.equal(labelOf('progress', 'deadbeef'), PANE_LABELS.progress);
-  assert.equal(PANE_LABELS.todo, '\u200b');
-  assert.equal(PANE_LABELS.workers, '\u200c');
-  assert.equal(PANE_LABELS.progress, '\u200d');
-  for (const role of ['todo', 'workers', 'progress']) {
-    const label = labelOf(role, key8Of(layout));
-    assert.equal(label.trim(), label, "survives Herdr's whitespace trim");
-    assert.equal(label.isWellFormed(), true);
-  }
-  assert.equal(new Set(Object.values(PANE_LABELS)).size, 3, 'the three roles stay distinguishable');
-  // The label never looks like an Omo dashboard pane (plan 7.10 coexistence).
-  const omoPredicate = name => typeof name === 'string' &&
-    (name.startsWith('DAG · ') || name === 'OmO DAG');
-  for (const role of ['todo', 'workers', 'progress']) {
-    assert.equal(omoPredicate(labelOf(role, key8Of(layout))), false);
-  }
-  assert.throws(() => labelOf('dag', 'deadbeef'), { code: 'role' });
+  // `ROLE_LABELS` is display text only (the host adapter shows it in its own UI). Panes carry no
+  // manual label at all: Herdr would draw it on the border and leave a gap there, so slot identity
+  // is the record's paneId + tabId and nothing in this module derives a pane label.
+  assert.deepEqual(ROLE_LABELS, { todo: 'Todo', workers: 'Workers', progress: 'Progress' });
 });
 
 test('path helpers place every state file exactly where plan 7.9 puts it', () => {
@@ -105,7 +88,7 @@ test('readSlot distinguishes ok, absent and corrupt, and an unknown schema is co
   const { slot } = slotPaths(state, KEY);
   assert.deepEqual(await readSlot(slot), { status: 'absent' });
   const record = { state: 'pending', token: 't', paneId: 'w1:p5', tabId: 'w1:t1',
-    label: 'GJC Todo · aaaaaaaa', shellPid: 42, pendingSince: 1 };
+    shellPid: 42, pendingSince: 1 };
   const good = { schema: SLOT_SCHEMA, layoutKey: KEY, parent: { socket: '/s', paneId: 'w1:p1', tabId: 'w1:t1' },
     herdr: ['herdr'], scope: { sessionId: 's', scopeKey: 'k'.repeat(24), scopeEpoch: 1, language: 'ko' },
     roles: { todo: record } };
@@ -166,8 +149,8 @@ test('owner, intent and heartbeat records carry the documented fields', async t 
   assert.equal(stopped.stoppedAt, 9);
   assert.equal('stoppedAt' in ownerRecord({ pid: 1, instanceId: 'i', sessionId: 's', now: 5 }), false);
   assert.equal(HEARTBEAT_MS, 5000);
-  const intent = intentRecord({ role: 'todo', label: 'GJC Todo · aaaaaaaa', tabId: 'w1:t1', now: 7 });
-  assert.deepEqual(intent, { role: 'todo', label: 'GJC Todo · aaaaaaaa', tabId: 'w1:t1', at: 7 });
+  const intent = intentRecord({ role: 'todo', tabId: 'w1:t1', now: 7 });
+  assert.deepEqual(intent, { role: 'todo', tabId: 'w1:t1', at: 7 });
   assert.equal(await readIntent(paths.intent), null);
   await writeIntent(paths.intent, intent);
   assert.deepEqual(await readIntent(paths.intent), intent);

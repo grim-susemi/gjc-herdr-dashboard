@@ -55,7 +55,8 @@ await runScript('lt1-fault (LV-2)', async () => {
     writeEvidence(evidence, 'notify-1.txt', first.line);
     fixture.snapshot(evidence, 'frame-after-failure', ws.rootPaneId);
 
-    // The flag is consumed, so the second `/dashboard` splits, renames and runs for real.
+    // The flag is consumed, so the second `/dashboard` splits and runs for real (no rename: panes
+    // carry no manual label).
     const second = await sendSlash(fixture, ws.rootPaneId, 'dashboard', OPENED,
       { label: 'the opened notify', since: () => first.all.length });
     const panes = viewerPanes(fixture);

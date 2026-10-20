@@ -299,9 +299,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]",
         "───────────────────────",
         " ~ · active · 12K · ⧖ ~",
-        "─ Implementation 0/2 ──",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementa~  0/2",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -315,9 +315,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]",
         "─────────────────────────",
         " ~ · active · 12K · ⧖ 5m~",
-        "─ Implementation 0/2 ────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementati~  0/2",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -331,9 +331,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────",
         " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
-        "─ Implementation 0/2 ────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ──────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -347,9 +347,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]  done:1 · drop:1",
         "───────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
-        "─ Implementation 0/2 ──────────────────────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ────────────────────────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -363,9 +363,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
-        "─ Implementation 0/2 ────────────────────────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ──────────────────────────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -382,9 +382,9 @@ const TODO_EXPECTED = {
         "───────────────────────",
         " ~ · active · 12K · ⧖ ~",
         "Read error: todo.json ~",
-        "─ Implementation 0/2 ──",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementa~  0/2",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -398,9 +398,9 @@ const TODO_EXPECTED = {
         "─────────────────────────",
         " ~ · active · 12K · ⧖ 5m~",
         "Read error: todo.json un~",
-        "─ Implementation 0/2 ────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementati~  0/2",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -414,9 +414,9 @@ const TODO_EXPECTED = {
         "─────────────────────────────────",
         " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
-        "─ Implementation 0/2 ────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ──────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -430,9 +430,9 @@ const TODO_EXPECTED = {
         "───────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
-        "─ Implementation 0/2 ──────────────────────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ────────────────────────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -446,9 +446,9 @@ const TODO_EXPECTED = {
         "─────────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
-        "─ Implementation 0/2 ────────────────────────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ──────────────────────────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -463,9 +463,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]",
         "───────────────────────",
         " ~ · active · 12K · ⧖ ~",
-        "─ Implementation 0/2 ──",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementa~  0/2",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -479,9 +479,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]",
         "─────────────────────────",
         " ~ · active · 12K · ⧖ 5m~",
-        "─ Implementation 0/2 ────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementati~  0/2",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -495,9 +495,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────",
         " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
-        "─ Implementation 0/2 ────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ──────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -511,9 +511,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]  done:1 · drop:1",
         "───────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
-        "─ Implementation 0/2 ──────────────────────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ────────────────────────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -527,9 +527,9 @@ const TODO_EXPECTED = {
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
-        "─ Implementation 0/2 ────────────────────────────────",
-        "[•] Wire the grammar",
-        "[ ] Pin the frames",
+        "── II. Implementation  0/2 ──────────────────────────",
+        "├─ ☐ Wire the grammar",
+        "└─ ☐ Pin the frames",
         "",
         "",
         "",
@@ -895,9 +895,9 @@ for (const scenario of WORKER_CASES) {
   }
 }
 
-// G12: selection is state only. The body starts at column 0 with the task mark or
-// the card bar, so no row can carry the removed `>` marker or leave a reserved
-// blank cell in front of the content it used to occupy.
+// G12: selection is state only. The body starts at column 0 with the phase divider and the
+// task branch (or the worker card bar), so no row can carry the removed `>` marker or leave a
+// reserved blank cell in front of the content it used to occupy.
 test("G12: neither pane draws a selection marker or reserves a leading cell", () => {
   const todo = plainOf(TODO_CASES.find((entry) => entry.id === "live").frame(54, "en"));
   const workers = plainOf(WORKER_CASES.find((entry) => entry.id === "hidden").frame(54, "en"));
@@ -906,7 +906,9 @@ test("G12: neither pane draws a selection marker or reserves a leading cell", ()
     assert.doesNotMatch(line, /^ (?:\[[ •✓×]\]|▌)/);
   }
   const task = todo.find((line) => line.includes("Wire the grammar"));
-  assert.match(task, /^\[•\] Wire the grammar$/);
+  assert.match(task, /^├─ ☐ Wire the grammar$/);
+  const last = todo.find((line) => line.includes("Pin the frames"));
+  assert.match(last, /^└─ ☐ Pin the frames$/);
   const card = workers.find((line) => line.includes("build the grammar"));
   assert.match(card, /^▌⠋ build the grammar · ⧖ 5m 0s$/);
   const role = workers.find((line) => line.includes("[worker]"));
@@ -918,42 +920,44 @@ test("colour runs: header chrome, connection footer and EMPTY colours - G1 G2 G3
     scenario.frame(columns, language);
   for (const columns of [34, 52, 54]) {
     const todo = frame(TODO_CASES.find((entry) => entry.id === "live"), columns);
-    assert.ok(todo.lines[0].startsWith(" \x1b[1;36mTodo\x1b[0m \x1b[1;33m["));
-    assert.equal(todo.lines.at(-1), " \x1b[36mFollow ON · LIVE\x1b[0m");
+    assert.ok(todo.lines[0].startsWith(" \x1b[1;38;2;255;106;61mTodo\x1b[0m \x1b[1;38;2;255;138;101m["));
+    assert.equal(todo.lines.at(-1), " \x1b[38;2;255;106;61mFollow ON · LIVE\x1b[0m");
     const workers = frame(WORKER_CASES.find((entry) => entry.id === "hidden"), columns);
-    assert.ok(workers.lines[0].startsWith(" \x1b[1;36mWorkers\x1b[0m \x1b[1;33m["));
-    assert.equal(workers.lines.at(-1), " \x1b[36mFollow ON · LIVE\x1b[0m");
-    // G2: the header divider is 90 on the Todo pane and dim on the Workers pane.
-    assert.ok(todo.lines[1].startsWith("\x1b[90m─"));
-    assert.ok(workers.lines[1].startsWith("\x1b[2m─"));
-    // G3: Todo WAITING is yellow; EMPTY is cyan in both panes, and Workers EMPTY
+    assert.ok(workers.lines[0].startsWith(" \x1b[1;38;2;255;106;61mWorkers\x1b[0m \x1b[1;38;2;255;215;168m["));
+    assert.equal(workers.lines.at(-1), " \x1b[38;2;255;106;61mFollow ON · LIVE\x1b[0m");
+    // G2: both header dividers are dimShell on the red-claw palette.
+    assert.ok(todo.lines[1].startsWith("\x1b[38;2;111;71;67m─"));
+    assert.ok(workers.lines[1].startsWith("\x1b[38;2;111;71;67m─"));
+    // G3: Todo WAITING is warning amber; EMPTY is claw in both panes, and Workers EMPTY
     // shares the live colour.
     assert.equal(frame(TODO_CASES.find((entry) => entry.id === "waiting"), columns).lines.at(-1),
-      " \x1b[33mFollow ON · WAITING\x1b[0m");
+      " \x1b[38;2;245;184;75mFollow ON · WAITING\x1b[0m");
     assert.equal(frame(TODO_CASES.find((entry) => entry.id === "empty"), columns).lines.at(-1),
-      " \x1b[36mFollow ON · EMPTY\x1b[0m");
+      " \x1b[38;2;255;106;61mFollow ON · EMPTY\x1b[0m");
     assert.equal(frame(WORKER_CASES.find((entry) => entry.id === "empty"), columns).lines.at(-1),
-      " \x1b[36mFollow ON · EMPTY\x1b[0m");
+      " \x1b[38;2;255;106;61mFollow ON · EMPTY\x1b[0m");
   }
   // G1: the Todo name takes the connection colour.
   assert.ok(frame(TODO_CASES.find((entry) => entry.id === "waiting"), 34).lines[0]
-    .startsWith(" \x1b[1;36mTodo\x1b[0m"));
+    .startsWith(" \x1b[1;38;2;255;106;61mTodo\x1b[0m"));
   assert.ok(frame(TODO_CASES.find((entry) => entry.id === "offline"), 34).lines[0]
-    .startsWith(" \x1b[1;33mTodo\x1b[0m"));
+    .startsWith(" \x1b[1;38;2;245;184;75mTodo\x1b[0m"));
   assert.ok(frame(TODO_CASES.find((entry) => entry.id === "source-error"), 34).lines[0]
-    .startsWith(" \x1b[1;31mTodo\x1b[0m"));
-  // Workers keeps the cyan name in every state.
+    .startsWith(" \x1b[1;38;2;255;77;94mTodo\x1b[0m"));
+  // Workers keeps the claw name in every state.
   assert.ok(frame(WORKER_CASES.find((entry) => entry.id === "offline"), 34).lines[0]
-    .startsWith(" \x1b[1;36mWorkers\x1b[0m"));
+    .startsWith(" \x1b[1;38;2;255;106;61mWorkers\x1b[0m"));
 });
 
 test("colour runs: offline footer keeps the leading space only where it fits - G3 G4", () => {
   for (const [columns, prefix] of [[24, ""], [26, ""], [34, " "], [52, " "], [54, " "]]) {
-    const expected = `${prefix}\x1b[33mFollow OFF · OFFLINE 09:05\x1b[0m`;
     const todo = TODO_CASES.find((entry) => entry.id === "offline").frame(columns, "en");
-    assert.equal(todo.lines.at(-1), expected);
+    assert.equal(todo.lines.at(-1),
+      `${prefix}\x1b[38;2;245;184;75mFollow OFF · OFFLINE 09:05\x1b[0m`);
+    // The Workers pane paints an offline footer with sand rather than the Todo pane's amber.
     const workers = WORKER_CASES.find((entry) => entry.id === "offline").frame(columns, "en");
-    assert.equal(workers.lines.at(-1), expected);
+    assert.equal(workers.lines.at(-1),
+      `${prefix}\x1b[38;2;255;215;168mFollow OFF · OFFLINE 09:05\x1b[0m`);
   }
 });
 

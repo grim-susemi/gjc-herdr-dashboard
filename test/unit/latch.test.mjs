@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { labelOf, layoutKeyOf, slotPaths } from '../../src/core/slot.mjs';
+import { layoutKeyOf, slotPaths } from '../../src/core/slot.mjs';
 import { createReconciler } from '../../src/core/reconciler.mjs';
 import { writeJson } from '../../src/storage.mjs';
 import { createFakeClock, createFakeHerdr, createFakeProcesses, createPassTracer } from './fake-herdr.mjs';
@@ -54,13 +54,23 @@ async function harness(t) {
   const layoutKey = layoutKeyOf({ socket: binding.socket, parentPaneId: binding.parentPaneId });
   const paths = slotPaths(stateDir, layoutKey);
   let serial = 0;
+  // `{paneId, tabId}` makes `pane list` report that pane under another tab. With no pane label,
+  // paneId + tabId is the whole identity, so this is how a test makes a same-id pane provably NOT
+  // ours without deleting it or inventing a label.
+  let foreignTab = null;
+  const listView = async (...args) => {
+    const result = await fake.herdr(...args);
+    if (!foreignTab || args[0] !== 'pane' || args[1] !== 'list') return result;
+    return { ...result, panes: result.panes.map(pane => (pane.pane_id === foreignTab.paneId
+      ? { ...pane, tab_id: foreignTab.tabId } : pane)) };
+  };
   // One "process" = one reconciler with its own instanceId, pid and herdr trace. A crash is
   // modelled by removing its pid from the fake process table, which is exactly what a killed GJC
   // looks like to the next pass (ESRCH) and what lets the next process take the lock.
   const spawn = (overrides = {}) => {
     serial += 1;
     const id = serial;
-    const tracer = createPassTracer(fake.herdr);
+    const tracer = createPassTracer(listView);
     const pid = 7000 + id;
     processes.add(pid);
     const reconciler = createReconciler({
@@ -95,12 +105,14 @@ async function harness(t) {
       catch { return null; }
     },
     record: async () => (await world.slot())?.roles?.todo ?? null,
-    // Panes this dashboard owns right now, read from the fake pane table (A-32: never from the
-    // slot record, which may be stale).
-    owned: () => {
-      const label = labelOf('todo', layoutKey.slice(0, 8));
-      return fake.ids().filter(paneId => fake.labelOf(paneId) === label);
-    },
+    // The panes the dashboard currently claims: every pane its slot records name that is still in
+    // the pane table. With no pane label, the record's paneId + tabId IS the identity, so this is
+    // what "ours" means; orphan panes no record names are deliberately excluded.
+    owned: async () => Object.values((await world.slot())?.roles ?? {})
+      .map(entry => entry?.paneId)
+      .filter(paneId => typeof paneId === 'string' && fake.has(paneId)),
+    // Report `paneId` under `tabId` in the next `pane list` (null clears the override).
+    foreignTab: tab => { foreignTab = tab; },
     panes: () => fake.paneIds().filter(paneId => paneId !== 'w1:p1'),
     // A ready file implies a live viewer process, so its pid is registered in the fake process
     // table; otherwise R2 would read V = dead instead of ready/unresponsive.
@@ -172,7 +184,7 @@ test('E2/LT-1: split failures are one coded result each and the same process ope
   world.fake.setFailures({});
   const third = await instance.explicit();
   assert.equal(third.code, 'opened');
-  assert.equal(world.owned().length, 1);
+  assert.equal((await world.owned()).length, 1);
 });
 
 test('E2/LT-1: a restarted process adopts an existing layout and reopens after a q close', async t => {
@@ -185,16 +197,16 @@ test('E2/LT-1: a restarted process adopts an existing layout and reopens after a
   const second = world.spawn();
   const adoptedPass = await second.explicit();
   assert.equal(adoptedPass.roles.todo.paneId, record.paneId);
-  assert.equal(world.owned().length, 1, 'a restart never duplicates the role pane');
+  assert.equal((await world.owned()).length, 1, 'a restart never duplicates the role pane');
   // A `q` close, then the same process reopens (AC1.4: three /dashboard passes -> one pane).
   await world.ready(record, { closing: 'q' });
   world.fake.panes.delete(record.paneId);
   const reopened = await second.explicit();
   assert.equal(reopened.code, 'opened');
-  assert.equal(world.owned().length, 1);
+  assert.equal((await world.owned()).length, 1);
   const again = await second.explicit();
   assert.equal(again.code, 'pending');
-  assert.equal(world.owned().length, 1);
+  assert.equal((await world.owned()).length, 1);
 });
 
 test('E2/LT-1: an exception in a session path never blocks a later explicit pass', async t => {
@@ -205,7 +217,7 @@ test('E2/LT-1: an exception in a session path never blocks a later explicit pass
     { code: 'session' })), { code: 'session' });
   const opened = await instance.explicit();
   assert.equal(opened.code, 'opened');
-  assert.equal(world.owned().length, 1);
+  assert.equal((await world.owned()).length, 1);
 });
 
 // ------------------------------------------------------------- E3: nothing is inherited ----
@@ -219,9 +231,10 @@ test('E3: seven consecutive transitions in one process end in the documented cod
   let record = await world.record();
   await world.ready(record, { heartbeatAt: world.clock.now() - 20000 });
   codes.push((await instance.explicit()).roles.todo.code);
-  // r6: label mismatch -> T5, keep the orphan and open next to it.
-  world.fake.setLabel(record.paneId, 'not ours');
+  // r6: the pane is listed under another tab, so O fails -> T5, keep the orphan and open next to it.
+  world.foreignTab({ paneId: record.paneId, tabId: 'w2:t9' });
   codes.push((await instance.explicit()).roles.todo.code);
+  world.foreignTab(null);
   // r5: the new record's viewer dies while the pane shell is someone else's -> T17.
   record = await world.record();
   await world.ready(record, { pid: 8300 });
@@ -231,7 +244,7 @@ test('E3: seven consecutive transitions in one process end in the documented cod
   codes.push(r5.roles.todo.code);
   assert.equal(r5.roles.todo.keptPaneId, record.paneId, 'the unprovable pane is named as kept');
   assert.equal(world.fake.has(record.paneId), true);
-  assert.equal(world.fake.labelOf(record.paneId), record.label, 'and never relabelled');
+  assert.equal(world.fake.paneLabel(record.paneId), null, 'and never relabelled');
   // r4: the viewer dies on an O+ pane -> close and replace, role pane count unchanged.
   record = await world.record();
   await world.ready(record, { pid: 8301 });
@@ -258,25 +271,21 @@ test('E3: seven consecutive transitions in one process end in the documented cod
   assert.deepEqual(world.fake.ids(), panesBeforeBusy, 'the blocked pass changed no pane');
   assert.deepEqual(instance.tracer.verbs('explicit'), [], 'and made no herdr call');
   // Exactly one pane is the CURRENT owner of the role; the orphans this run refused to touch (r6's
-  // relabelled pane and r5's unprovable pane) are still present and still untouched.
+  // not-ours pane and r5's unprovable pane) are still present and still untouched.
   const current = await world.record();
   assert.equal(world.fake.has(current.paneId), true);
-  assert.equal(world.fake.labelOf(current.paneId), current.label);
-  assert.equal(world.fake.labelOf(world.fake.ids().find(paneId => world.fake.labelOf(paneId) === 'not ours')), 'not ours');
-  const owned = world.owned();
-  // The r5 orphan kept its label too, so the label count is 2: the orphan + the current pane.
-  assert.equal(owned.length, 2, JSON.stringify(owned));
-  assert.ok(owned.includes(current.paneId));
-  assert.equal(owned.filter(paneId => paneId !== current.paneId).length, 1);
+  assert.equal(world.fake.paneLabel(current.paneId), null, 'no pane ever carries our label');
+  assert.deepEqual(await world.owned(), [current.paneId], 'one record, one owned pane');
+  // The two orphans (r6's and r5's) plus the current pane are all still open: none was closed.
+  assert.equal(world.panes().length, 3, JSON.stringify(world.panes()));
   for (const code of codes) assert.equal(/BLOCKED|blocked|waiting/.test(code), false, code);
 });
 
 // ----------------------------------------------------------------- E5/LT-3: the window ----
-test('E5/LT-3: FP1-FP5 each converge with one more pass, and no crashed pane is ever re-entered', async t => {
+test('E5/LT-3: FP1/FP2/FP4/FP5 each converge with one more pass, and no crashed pane is re-entered', async t => {
   const failpoints = [
     ['fp1', 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT'],
     ['fp2', 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT'],
-    ['fp3', 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT'],
     ['fp4', 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT'],
     ['fp5', 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT'],
   ];
@@ -291,8 +300,8 @@ test('E5/LT-3: FP1-FP5 each converge with one more pass, and no crashed pane is 
       assert.ok(world.fake.commandOf(record.paneId).includes('ready-delay-25s'));
     } else {
       assert.equal(crashedPass.code, 'failed:failpoint', `${name}: ${JSON.stringify(crashedPass)}`);
-      assert.equal(crashedPass.detail, `${name}:after-${name === 'fp1' ? 'split' : name === 'fp2'
-        ? 'record' : name === 'fp3' ? 'rename' : 'run'}`);
+      assert.equal(crashedPass.detail, `${name}:after-${name === 'fp1' ? 'split'
+        : name === 'fp2' ? 'record' : 'run'}`);
     }
     const crashedPane = world.panes()[0] ?? null;
     const commandsBefore = crashedPane === null ? null : world.fake.commandOf(crashedPane);
@@ -301,7 +310,7 @@ test('E5/LT-3: FP1-FP5 each converge with one more pass, and no crashed pane is 
     const next = world.spawn({ env: {} });
     const recovered = await next.explicit();
     assert.ok(EXPLICIT_CODE.test(recovered.code), `${name}: ${recovered.code}`);
-    assert.equal(world.owned().length, 1, `${name}: exactly one owned pane`);
+    assert.equal((await world.owned()).length, 1, `${name}: exactly one owned pane`);
     if (crashedPane !== null) {
       assert.equal(world.fake.commandOf(crashedPane), commandsBefore, `${name}: no re-entry`);
     }
@@ -310,7 +319,7 @@ test('E5/LT-3: FP1-FP5 each converge with one more pass, and no crashed pane is 
     // And a third pass is stable.
     const settled = await next.explicit();
     assert.ok(EXPLICIT_CODE.test(settled.code), `${name}: ${settled.code}`);
-    assert.equal(world.owned().length, 1, `${name}: still one owned pane`);
+    assert.equal((await world.owned()).length, 1, `${name}: still one owned pane`);
   }
 
   // FP5 continued: the 25 s late viewer is promoted by the automatic path alone.
@@ -325,7 +334,7 @@ test('E5/LT-3: FP1-FP5 each converge with one more pass, and no crashed pane is 
   await world.ready(record);
   const promoted = await crashed.auto('turn_end');
   assert.equal(promoted.roles.todo.id, 'T13');
-  assert.equal(world.owned().length, 1, 'the late viewer needed no second /dashboard');
+  assert.equal((await world.owned()).length, 1, 'the late viewer needed no second /dashboard');
   assert.equal((await world.record()).state, 'ready');
   assertAutoDiscipline(crashed);
 
@@ -410,7 +419,7 @@ test('A-30 totals: the T20 O+ path costs close 1 / create 1, the failure path ad
   assert.equal(first.tracer.verbs('explicit').filter(verb => verb === 'pane close').length, 1);
   assert.equal(first.tracer.verbs('explicit').filter(verb => verb === 'pane split').length, 1);
   assert.equal(first.tracer.verbs('explicit').filter(verb => verb === 'pane run').length, 1);
-  assert.equal(clean.owned().length, 1);
+  assert.equal((await clean.owned()).length, 1);
 
   // (b) the first close fails -> close 2 (one failed) / create 1 across the two passes. The tracer
   // totals count the whole process lifetime, because `inPass` resets the per-pass trace.
@@ -432,7 +441,7 @@ test('A-30 totals: the T20 O+ path costs close 1 / create 1, the failure path ad
   assert.equal(second.tracer.totals()['pane close'], 2, 'one failed close + one success');
   assert.equal(second.tracer.totals()['pane split'], 1);
   assert.equal(failing.fake.has(failingRecord.paneId), false);
-  assert.equal(failing.owned().length, 1);
+  assert.equal((await failing.owned()).length, 1);
 
   // (c) the pane is already gone (T3): close is never called and create is 1.
   const vanished = await harness(t);
@@ -491,7 +500,7 @@ test('A-30: a not-found close with a still-present pane, a failed confirm list a
     const recovered = await instance.explicit();
     assert.equal(recovered.roles.todo.code, 'opened', `${name}: ${JSON.stringify(recovered.roles)}`);
     assert.equal(world.fake.has(record.paneId), false, name);
-    assert.equal(world.owned().length, 1, name);
+    assert.equal((await world.owned()).length, 1, name);
     assert.equal(instance.tracer.verbs('explicit').filter(verb => verb === 'pane split').length, 1, name);
   }
 });
@@ -555,7 +564,7 @@ test('A-31: pinned automatic passes at hbAge >= 15000 ms report unresponsive and
     assert.ok(instance.tracer.lists('auto').length >= 1, `${trigger}: the pass really ran`);
     assertAutoDiscipline(instance);
   }
-  assert.equal(world.owned().length, 1);
+  assert.equal((await world.owned()).length, 1);
 });
 
 test('A-31: a pending q record survives automatic passes with zero bytes changed and no promotion', async t => {
@@ -578,7 +587,7 @@ test('A-31: a pending q record survives automatic passes with zero bytes changed
   assert.equal(await world.slotBytes(), slotBefore, 'no slot byte moved');
   assert.equal(await readFile(world.paths.ready('todo'), 'utf8'), readyBefore, 'no ready byte moved');
   assert.equal(world.fake.has(record.paneId), true);
-  assert.equal(world.owned().length, 1);
+  assert.equal((await world.owned()).length, 1);
   // The only file activity an automatic pass may cause is its own lock generation.
   const generationsAfter = Math.max(...await world.lockGenerations());
   assert.ok(generationsAfter >= generationsBefore + 3, `${generationsBefore} -> ${generationsAfter}`);
@@ -608,10 +617,11 @@ test('LT-8: in a full lifecycle every run target belongs to the same pass split'
       await world.stale(record);
       world.clock.set(record.pendingSince + 120000);
     } else {
-      world.fake.setLabel(record.paneId, 'foreign');
+      world.foreignTab({ paneId: record.paneId, tabId: 'w2:t9' });
     }
     instance.tracer.clear();
     const pass = await instance.explicit();
+    world.foreignTab(null);
     const splits = instance.tracer.trace.filter(entry => entry.argv[1] === 'split')
       .map(entry => entry.paneId);
     const targets = instance.tracer.trace.filter(entry => entry.argv[1] === 'run')
@@ -638,11 +648,12 @@ test('LT-5: no sequence produces a waiting state and foreign siblings are never 
     if (step === 'shrink') world.fake.setPaneRect('w1:p1', { x: 0, y: 0, width: 30, height: 6 });
     if (step === 'foreign') {
       const current = await world.record();
-      if (current) world.fake.setLabel(current.paneId, 'GJC Todo · 00000000');
+      if (current) world.foreignTab({ paneId: current.paneId, tabId: 'w2:t9' });
     }
     if (step === 'corrupt') await writeFile(world.paths.slot, '{ broken', 'utf8');
     instance.tracer.clear();
     const pass = await instance.explicit();
+    world.foreignTab(null);
     assert.ok(EXPLICIT_CODE.test(pass.code), `${step}: ${pass.code}`);
     assert.equal(/waiting/.test(JSON.stringify(pass.roles)), false, `${step}: waiting state`);
     assert.equal(/layout-waiting/.test(pass.detail ?? ''), false, step);
@@ -650,8 +661,8 @@ test('LT-5: no sequence produces a waiting state and foreign siblings are never 
       step);
   }
   // The two foreign panes are byte-identical in every observable way, after the whole sequence.
-  assert.equal(world.fake.labelOf('w1:p9'), 'OmO Todo · deadbeef');
-  assert.equal(world.fake.labelOf('w1:p8'), 'DAG · x');
+  assert.equal(world.fake.paneLabel('w1:p9'), 'OmO Todo · deadbeef');
+  assert.equal(world.fake.paneLabel('w1:p8'), 'DAG · x');
   assert.equal(world.fake.commandOf('w1:p9'), null);
   assert.equal(world.fake.commandOf('w1:p8'), null);
   assert.equal(world.fake.shellOf('w1:p9'), 6100);

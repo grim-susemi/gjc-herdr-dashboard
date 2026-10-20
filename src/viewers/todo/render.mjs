@@ -14,8 +14,18 @@
 //
 // MIT License, Copyright (c) 2026 omo-herdr-dag contributors (see PROVENANCE.md).
 //
+// The body follows Gajae Code's own todo list (`#renderTodoList` in
+// `src/modes/interactive-mode.ts`): a phase divider row `── I. <name>  <closed>/<total> ─────`
+// and tree task rows `├─ ☐ <content>` / `└─ ☐ <content>`, where the roman numeral is the
+// phase's one-based position among ALL phases and folding never renumbers it. Colours are the
+// GJC `red-claw` 24-bit palette, so the pane reads as GJC's own chrome: dropped rows are struck
+// through (`9;` + dangerRed), completed rows are kelp, in-progress is bold claw and pending is
+// mutedShell. With follow ON the phase that holds the in-progress task is pinned to the top of
+// the body. `color: false` stays free of every escape sequence.
+//
 // Exported signatures
-//   marks: Record<status, string>
+//   marks: Record<status, string>                  // ☐ pending/in_progress/abandoned, ☑ completed
+//   phaseRomanNumeral(oneBasedIndex): string       // I, II, III, … ; "" for <= 0
 //   counts(tasks): { total, closed, completed, dropped }
 //   isClosedPhase(phase): boolean
 //   taskKeys(projection): string[]                 // render order, all phases
@@ -32,15 +42,47 @@
 // the frame carries exactly one goal row directly under the header divider; when it is null
 // there is no row and no blank. (Amended L5b: the goal row is no longer row 0.)
 import { clean, compactCount, fit, footerText, languageOf, t, width, wrap } from "../common.mjs";
-const style = { accent: "36", phase: "35", muted: "90", completed: "90", abandoned: "90",
-  in_progress: "36", warning: "33", error: "31", activePhase: "33", goal: "35" };
-// The task row starts with the status mark at column 0, so a continuation row is
-// indented by exactly the mark and its trailing space.
-const layout = { taskInset: 4, fallbackColumns: 16, fallbackRows: 3 };
-export const marks = { pending: "[ ]", in_progress: "[•]", completed: "[✓]", abandoned: "[×]" };
+// GJC's default theme is `red-claw`. Each body is a 24-bit SGR colour usable directly as
+// `\x1b[${body}m`: claw accent (live, in progress), coral (badge/phase, goal), dimShell
+// (dividers), kelp (completed), dangerRed (abandoned, source error), warningAmber
+// (offline/waiting) and mutedShell (secondary text and pending work).
+const style = { accent: "38;2;255;106;61", phase: "38;2;255;138;101", muted: "38;2;111;71;67",
+  completed: "38;2;110;231;183", abandoned: "38;2;255;77;94",
+  in_progress: "38;2;255;106;61", warning: "38;2;245;184;75",
+  error: "38;2;255;77;94", activePhase: "38;2;255;106;61", goal: "38;2;255;138;101",
+  secondary: "38;2;185;143;134" };
+// GJC row ink: only abandoned work strikes the row through (SGR 9); in-progress work is bold
+// claw, completed work is kelp and pending work is mutedShell (dimShell is too dark to read).
+// `strike`/`bold` are combinable flags on `paint`.
+const rowInk = { pending: { token: "secondary" }, in_progress: { token: "in_progress", bold: true },
+  completed: { token: "completed" }, abandoned: { token: "abandoned", strike: true } };
+// No lead indent: the tree starts at column 0 so a narrow pane spends its cells on the task text.
+const taskIndent = "";
+export const marks = { pending: "☐", in_progress: "☐", completed: "☑", abandoned: "☐" };
+// A task row is `├─ ☐ <content>`, and the last task of its phase closes the branch with
+// `└─`. A wrapped row keeps the rail of a middle task (`│  ` plus blanks) and blanks only
+// under the last one, so every continuation line starts under the task text.
+const railPrefix = `${taskIndent}│  `;
+const layout = { taskInset: width(`${taskIndent}├─ ${marks.pending} `),
+  fallbackColumns: 16, fallbackRows: 3 };
 
-const paint = (text, token, enabled, heading = false) => enabled && style[token]
-  ? `\x1b[${heading ? "1;" : ""}${style[token]}m${text}\x1b[0m` : text;
+const paint = (text, token, enabled, { bold = false, strike = false } = {}) =>
+  enabled && style[token]
+    ? `\x1b[${bold ? "1;" : ""}${strike ? "9;" : ""}${style[token]}m${text}\x1b[0m` : text;
+
+const ROMAN_PAIRS = Object.freeze([[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+  [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"],
+  [4, "IV"], [1, "I"]]);
+
+// Same algorithm as GJC's `phaseRomanNumeral`: ASCII display-only numerals, never state.
+export function phaseRomanNumeral(oneBasedIndex) {
+  if (!(oneBasedIndex > 0)) return "";
+  let out = "", rem = Math.floor(oneBasedIndex);
+  for (const [value, symbol] of ROMAN_PAIRS) {
+    while (rem >= value) { out += symbol; rem -= value; }
+  }
+  return out;
+}
 
 export function counts(tasks) {
   const completed = tasks.filter((task) => task.status === "completed").length;
@@ -77,7 +119,13 @@ export function taskKeys(projection) {
   return keys;
 }
 
-// Body rows. `expanded` only ever reveals fully closed phases: a phase that still
+// Body rows, in Gajae Code's own todo shape: one `── I. <name>  <closed>/<total>[ drop:n] ────`
+// divider row per drawn phase and tree task rows `├─ ☐ <content>` / `└─ ☐ <content>`
+// under it, where the last task of a phase closes the branch. The roman numeral is the
+// phase's one-based position among ALL phases of the projection, so folding a closed phase
+// never renumbers its neighbours, and it is display-only: selection and preference keys stay
+// `[phase, occurrence, content, occurrence]`.
+// `expanded` only ever reveals fully closed phases: a phase that still
 // holds pending or in-progress work always lists its tasks, because hiding pending
 // work would defeat the point of a todo list. Closed phases collapse to nothing unless
 // `expanded`; the viewer passes `expanded` by default so finished work stays on record, and
@@ -85,6 +133,8 @@ export function taskKeys(projection) {
 function body(projection, { columns, expanded, color, language }) {
   const bodyLines = [];
   const taskRanges = Object.create(null), phaseRanges = Object.create(null);
+  // Drawn phases in body order, so the follow anchor can be chosen without re-doing the fold.
+  const drawnPhases = [];
   const selectableKeys = [];
   const phases = phasesOf(projection);
   const occurrences = new Map();
@@ -99,33 +149,60 @@ function body(projection, { columns, expanded, color, language }) {
     const count = counts(tasks);
     const summary = `${count.closed}/${count.total}` +
       `${count.dropped ? ` ${t(language, "dropped")}:${count.dropped}` : ""}`;
-    const nameRoom = columns - width(summary) - 5;
-    const label = fit(nameRoom > 0 ? `${fit(name, nameRoom)} ${summary}` : summary, Math.max(1, columns - 3));
-    const tail = "─".repeat(Math.max(0, columns - width(label) - 3));
+    // Divider row: `── <ROMAN>. <name>  <closed>/<total>` then one space and dashes to the pane's
+    // edge. The name is what gives up room first, so the counts stay readable; with no room for
+    // dashes the row is just the title, and it never exceeds `columns` cells (CJK width included).
+    // The lead shrinks only for a pane narrower than the three cells it needs; the fallback
+    // layout replaces the body below 16 columns anyway, so that row is never seen at a real width.
+    const lead = columns >= 3 ? "── " : "─".repeat(columns);
+    const room = Math.max(0, columns - width(lead));
+    const roman = `${phaseRomanNumeral(phaseIndex + 1)}. `, gap = "  ";
+    // Untrusted phase names are stripped before they are measured, so a control sequence can never
+    // widen the row or leave an escape in a colour-free frame.
+    const label = clean(name);
+    const nameRoom = room - width(roman) - width(gap) - width(summary);
+    const title = width(roman) + width(label) + width(gap) + width(summary) <= room
+      ? `${roman}${label}${gap}${summary}`
+      : nameRoom > 0 ? `${roman}${fit(label, nameRoom)}${gap}${summary}`
+        : fit(`${roman}${summary}`, room);
+    const dashes = Math.max(0, columns - width(lead) - width(title) - 1);
     const holdsCurrent = tasks.some((task) => task.status === "in_progress");
-    bodyLines.push(holdsCurrent && !closed
-      ? `${paint("─ ", "muted", color)}${paint(label, "activePhase", color, true)}${paint(` ${tail}`, "muted", color)}`
-      : paint(`─ ${label} ${tail}`, "muted", color));
+    // Ink: the phase holding the in-progress task is bold claw, any other open phase is bold
+    // coral, a fully closed phase is mutedShell and not bold. The dashes stay dimShell.
+    const ink = closed ? { token: "secondary" }
+      : holdsCurrent ? { token: "activePhase", bold: true } : { token: "phase", bold: true };
+    bodyLines.push(paint(lead, "muted", color) + paint(title, ink.token, color, ink) +
+      (dashes > 0 ? paint(` ${"─".repeat(dashes)}`, "muted", color) : ""));
     const contents = new Map();
-    for (const task of tasks) {
+    for (const [taskIndex, task] of tasks.entries()) {
       const content = String(task?.content ?? "");
       const contentOccurrence = contents.get(content) ?? 0;
       contents.set(content, contentOccurrence + 1);
       const key = taskKeyOf(name, phaseOccurrence, content, contentOccurrence);
       const taskStart = bodyLines.length;
-      const prefix = `${marks[task.status] ?? " ? "} `;
+      // Tree rows: `├─` while the phase has a later task and `└─` on its last one, so the
+      // checkboxes of a phase line up in one column and the branch visibly closes.
+      const last = taskIndex === tasks.length - 1;
+      const prefix = `${taskIndent}${last ? "└" : "├"}─ ${marks[task.status] ?? marks.pending} `;
+      const ink = rowInk[task.status] ?? rowInk.pending;
+      // A wrapped row keeps the rail of a middle task (`│  ` plus blanks) and blanks only
+      // under the last one, so every continuation line starts under the task text. Wrapping
+      // uses the shared inset, the widest prefix, so every row of the body fits.
+      const continuation = last ? " ".repeat(width(prefix))
+        : railPrefix + " ".repeat(Math.max(0, width(prefix) - width(railPrefix)));
       const wrapped = wrap(content, Math.max(1, columns - layout.taskInset));
       for (const [index, line] of wrapped.entries()) {
-        const inset = index === 0 ? prefix : " ".repeat(layout.taskInset);
-        bodyLines.push(paint(`${inset}${line}`, task.status, color, task.status === "in_progress"));
+        bodyLines.push(paint(`${index === 0 ? prefix : continuation}${line}`, ink.token, color, ink));
       }
       taskRanges[key] = { start: taskStart, end: bodyLines.length, phaseStart: start, status: task.status };
       selectableKeys.push(key);
     }
     if (!tasks.length) bodyLines.push(fit(t(language, "emptyPhase"), columns));
-    phaseRanges[phaseKeyOf(name, phaseOccurrence)] = { start, end: bodyLines.length };
+    const range = { start, end: bodyLines.length };
+    phaseRanges[phaseKeyOf(name, phaseOccurrence)] = range;
+    drawnPhases.push({ ...range, closed, holdsCurrent, openWork: !closed && tasks.length > 0 });
   }
-  return { bodyLines, taskRanges, phaseRanges, selectableKeys };
+  return { bodyLines, taskRanges, phaseRanges, selectableKeys, drawnPhases };
 }
 
 // L5b: one compact goal row. The four required fields are objective, status, tokens and
@@ -182,7 +259,7 @@ export function goalLine(goal, { columns = 80, language = "ko", color = true, in
   const objective = goal.objective === "" ? t(languageCode, "goal.untitled") : goal.objective;
   let line = `${head}${fit(objective, Math.max(1, room))}${suffix(tokens)}`;
   if (width(line) > columns) line = fit(line, columns);
-  return paint(`${lead}${line}`, "goal", color, true);
+  return paint(`${lead}${line}`, "goal", color, { bold: true });
 }
 
 function defaultSelection(projection) {
@@ -249,7 +326,7 @@ export function renderFrame(projection, {
     paint(footer, kind === "live" || kind === "empty" ? "accent" : "warning", color);
 
   const drawn = body(projection, { columns, expanded, color, language: languageCode });
-  const { bodyLines, taskRanges, phaseRanges, selectableKeys } = drawn;
+  const { bodyLines, taskRanges, phaseRanges, selectableKeys, drawnPhases } = drawn;
   const isEmpty = projection?.empty === true || (phases.length === 0 && kind === "empty");
   if (phases.length === 0) {
     const key = sourceError ? "errorBody" : kind === "empty" ? "emptyBody" : "waitingBody";
@@ -258,17 +335,17 @@ export function renderFrame(projection, {
   const detail = `${t(languageCode, "completed")}:${total.completed} · ${t(languageCode, "dropped")}:${total.dropped}`;
   const name = `${t(languageCode, "todo")} [${total.closed}/${total.total}]`;
   // Header-first grammar mirrors OMO packages/todo/src/render.mjs:202 at 3242ad4:
-  // accent (cyan) for live/waiting/empty, warning (yellow) for disconnected,
-  // error (red) for a source error.
+  // bold accent (claw) for live/waiting/empty, warning amber for disconnected,
+  // dangerRed for a source error. The tally is a coral badge, the summary mutedShell.
   const headStyle = kind === "source-error" ? "error" : kind === "disconnected" ? "warning" : "accent";
   const inset = columns > 1 ? " " : "", edge = columns - inset.length;
   const headerCore = width(`${name}  ${detail}`) <= edge
-    ? `${paint(t(languageCode, "todo"), headStyle, color, true)} ` +
-      `${paint(`[${total.closed}/${total.total}]`, "activePhase", color, true)}  ${paint(detail, "muted", color)}`
-    : paint(fit(name, edge), headStyle, color, true);
+    ? `${paint(t(languageCode, "todo"), headStyle, color, { bold: true })} ` +
+      `${paint(`[${total.closed}/${total.total}]`, "phase", color, { bold: true })}  ` +
+      `${paint(detail, "secondary", color)}`
+    : paint(fit(name, edge), headStyle, color, { bold: true });
   const header = inset + headerCore;
-  // The Todo divider mirrors OMO packages/todo/src/render.mjs:207 at 3242ad4:
-  // paint('─'.repeat(columns), 'muted', color), where muted is '90' (:24).
+  // The Todo divider is dimShell, as GJC's own dividers are.
   const divider = paint("─".repeat(columns), "muted", color);
   // A goal row exists only when `goal.json` carries a goal. There is no placeholder row and no
   // blank spacer when the host reports none, so an ordinary Todo frame keeps its header and divider.
@@ -309,13 +386,54 @@ export function renderFrame(projection, {
   if (kept.has("goal")) top.push(goalRow);
   if (kept.has("error")) top.push(errorLine);
   const bodyRows = Math.max(0, extraRoom - kept.size);
+  // Follow pins the current phase to the top of the body: the phase holding the in-progress
+  // task, else the first phase that still has pending work, else the last drawn phase. Finished
+  // phases above it scroll out of view instead of being deleted, and the revealed selection may
+  // push the window down a little further. A follow frame is not clamped to the end of the body:
+  // the empty rows below the last phase are padded, so a short list still pins its phase.
+  const followOn = follow !== false && bodyRows > 0 && phases.length > 0;
   const selected = taskRanges[resolved];
-  if (revealSelection && selected && bodyRows > 0 &&
-    (selected.start < scroll || selected.start + Math.min(selected.end - selected.start, bodyRows) > scroll + bodyRows)) {
-    scroll = selected.start - selected.phaseStart < bodyRows ? selected.phaseStart : selected.start;
+  if (followOn) {
+    // Anchor order: the phase holding the in-progress task, else the first drawn phase that still
+    // has pending work, else the last drawn phase. The frame scrolls finished phases above it away
+    // rather than deleting them; the wheel and j/k set follow OFF and show them again.
+    const anchor = drawnPhases.find((range) => range.holdsCurrent) ??
+      drawnPhases.find((range) => range.openWork) ?? drawnPhases.at(-1);
+    scroll = anchor?.start ?? 0;
+    // Only raise the window, never lower it below the pinned divider, and stop at the selected
+    // task's own first row so a wrapped task still shows its beginning.
+    if (selected && selected.end > scroll + bodyRows) {
+      scroll = Math.max(scroll, Math.min(selected.end - bodyRows, selected.start));
+    }
+  } else if (revealSelection && selected && bodyRows > 0) {
+    // Reveal keeps the selected task AND its phase title on screen. The window is moved the least
+    // that satisfies both, so a selection that is already visible never makes the pane jump:
+    //   * the phase head through the selected task fits: scroll lands in [end - rows, phaseStart];
+    //   * it does not fit: the title cannot share the window with the selection, so one row is
+    //     reserved above the selection and the sticky title below fills it.
+    if (selected.end - selected.phaseStart <= bodyRows) {
+      scroll = Math.min(Math.max(scroll, selected.end - bodyRows), selected.phaseStart);
+    } else {
+      const span = Math.min(selected.end - selected.start, bodyRows);
+      const reserve = bodyRows >= 2 && span <= bodyRows - 1 ? 1 : 0;
+      scroll = Math.min(Math.max(scroll, selected.start + span - bodyRows), selected.start - reserve);
+    }
   }
-  scroll = clamp(scroll, bodyLines.length - bodyRows);
+  if (!followOn) scroll = clamp(scroll, bodyLines.length - bodyRows);
   const visible = bodyLines.slice(scroll, scroll + bodyRows);
+  // Sticky phase title: when the first visible row is a task row of some phase, that phase's title
+  // takes its place, so a title scrolled out of the window is never the cause of an anonymous task.
+  // It only ever replaces a row, never the scroll the frame returns. Under follow ON the pinned
+  // divider is already the first row, so this only fires after the selection pushed the window
+  // down — and then it must not replace a row of the selected task itself.
+  if (bodyRows >= 2 && scroll > 0) {
+    const keepSelected = followOn && selected && scroll >= selected.start && scroll < selected.end;
+    if (!keepSelected) {
+      for (const range of Object.values(phaseRanges)) {
+        if (scroll > range.start && scroll < range.end) { visible[0] = bodyLines[range.start]; break; }
+      }
+    }
+  }
   while (visible.length < bodyRows) visible.push("");
 
   const lines = [...top, ...visible, divider, footerLine];
