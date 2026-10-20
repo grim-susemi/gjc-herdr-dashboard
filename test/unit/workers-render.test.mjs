@@ -277,6 +277,8 @@ test("completed cards hide behind `done N ▸`, show as one row under `▾`, and
   assert.deepEqual(selected.selectable, ["c1", "c2"]);
   assert.equal(selected.bodyLines[0][0], ">");
   assert.match(selected.bodyLines[0], /done one/);
+  // A collapsed completed card carries OMO's per-card chevron, selected or not.
+  assert.match(selected.bodyLines[0], /✓ ▸ done one/);
   assert.equal(selected.ranges.c1.end - selected.ranges.c1.start, 1);
   assert.equal(selected.lines[0].endsWith("done 1 ▸"), true);
   const opened = frame({ selection: "c1", expanded: { c1: true } });
@@ -295,7 +297,7 @@ test("a folded completed card is one row with no bar", () => {
     toolCount: 2, durationMs: 12000 })], { view: { follow: false, showCompleted: true } });
   assert.equal(frame.bodyLines.length, 1);
   const line = plainLine(frame.bodyLines[0]);
-  assert.match(line, /done one/);
+  assert.match(line, /✓ ▸ done one/);
   assert.equal(line[0], ">", "the only drawn card is the resolved selection");
   assert.equal(line[1], " ", "a one-row card gets a space instead of the bar");
   assert.equal(line[2], "✓");

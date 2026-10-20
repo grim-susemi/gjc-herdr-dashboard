@@ -714,7 +714,7 @@ const WORKERS_EXPECTED = {
         " ▌[worker] background",
         " ▌⧖ 1m 5s · 2K tok · 3…",
         "───────────────────────",
-        "  ✓ folded card · ⧖ 1s",
+        "  ✓ ▸ folded ca… · ⧖ 1s",
         "",
         "───────────────────────",
         " Follow ON · LIVE"
@@ -730,7 +730,7 @@ const WORKERS_EXPECTED = {
         " ▌[worker] background",
         " ▌⧖ 1m 5s · 2K tok · 3 t…",
         "─────────────────────────",
-        "  ✓ folded card · ⧖ 1s",
+        "  ✓ ▸ folded card · ⧖ 1s",
         "",
         "─────────────────────────",
         " Follow ON · LIVE"
@@ -746,7 +746,7 @@ const WORKERS_EXPECTED = {
         " ▌[worker] background",
         " ▌2K tok · 3 tools",
         "─────────────────────────────────",
-        "  ✓ folded card · ⧖ 1s",
+        "  ✓ ▸ folded card · ⧖ 1s",
         "",
         "─────────────────────────────────",
         " Follow ON · LIVE"
@@ -762,7 +762,7 @@ const WORKERS_EXPECTED = {
         " ▌[worker] background",
         " ▌2K tok · 3 tools",
         "───────────────────────────────────────────────────",
-        "  ✓ folded card · ⧖ 1s",
+        "  ✓ ▸ folded card · ⧖ 1s",
         "",
         "───────────────────────────────────────────────────",
         " Follow ON · LIVE"
@@ -778,7 +778,7 @@ const WORKERS_EXPECTED = {
         " ▌[worker] background",
         " ▌2K tok · 3 tools",
         "─────────────────────────────────────────────────────",
-        "  ✓ folded card · ⧖ 1s",
+        "  ✓ ▸ folded card · ⧖ 1s",
         "",
         "─────────────────────────────────────────────────────",
         " Follow ON · LIVE"

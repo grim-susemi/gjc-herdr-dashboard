@@ -219,11 +219,14 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
     })
     : "";
   const room = columns - 2; // selection marker + status bar
+  // OMO `:402`: a collapsed completed card keeps the per-card fold chevron after the
+  // glyph (`✓ ▸ done one`), including when the card is drawn because it is selected.
+  const fold = oneRow ? "▸ " : "";
   // OMO `:409-410`: the time ends the title row only when the title keeps at least
   // ten cells (or its whole short self); otherwise it leads row 3.
-  const titleRoomWithTime = room - 2 - width(word) - width(timeSuffix);
+  const titleRoomWithTime = room - 2 - width(fold) - width(word) - width(timeSuffix);
   const timeInTitle = titleRoomWithTime >= Math.min(width(name), 10);
-  const titleRoom = timeInTitle ? titleRoomWithTime : room - 2 - width(word);
+  const titleRoom = timeInTitle ? titleRoomWithTime : room - 2 - width(fold) - width(word);
   const statsRow = !oneRow && (metrics !== "" || !timeInTitle);
   const multiRow = hasAgentRow || statsRow || Boolean(alert);
   const bar = paint(multiRow ? "▌" : " ", status, color);
@@ -231,11 +234,11 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
   // Even the status word does not fit: keep the existing single coloured strip
   // (still fitted to the pane with the Workers `…` mark).
   if (titleRoom < 1) {
-    return [paint(fit(`${marker}${bar}${glyphOf(status, spin)} ${name}${word}`, columns, false, "…"),
+    return [paint(fit(`${marker}${bar}${glyphOf(status, spin)} ${fold}${name}${word}`, columns, false, "…"),
       status, color)];
   }
   const lines = [
-    `${marker}${bar}${paint(glyphOf(status, spin), status, color, true)} ` +
+    `${marker}${bar}${paint(glyphOf(status, spin), status, color, true)} ${paint(fold, status, color)}` +
     `${paint(fit(name, titleRoom, false, "…"), status, color, selected)}` +
     `${paint(word, status, color)}` +
     (timeInTitle ? paint(timeSuffix, timeToken, color) : ""),
