@@ -48,7 +48,7 @@ When a goal exists, row 2 of the Todo pane (directly under the header divider) r
 
 ## G7. Worker card rows
 
-A card has up to three rows plus one alert row. Column 0 is the selection column (G12).
+A card has up to three base rows plus one alert row; a long agent identity adds continuation rows (row 2). Column 0 is the selection column (G12).
 
 1. Row 1: bar, glyph, space, title, then ` · <word>` for failed, aborted, paused, pending and unknown, then ` · ⧖ <compact time>`. Example: `▌⠋ build docs · ⧖ 5m 0s`. A folded completed card inserts `▸ ` between the glyph and the title (`✓ ▸ done one`), mirroring OMO `:402`. The word and the time are reserved before the title is sized. If the title would keep fewer than 10 cells, the time moves to the front of row 3.
 2. Row 2: `[agent]` in `35`, plus ` background` dim when the worker runs in the background. Left out when there is neither. A long agent identity continues on following rows instead of being ellipsis-cut: the first row starts `[`, continuation rows are indented under the badge (two cells) and keep the same bar column, and the closing `]` ends the last identity row. At most six continuation rows are drawn; beyond that the last one ends `…]` so the title and metrics stay reachable. The ` background` mark stays visible: it shares the last identity row when it fits and otherwise takes one dim indented row. Mirrors OMO `packages/dag/src/render.mjs:395,399,445-447` (the role keeps its own row instead of being cut short to share one).

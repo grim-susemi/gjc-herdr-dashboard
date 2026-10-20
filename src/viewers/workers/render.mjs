@@ -298,6 +298,12 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
           const first = takeCells(remaining, rowRoom - 1);
           remaining = remaining.slice(first.length);
           pushIdentity(paint(`[${first}`, "badge", color), 1 + width(first));
+          if (remaining === "") {
+            // The first row consumed the whole identity, so no cell is left for the
+            // closing `]`. Close on its own continuation row: the badge must never
+            // stay open (GRAMMAR G7). `background` may share this row via addTail.
+            pushIdentity(`  ${paint("]", "badge", color)}`, 3);
+          }
           let continuation = 0;
           while (remaining !== "") {
             const lastRoom = rowRoom - 2;

@@ -400,6 +400,58 @@ test("owner #259: a long agent identity continues under the badge and keeps TAIL
   for (const line of hugeLines) assert.ok(width(line) <= 23, line);
 });
 
+// G7: the identity badge always closes. At the wrap boundary the first row can
+// consume the entire identity, leaving no cell for `]`; the bracket then occupies a
+// closing continuation row. This grid is every wrap boundary: seven agent lengths at
+// four widths, background off/on. Expectations come from GRAMMAR G7 (opener on the
+// first identity row, two-cell continuation indent, one closing `]` on the final
+// identity row, background visible, nothing wider than the pane) rather than from
+// snapshots of the renderer output.
+test("G7: every wrapped agent badge closes at the wrap boundary", () => {
+  for (const columns of [24, 34, 54, 80]) {
+    for (const background of [false, true]) {
+      for (const size of [6, columns - 6, columns - 5, columns - 4, columns - 3,
+        columns - 2, columns + 1]) {
+        const label = `${columns}/${background}/${size}`;
+        const frame = frameOf([card("c1", { title: "alpha", status: "running",
+          agent: "a".repeat(size), background, tokens: 48000, toolCount: 12,
+          durationMs: 12000 })], { columns, rows: 14 });
+        const lines = frame.bodyLines.map(plainLine);
+        const identity = lines.slice(1, -1); // title row first, metrics row last
+        assert.ok(identity.length >= 1, `${label}: identity row`);
+        // The badge opens on the first identity row, followed by the agent text.
+        assert.match(identity[0], /^ ▌\[a/, `${label}: opener`);
+        // Continuation rows align two cells under the badge, after the bar column.
+        for (const line of identity.slice(1)) assert.match(line, /^ ▌  /, `${label}: ${line}`);
+        // Exactly one `]`, and it ends the final identity row (the background mark may
+        // share that row; if it cannot, it is the only row allowed to follow).
+        const closed = identity.findIndex((line) => line.includes("]"));
+        assert.notEqual(closed, -1, `${label}: badge closes`);
+        assert.equal(identity.join("").split("]").length - 1, 1, `${label}: one closing bracket`);
+        assert.match(identity[closed], /\]( background)?$/, `${label}: bracket ends its row`);
+        for (const line of identity.slice(closed + 1)) {
+          assert.match(line, /^ ▌  background$/, `${label}: only background follows the close`);
+        }
+        // No identity cell was dropped and nothing was ellipsized at these boundaries.
+        assert.equal(identity.join("").replaceAll(" background", "").split("a").length - 1,
+          size, `${label}: every agent cell`);
+        assert.doesNotMatch(identity.join(""), /…/, `${label}: no ellipsis at the boundary`);
+        if (background) {
+          assert.ok(identity.some((line) => line.includes("background")), `${label}: background`);
+        }
+        // The renderer keeps the terminal's final cell free, so every row stays within
+        // columns-1; the metrics row and the card range are unchanged.
+        for (const line of lines) {
+          assert.ok(width(line) <= columns - 1, `${label}: ${JSON.stringify(line)}`);
+        }
+        assert.match(lines.at(-1), /48K tok · 12 tools/, `${label}: metrics row`);
+        assert.deepEqual(frame.ranges.c1, { start: 0, end: frame.bodyLines.length,
+          status: "running" }, `${label}: card range`);
+      }
+    }
+  }
+});
+
 // K1: a reported 0 is exactly the "never measured" ambiguity, so the detail view
 // prints `?`, never a confident `$0.0000`. The list has no cost row at all.
 test("K1: an unknown cost is `?` in the detail view only", () => {
