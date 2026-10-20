@@ -386,6 +386,76 @@ test("a selected card that completes stays drawn, and Space expands that same id
   assert.match(plain(viewer), /alpha-agent/, "the expanded card shows its role row");
 });
 
+// TODO 4b: the renderer's default selection is a selection the user can see. When that
+// card completes it must stay drawn with the marker (OMO keeps its selected task), and
+// Space must act on that same id. The default stays implicit: prefs.selection is null
+// until the user moves the selection.
+test("an implicitly default-selected card stays drawn after it completes", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha" })]));
+  const viewer = await startViewer(options(f), deps(f));
+  t.after(() => viewer.stop());
+  assert.equal(viewer.state.prefs.selection, null, "the default is resolved, not stored");
+  assert.equal(viewer.frame.selection, "c1");
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed",
+    agent: "alpha-agent", lastIntent: "done" })]));
+  viewer.refresh();
+  assert.equal(viewer.state.prefs.selection, null, "the default is still not persisted");
+  assert.deepEqual(viewer.frame.selectable, ["c1"], "the completed default card stays drawn");
+  assert.equal(viewer.frame.selection, "c1");
+  const row = viewer.frame.lines.find((line) => line.includes("alpha"));
+  assert.equal(stripVTControlCharacters(row)[0], ">");
+  await viewer.key(" ");
+  assert.equal(viewer.state.prefs.selection, "c1", "Space acts on the card the marker shows");
+  assert.equal(viewer.state.prefs.expanded.c1, true);
+  assert.match(plain(viewer), /alpha-agent/, "the expanded card shows its role row");
+  assert.equal(f.readPrefs().selection, "c1", "the first real move is what gets persisted");
+});
+
+test("a completed default card stays drawn while another card keeps running", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha" }),
+    card("c2", { title: "beta" })]));
+  const viewer = await startViewer(options(f), deps(f));
+  t.after(() => viewer.stop());
+  assert.equal(viewer.frame.selection, "c1");
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed",
+    agent: "alpha-agent" }), card("c2", { title: "beta" })]));
+  viewer.refresh();
+  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"], "the completion does not drop the card");
+  assert.equal(viewer.frame.selection, "c1");
+  assert.equal(stripVTControlCharacters(
+    viewer.frame.lines.find((line) => line.includes("alpha")))[0], ">");
+  assert.equal(stripVTControlCharacters(
+    viewer.frame.lines.find((line) => line.includes("beta")))[0], " ", "the running card stays unmarked");
+  assert.equal(viewer.state.prefs.selection, null);
+  await viewer.key(" ");
+  assert.equal(viewer.state.prefs.expanded.c1, true, "Space expands the completed default card");
+  assert.match(plain(viewer), /alpha-agent/);
+});
+
+test("Tab away from a completed default card folds it again", async (t) => {
+  const f = fixture(t);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha" }),
+    card("c2", { title: "beta" })]));
+  const viewer = await startViewer(options(f), deps(f));
+  t.after(() => viewer.stop());
+  f.writeProjection(projectionFor([card("c1", { title: "alpha", status: "completed" }),
+    card("c2", { title: "beta" })]));
+  viewer.refresh();
+  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
+  await viewer.key("\t");
+  assert.equal(viewer.state.prefs.selection, "c2", "Tab steps off the completed card");
+  assert.deepEqual(viewer.frame.selectable, ["c2"], "the completed card folds once it is no longer selected");
+  assert.equal(viewer.frame.selection, "c2");
+  assert.doesNotMatch(plain(viewer), /alpha/, "the completed card is hidden again");
+  assert.equal(stripVTControlCharacters(
+    viewer.frame.lines.find((line) => line.includes("beta")))[0], ">");
+});
+
 test("c toggles completed cards and persists the filter; f toggles follow", async (t) => {
   const f = fixture(t);
   f.writeSlot(slotFor());
@@ -705,6 +775,36 @@ test("scope switch: a new scopeKey rebinds data and prefs without touching the p
   assert.equal(viewer.state.prefs.showCompleted, true);
   assert.equal(viewer.state.prefs.follow, true);
   assert.deepEqual(f.calls, []);
+});
+
+test("scope switch: a fresh scope selects its own card, not the old scope's", async (t) => {
+  const f = fixture(t);
+  const otherScope = "c".repeat(24);
+  f.writeSlot(slotFor());
+  f.writeProjection(projectionFor([card("a", { title: "alpha" }), card("b", { title: "beta" })]));
+  // The new scope reuses the old ids: `b` runs and is listed first, `a` is already
+  // completed, and no prefs file exists there to restore an explicit selection.
+  f.writeProjection(projectionFor([card("b", { title: "beta" }),
+    card("a", { title: "alpha", status: "completed" })]), otherScope);
+  const viewer = await startViewer(options(f), deps(f));
+  t.after(() => viewer.stop());
+  // The old scope's selection is implicit: nothing is stored, but `a` is what is drawn.
+  assert.equal(viewer.state.prefs.selection, null);
+  assert.equal(viewer.frame.selection, "a");
+  assert.equal(stripVTControlCharacters(
+    viewer.frame.lines.find((line) => line.includes("alpha")))[0], ">");
+  const switched = new Promise((done) => viewer.events.once("scope", done));
+  f.writeSlot(slotFor({ scopeKey: otherScope }));
+  viewer.refresh();
+  assert.deepEqual(await switched, { scopeKey: otherScope });
+  // The old selection must not leak in as a drawn hint: the new scope resolves its own
+  // first visible card, and the completed old id stays folded away and unselectable.
+  assert.equal(viewer.state.prefs.selection, null, "the new scope's selection stays implicit");
+  assert.equal(viewer.frame.selection, "b");
+  assert.deepEqual(viewer.frame.selectable, ["b"], "the old completed id is not selectable");
+  assert.doesNotMatch(plain(viewer), /alpha/, "the old completed id is hidden");
+  assert.equal(stripVTControlCharacters(
+    viewer.frame.lines.find((line) => line.includes("beta")))[0], ">");
 });
 
 test("a bad prefs file shows a notice but never crashes the viewer", async (t) => {

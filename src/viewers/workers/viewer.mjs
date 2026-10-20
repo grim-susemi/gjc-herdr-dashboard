@@ -246,6 +246,13 @@ export async function startViewer(options, {
   // timer, and `paintLink` is the connection of the last data paint, so a tick can
   // redraw without re-reading the slot, owner or projection files.
   let spin = 0, spinTimer, paintLink = null;
+  // The renderer resolves an unset `prefs.selection` to the first drawn card. That
+  // implicit default is a selection the user can see, so the next paint hands it back
+  // to the renderer: a completed card nobody requested anymore would be folded away
+  // and the marker would jump (OMO keeps its selected task, viewer.mjs:186). It is
+  // deliberately not written to prefs, so the stored selection stays null until the
+  // user really moves it.
+  let lastSelection = null;
   // Pointer drag anchor (1-based SGR row), cleared by release and by blur (AC3.1), plus
   // the two disposers that `finish()` has to release: the input decoder and the Herdr
   // focus subscription.
@@ -288,12 +295,14 @@ export async function startViewer(options, {
     const drawn = renderWorkers(projection, { columns: columnsOf(), rows: rowsOf(),
       color: isInteractive, language: language.language, now: clock.now(), spin,
       connection: link,
-      view: { scroll: prefs.scroll, follow: prefs.follow, selection: prefs.selection,
+      view: { scroll: prefs.scroll, follow: prefs.follow,
+        selection: prefs.selection ?? lastSelection,
         expanded: prefs.expanded, showCompleted: prefs.showCompleted, detail },
       footer: [footerText(language.language, { follow: prefs.follow, connection: link, notices })] });
     // The renderer resolves the connection from the projection alone; the viewer knows
     // more (owner liveness, an unreadable slot), so its own kind wins on the frame.
     frame = { ...drawn, connection: link.kind };
+    lastSelection = drawn.selection;
     paintLink = link;
     syncAnimation();
     return frame;
@@ -468,6 +477,8 @@ export async function startViewer(options, {
     const path = `${options.state}/prefs/${scopeKey}/${options.role}.json`;
     const loaded = loadPreferences(path, scopeKey, { read: port.read });
     prefs = { ...loaded.prefs, scopeKey };
+    // A selection resolved against the previous scope's cards never leaks into this one.
+    lastSelection = null;
     events.emit("scope", { scopeKey });
     if (loaded.error) {
       events.emit("prefs-error", loaded.error);
