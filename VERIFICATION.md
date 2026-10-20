@@ -41,6 +41,31 @@ pane 문법을 omo `3242ad4`에 맞췄다. 규칙과 의도된 차이는 `GRAMMA
 
 증거(`C:/Users/USER/orca/projects/기타 작업/.omo/evidence/gjc-dashboard-omo-align/`): `task-3-todo-frames.txt`, `task-4-workers-frames.txt`, `task-7-live-pass.txt`, `task-7-rerun-live-pass.txt`, `task-8-docs-review.txt`, `task-8-docs-before.txt`.
 
+### 사용자 범위 설치 (generation-000002)
+
+소유자 승인 Q2=A에 따라 Release step A를 실행했다. push와 merge는 하지 않았다.
+
+- 단위: `node scripts/test.mjs` -> 683 tests, 683 pass, 0 fail, 0 skipped, 0 todo (`task-9-unit.txt`).
+- 패키지 스모크: scratch agent dir에 `--lang ko` 설치 exit 0; `scripts/verify-package.mjs` exit 0, `pass:true`, 28 required files, `importOk:true`, `defaultExport:"function"`, `localeHeader:"ext gen-000001"`, shim `targetMatches:true`/`envDefaults:false`/`failpointPlumbing:false` (`task-9-package-install.json`, `task-9-package-verify.json`).
+- 실제 설치: `--dry-run` exit 0 -> `generation-000002`, `previous: generation-000001`; 설치 exit 0; 설치된 트리 verify-package exit 0, `pass:true`, `localeHeader:"ext gen-000002"` (`task-9-install.json`, `task-9-verify-installed.json`).
+- l6-userscope: `--confirm-user-scope` PASS (exit 0, 110188 ms). notify `ext gen-000002 · Todo 열림 · Workers 열림`; frame-todo row 0 ` Todo [0/0]  done:0 · drop:0`, row 1 구분선, footer ` Follow ON · EMPTY`; frame-workers row 0 ` Workers [0/0]  run 0`, row 1 구분선, footer ` Follow ON · EMPTY`; AC6.3에서 shim 제거 시 ext notify 없음. outer finally의 `--select generation-000002` exit 0, current/shim은 설치 직후 기록과 바이트 동일 (`task-9-l6-frames.txt`, `task-9-l6-guard.json`).
+- doctor: 설치 전 `generation-000001` 하나(selected, usable) -> 설치 후 두 개(`generation-000002` selected, `generation-000001` usable), mismatches 없음. 정확히 한 세대만 추가되고 제거된 세대는 없다 (`task-9-doctor-diff.txt`).
+- 롤백 명령: `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --select generation-000001` (이번 단계에서는 실행하지 않음).
+- OMO protected는 전후 바이트 동일: wrapper `25c376b0...`, pointer `5d6c0120...`, main `d8836c7b...`.
+- 증거: `task-9-release.txt` 및 위 파일들.
+
+해시 표 (sha256; 트리는 정렬된 `<sha256>  <path>` manifest의 sha256):
+
+| 항목 | 설치 전 | 설치 후 | l6 이후 |
+|---|---|---|---|
+| current.json | `950a9d67...` | `42689392...` | `42689392...` |
+| shim | `07acd7cc...` | `75a25c93...` | `75a25c93...` |
+| generation-000001 tree | `a9adb2c0...` | `a9adb2c0...` | `a9adb2c0...` |
+| generation-000002 tree | - | `b29388d6...` | `b29388d6...` |
+| models.yml | `29747daa...` | `29747daa...` | `29747daa...` |
+
+gjc sessions that are already open keep generation-000001 until they are restarted (PROVENANCE.md:238); restart them to see the new panes.
+
 ## L0
 
 실행 환경: Windows, Node v24.12.0, Herdr 0.9.3, gjc 0.18.11. 라이브 프로브는 harness가 만든 별도 Herdr session `gjcdash-probe`에서만 실행했다. 소유자 pane에는 입력하지 않았다.
