@@ -400,9 +400,65 @@ test("owner #259: a long agent identity continues under the badge and keeps TAIL
   for (const line of hugeLines) assert.ok(width(line) <= 23, line);
 });
 
-// G7: the identity badge always closes. At the wrap boundary the first row can
-// consume the entire identity, leaving no cell for `]`; the bracket then occupies a
-// closing continuation row. This grid is every wrap boundary: seven agent lengths at
+// G7: a `[agent]` badge that fits on its first identity row is drawn whole there.
+// When ` background` does not also fit, the mark takes the next dim indented row;
+// the badge is never split so that `]` lands on a row by itself. This covers every
+// agent length up to the wrap boundary at the four documented widths, both background
+// settings, and the reported 24-column `librarian` regression.
+test("G7: a fitting agent badge stays whole and background moves to its own row", () => {
+  const render = (agent, background, columns) => frameOf([card("c1", { title: "alpha",
+    status: "running", agent, background, tokens: 48000, toolCount: 12,
+    contextPercent: 41, durationMs: 12000 })], { columns, rows: 14 }).bodyLines.map(plainLine);
+  // The reported regression: `librarian` fits as `[librarian]` at the default narrow
+  // pane, but `[librarian] background` is one cell too wide.
+  assert.deepEqual(render("librarian", true, 24).slice(1, -1),
+    [" ▌[librarian]", " ▌  background"]);
+  assert.deepEqual(render("librarian", false, 24).slice(1, -1), [" ▌[librarian]"]);
+  for (const columns of [34, 54, 80]) {
+    assert.deepEqual(render("librarian", true, columns).slice(1, -1),
+      [" ▌[librarian] background"], `${columns}: the short badge keeps its one row`);
+  }
+  for (const columns of [24, 34, 54, 80]) {
+    const rowRoom = columns - 3; // the renderer keeps the terminal's final cell free
+    for (const background of [false, true]) {
+      for (let size = 1; size <= columns - 3; size += 1) {
+        const label = `${columns}/${background}/${size}`;
+        const lines = render("a".repeat(size), background, columns);
+        const identity = lines.slice(1, -1);
+        // The badge opens on the first identity row, and no identity row is left
+        // holding only `]` (or `] background`) when agent text could share it.
+        assert.match(identity[0], /^ ▌\[a/, `${label}: opener`);
+        for (const line of identity) {
+          assert.doesNotMatch(line, /^\s*▌\s*\](\s+background)?$/, `${label}: bracket-only row`);
+        }
+        // Exactly one `]`, attached to the last agent text row. The background mark
+        // shares that row or follows on its own dim indented row.
+        assert.equal(identity.join("").split("]").length - 1, 1, `${label}: one close`);
+        const closed = identity.findIndex((line) => line.includes("]"));
+        assert.match(identity[closed], /a\](\s+background)?$/, `${label}: close follows text`);
+        for (const line of identity.slice(closed + 1)) {
+          assert.match(line, /^ ▌  background$/, `${label}: only background follows`);
+        }
+        if (size + 2 <= rowRoom) {
+          assert.ok(identity[0].startsWith(` ▌[${"a".repeat(size)}]`),
+            `${label}: whole badge on its first identity row`);
+        }
+        assert.equal(identity.join("").replaceAll(" background", "").split("a").length - 1,
+          size, `${label}: every agent cell`);
+        if (background) {
+          assert.ok(identity.some((line) => line.includes("background")), `${label}: background`);
+        }
+        for (const line of lines) {
+          assert.ok(width(line) <= columns - 1, `${label}: ${JSON.stringify(line)}`);
+        }
+      }
+    }
+  }
+});
+
+// G7: the identity badge always closes. At the wrap boundary the first row would
+// consume the entire identity, so the closing row carries the trailing agent text
+// and `]`. This grid is every wrap boundary: seven agent lengths at
 // four widths, background off/on. Expectations come from GRAMMAR G7 (opener on the
 // first identity row, two-cell continuation indent, one closing `]` on the final
 // identity row, background visible, nothing wider than the pane) rather than from
@@ -421,6 +477,16 @@ test("G7: every wrapped agent badge closes at the wrap boundary", () => {
         assert.ok(identity.length >= 1, `${label}: identity row`);
         // The badge opens on the first identity row, followed by the agent text.
         assert.match(identity[0], /^ ▌\[a/, `${label}: opener`);
+        // A `]`-only row is never acceptable at these widths: when the whole badge
+        // fits it must stay on the first row, and a wrapped identity always has a
+        // trailing grapheme that fits beside `]` under columns-1.
+        for (const line of identity) {
+          assert.doesNotMatch(line, /^\s*▌\s*\](\s+background)?$/, `${label}: bracket-only row`);
+        }
+        if (size + 2 <= columns - 3) {
+          assert.ok(identity[0].startsWith(` ▌[${"a".repeat(size)}]`),
+            `${label}: whole badge on its first identity row`);
+        }
         // Continuation rows align two cells under the badge, after the bar column.
         for (const line of identity.slice(1)) assert.match(line, /^ ▌  /, `${label}: ${line}`);
         // Exactly one `]`, and it ends the final identity row (the background mark may
