@@ -35,7 +35,7 @@ Five labels, in English in the ko and en catalogues and pairwise distinct: `LIVE
 
 GJC keeps its own Todo body semantics (IS-7). Each item states the OMO fact first, then what the GJC pane draws.
 
-- Task marks, each followed by one space: pending `[ ]`, in progress `[•]`, done `[✓]`, dropped `[×]`. OMO: `packages/todo/src/render.mjs:27` (`marks`, also `[×]` for cancelled). GJC: the same four marks (`src/viewers/todo/render.mjs:38`); a status outside the four draws ` ? `. The row prefix is the selection column (G12), the mark and a space.
+- Task marks, each followed by one space: pending `[ ]`, in progress `[•]`, done `[✓]`, dropped `[×]`. OMO: `packages/todo/src/render.mjs:27` (`marks`, also `[×]` for cancelled). GJC: the same four marks (`src/viewers/todo/render.mjs:38`); a status outside the four draws ` ? `. The mark starts the task row at column 0, followed by one space; a continuation row repeats that four-cell indent.
 - Task row colours. OMO: in progress `36`; done `2;32` struck through (`9;2;32`, with a strike reveal through `9m`/`29m` while the completion animates); dropped `2;31`; pending uncoloured; the target bold (`:24-25`, `:31`, `:36-40`, `:177-180`). GJC: in progress bold `1;36`; done and dropped both plain `90`, with no strike and no animation; pending uncoloured (`src/viewers/todo/render.mjs:35-36,40-41,117`).
 - Phase rows are divider rows `─ <name> <closed>/<total>[ drop:n] ───`. A phase holding in-progress work paints `─ ` and the tail `90` and the label bold `1;33`; every other phase row is `90` whole. OMO: `:153-160`. GJC: the same colours, without the ` ▸` fold suffix (`src/viewers/todo/render.mjs:97-105`).
 - Folding. OMO picks the phases that hold in-progress work; when no task is in progress it picks the first open phase instead (`:141-143`). Every open phase outside that set folds to its phase row and ends its summary with ` ▸` (`:150,153`). So with two pending-only phases the first stays listed and highlighted while the second folds, and once a third phase holds in-progress work both pending phases fold. OMO also hides closed phases unless `c` expands them (`:149`). GJC never folds an open phase: every phase that still holds pending or in-progress work lists all its tasks. Only fully closed phases are hidden until `c` (`src/viewers/todo/render.mjs:78-81,93-94`). A phase with no tasks shows the empty-phase line in both (OMO `:185`, GJC `:122`).
@@ -48,7 +48,7 @@ When a goal exists, row 2 of the Todo pane (directly under the header divider) r
 
 ## G7. Worker card rows
 
-A card has up to three base rows plus one alert row; a long agent identity adds continuation rows (row 2). Column 0 is the selection column (G12).
+A card has up to three base rows plus one alert row; a long agent identity adds continuation rows (row 2). Column 0 is the card bar `▌` on a multi-row card and a space on a folded one-row card; every row of a card keeps that column, so the card edge stays straight.
 
 1. Row 1: bar, glyph, space, title, then ` · <word>` for failed, aborted, paused, pending and unknown, then ` · ⧖ <compact time>`. Example: `▌⠋ build docs · ⧖ 5m 0s`. A folded completed card inserts `▸ ` between the glyph and the title (`✓ ▸ done one`), mirroring OMO `:402`. The word and the time are reserved before the title is sized. If the title would keep fewer than 10 cells, the time moves to the front of row 3.
 2. Row 2: `[agent]` in `35`, plus ` background` dim when the worker runs in the background. Left out when there is neither. When the whole `[agent]` badge fits on one row it is drawn whole there, even when ` background` does not also fit. A long agent identity continues on following rows instead of being ellipsis-cut: the first row starts `[`, continuation rows are indented under the badge (two cells) and keep the same bar column, and the badge closes with exactly one `]` on the last identity row, sharing the last row that carries agent text whenever a trailing grapheme fits there. A row holding only `]` is drawn only where no agent text fits with it under columns-1. At most six continuation rows are drawn; beyond that the last one ends `…]` so the title and metrics stay reachable. The ` background` mark stays visible: it shares the last identity row when it fits and otherwise takes one dim indented row. Mirrors OMO `packages/dag/src/render.mjs:395,399,445-447` (the role keeps its own row instead of being cut short to share one).
@@ -89,9 +89,9 @@ These follow the OMO generation-32 empty panes at `3242ad4`. The Workers shape m
 
 The Todo pane cuts with `~`, as OMO `packages/todo/src/render.mjs:70` does. The Workers pane cuts with `…`, as OMO `packages/dag/src/render.mjs:552` fits the DAG pane. The shared `fit` takes the mark as a parameter. A Workers agent identity is wrapped on continuation rows first (G7) and only ellipsized after the six-row cap or at a degenerate pane width.
 
-## G12. Selection column
+## G12. Selection
 
-Column 0 of every selectable row holds `>` on the selected row and a space elsewhere, in both panes. Workers paints the marker bold `1;36` (`src/viewers/workers/render.mjs:230`). Todo puts the literal `>` inside the task row and paints the whole row by the task status, with no separate marker colour, so a selected pending task reads plain `>[ ] task` (`src/viewers/todo/render.mjs:113,117`). OMO marks selection by bold title only (`packages/dag/src/render.mjs:442` at `3242ad4`); GJC keeps the column for j/k/Tab (see Deviations).
+Selection is state, not a column: neither pane draws a marker, and no row reserves a leading cell for one. Workers keeps its selected card's title bold (`1;36`, `src/viewers/workers/render.mjs:246`); Todo changes no ink when the selection moves, so a selected row looks exactly like an unselected row of the same status (`src/viewers/todo/render.mjs:113-119`). The selection still drives j/k/Tab, Space, `c` and pointer clicks, and the task or card key is carried in the frame (`selection`, `selectionIndex`/`selectable`). OMO marks Workers selection by bold title only (`packages/dag/src/render.mjs:442` at `3242ad4`) and Todo by a bold selected row when its status is coloured (`packages/todo/src/render.mjs:177-180`); removing the GJC column matches OMO's no-marker layout.
 
 ## G13. Spinner
 
@@ -108,7 +108,6 @@ Every place where GJC differs from OMO `3242ad4` on purpose, with the contract b
 | AC1.9 | Five pairwise distinct connection labels (G4). | Source-state labels from its own catalogue. | GJC contract AC1.9. |
 | AC2.2 | Failed `×` + `failed`; aborted `⊘` + `aborted`. | No aborted state (`packages/dag/src/render.mjs:76`). | GJC contract AC2.2. |
 | AC-F4 | Amended: at 24 columns the title keeps at least one cell and the status indicator survives: the glyph for running and done, glyph plus word for the other states. | Running and done show the glyph only. | Owner decision Q3=A (2026-10-20) amends AC-F4. |
-| selection | Column-0 `>` marker (G12): bold `36` in Workers, styled with the task row in Todo. | Bold title only (`packages/dag/src/render.mjs:442`). | GJC j/k/Tab selection. |
 | data-absent | No model, turns or tok/s on cards. | Shows them (`packages/dag/src/render.mjs:387-411`). | The data isn't in the GJC workers projection. |
 | truncation | Todo `~`, Workers `…` (G11). A Workers agent identity continues on up to six following rows before it is fitted with `…` (G7). | Same split per pane; OMO keeps the role on its own row (`packages/dag/src/render.mjs:395,399,445-447`). | Mirrors OMO per pane; owner #259 keeps existing identity text instead of cutting it. |
 | zh-cn | zh-cn keeps its translated pane strings and only gains the new keys. | ko block is English. | Existing zh-cn values stay byte-identical. |
@@ -123,4 +122,4 @@ Every place where GJC differs from OMO `3242ad4` on purpose, with the contract b
 
 ## 요약 (Korean summary)
 
-이 문서는 GJC 대시보드의 Todo, Workers 패널이 OMO `3242ad4`와 같은 모양으로 읽히도록 정한 규칙입니다. G1부터 G13까지 머리줄, 구분선, 바닥줄, 연결 상태, 본문, 목표 줄, 작업자 카드, 기호와 색, 완료 접기, 빈 화면, 잘림 표시, 선택 열, 스피너를 다루고, 규칙마다 따라 한 OMO 소스 줄을 적었습니다. OMO와 다르게 남긴 부분은 Deviations 표에 GJC 계약(AC-F1, AC-F3, AC1.9, AC2.2, AC2.6, 수정된 AC-F4와 L5b)이나 IS-7과 함께 정리했습니다. 표에는 모두 17개 항목이 있습니다.
+이 문서는 GJC 대시보드의 Todo, Workers 패널이 OMO `3242ad4`와 같은 모양으로 읽히도록 정한 규칙입니다. G1부터 G13까지 머리줄, 구분선, 바닥줄, 연결 상태, 본문, 목표 줄, 작업자 카드, 기호와 색, 완료 접기, 빈 화면, 잘림 표시, 선택 상태, 스피너를 다루고, 규칙마다 따라 한 OMO 소스 줄을 적었습니다. OMO와 다르게 남긴 부분은 Deviations 표에 GJC 계약(AC-F1, AC-F3, AC1.9, AC2.2, AC2.6, 수정된 AC-F4와 L5b)이나 IS-7과 함께 정리했습니다. 표에는 모두 16개 항목이 있습니다.
