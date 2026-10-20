@@ -19,8 +19,10 @@
 //   layoutKeyOf({socket, parentPaneId})          -> 24 hex chars of sha256(JSON([socket, parent]))
 //   scopeKeyOf({socket, parentPaneId, sessionId})-> 24 hex chars of sha256(JSON([socket, parent,
 //                                                 session]))
-//   key8Of(layoutKey)                            -> first 8 chars, the label token
-//   labelOf(role, key8)                          -> `GJC Todo · <key8>` / Workers / Progress
+//   key8Of(layoutKey)                            -> first 8 chars; diagnostic token (the pane
+//                                                   label below no longer embeds it)
+//   labelOf(role, key8)                          -> role-specific invisible pane label (see below)
+//   PANE_LABELS                                  -> {todo, workers, progress} invisible labels
 //   slotPaths(stateDir, layoutKey)               -> {dir, slot, owner, intent, lockDir, rolesDir,
 //                                                   ready(role)}
 //   dataPaths(stateDir, scopeKey)                -> {dir, todo, workers, goal, progress}
@@ -49,6 +51,19 @@ export const HEARTBEAT_MS = 5000;
 export const LOCK_DIR_NAME = 'lock';
 export const ROLES = ['todo', 'workers', 'progress'];
 export const ROLE_LABELS = { todo: 'Todo', workers: 'Workers', progress: 'Progress' };
+// The pane label is LOAD-BEARING identity: `isO` requires the pane's label to equal record.label
+// exactly. Herdr also draws that label as a title on the pane border, and the owner does not want a
+// second title above the viewer's own header. A zero-width role marker is a real, exact string (so
+// the identity fence is unchanged) that Herdr's border renderer shows as no text: `border_label`
+// returns the manual label, `pane_border_title` trims only Unicode whitespace
+// (herdr src/ui/panes.rs), and U+200B/U+200C/U+200D are not whitespace. The three roles keep
+// distinct labels so `pane list` and the live helpers can still tell them apart programmatically;
+// uniqueness across dashboards is carried by the record's paneId + tabId, not by key8.
+export const PANE_LABELS = Object.freeze({
+  todo: '\u200b',       // ZERO WIDTH SPACE
+  workers: '\u200c',    // ZERO WIDTH NON-JOINER
+  progress: '\u200d',   // ZERO WIDTH JOINER
+});
 export const LOCK_FILE_PATTERN = /^g(\d{12})\.(lock|released)$/;
 
 const hash = parts => createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);
@@ -66,9 +81,13 @@ export function key8Of(layoutKey) {
 }
 
 export function labelOf(role, key8) {
-  const name = ROLE_LABELS[role];
-  if (!name) throw Object.assign(new Error(`Unknown dashboard role: ${role}`), { code: 'role' });
-  return `GJC ${name} · ${key8}`;
+  if (!Object.hasOwn(PANE_LABELS, role)) {
+    throw Object.assign(new Error(`Unknown dashboard role: ${role}`), { code: 'role' });
+  }
+  // key8 is accepted for call-site and persisted-record compatibility; the label is deliberately
+  // invisible now, so it is not rendered into the string.
+  void key8;
+  return PANE_LABELS[role];
 }
 
 export function slotPaths(stateDir, layoutKey) {

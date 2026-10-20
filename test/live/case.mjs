@@ -17,13 +17,16 @@
 //   launchGjc(fixture, paneId, options)        -> the typed command string
 //   notifyLines(frame)                         -> ['ext dev · …', …]
 //   waitForNotify(fixture, paneId, pattern, options) -> {frame, line, all}
-//   viewerPanes(fixture, role = 'todo')       -> panes labelled `GJC <Role> ·` (role null = every GJC pane)
+//   viewerPanes(fixture, role = 'todo')       -> panes carrying the role's invisible identity label
+//                                                (role null = every dashboard pane)
+//   isDashboardPaneLabel(label)               -> true for one of the three invisible role labels
 //   assert(condition, message, details?)
 //   evidenceDirFor(level, lv)
 //   runScript(name, fn)                        -> never returns; exits 0 or 1
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { PANE_LABELS } from '../../src/core/slot.mjs';
 import { EVIDENCE, REPO, SANDBOX } from './fixture.mjs';
 
 export const LAUNCH_CLEAR_ENV = ['GJC_HERDR_PANE_OWNER', 'GJC_SESSION_CWD', 'HERDR_CONFIG_PATH'];
@@ -159,12 +162,13 @@ export async function expectNoNotify(fixture, paneId, pattern, {
   return true;
 }
 
-// `role` filters by label (`GJC Todo ·`, `GJC Workers ·`); the default is the Todo pane, which is the
-// L1 single-viewer view. Pass `null` for every dashboard pane.
+// The pane labels are load-bearing identity but deliberately invisible (zero-width role markers), so
+// the live scripts discover our panes by the exact label rather than by a rendered `GJC …` prefix.
+// `role === null` means every dashboard role. `role` filters by role; the default is the Todo pane.
+export const isDashboardPaneLabel = label => Object.values(PANE_LABELS).includes(label);
 export const viewerPanes = (fixture, role = 'todo') => fixture.listPanes().filter((pane) => {
-  const label = String(pane.label ?? '');
-  if (role === null) return /^GJC /.test(label);
-  return label.startsWith(`GJC ${role[0].toUpperCase()}${role.slice(1)} `);
+  if (role === null) return isDashboardPaneLabel(pane.label);
+  return pane.label === PANE_LABELS[role];
 });
 
 export function assert(condition, message, details = null) {

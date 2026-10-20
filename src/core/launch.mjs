@@ -323,7 +323,9 @@ export async function launchRole(options = {}) {
   if (crash === 'fp2') return abort('failed:failpoint', 'fp2:after-record',
     { paneId, tabId, shellPid, record, slot: nextSlot });
 
-  // 8. rename to the role label.
+  // 8. rename to the role label. The label is a real, exact string because isO/O+ compare it with
+  // the record on every later pass (slot.mjs uses an invisible role marker: Herdr renders no title
+  // for it, but the equality fence is unchanged).
   try { await herdr('pane', 'rename', paneId, label); }
   catch (error) {
     if (isControlFailure(error)) throw error;

@@ -946,7 +946,7 @@ test('T19: a leftover intent is an interrupted launch - explicit clears it and o
   const world = await createWorld(t);
   // An FP1 crash left intent.json behind and no record at all.
   await writeJson(world.paths.intent, { schema: 'gjc-herdr-dashboard/intent/1', role: 'todo',
-    token: 'tok-x', label: `GJC Todo · ${world.key8}`, tabId: world.binding.tabId, at: START });
+    token: 'tok-x', label: labelOf('todo', world.key8), tabId: world.binding.tabId, at: START });
   const auto = await world.auto('turn_end');
   assert.equal(auto.roles.todo.id, 'T19');
   assert.equal(auto.roles.todo.code, 'none');

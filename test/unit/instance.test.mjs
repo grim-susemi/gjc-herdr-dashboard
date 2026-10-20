@@ -14,7 +14,7 @@ import { join, relative, sep } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { createDataWriter } from '../../src/core/data.mjs';
-import { dataPaths, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
+import { PANE_LABELS, dataPaths, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
 import { createInstance as createInstanceRaw, REGISTRY_KEY } from '../../src/host/instance.mjs';
 import { writeJson } from '../../src/storage.mjs';
 import { createFakeClock, createFakeHerdr, createFakeProcesses, createPassTracer } from './fake-herdr.mjs';
@@ -177,7 +177,7 @@ async function makeWorld(t, options = {}) {
         herdr: ['herdr.exe'],
         scope: { sessionId, scopeKey, scopeEpoch: 1, language: 'en' },
         roles: { [role]: { state, token, paneId, tabId: 'w1:t1', shellPid,
-          label: label ?? `GJC Todo · ${world.layoutKey.slice(0, 8)}`, pendingSince, closedBy: null } },
+          label: label ?? PANE_LABELS[role] ?? PANE_LABELS.todo, pendingSince, closedBy: null } },
       }),
   };
   t.after(async () => {
@@ -411,7 +411,7 @@ test('LT-4 list failure: a failing pane list is reported once as a coded failure
   const world = await makeWorld(t);
   await mkdir(slotPaths(world.stateDir, world.layoutKey).dir, { recursive: true });
   await world.writeSlot({ state: 'ready' });
-  world.fake.addPane('w1:p2', { label: `GJC Todo · ${world.layoutKey.slice(0, 8)}`, shell: 500 });
+  world.fake.addPane('w1:p2', { label: PANE_LABELS.todo, shell: 500 });
   const pi = piOf();
   const handle = createInstance(pi, world.deps());
   const { ctx } = world.ctx();
@@ -465,7 +465,7 @@ test('LT-4 normal: one opened notify, one pane, and the single notify carries th
   assert.equal(handle.state().owner, true);
   assert.equal(handle.state().gen, 'dev');
   assert.equal(world.notifications[0].level, 'info');
-  assert.equal(world.fake.paneIds().filter(id => world.fake.labelOf(id) === `GJC Todo · ${world.layoutKey.slice(0, 8)}`).length, 1);
+  assert.equal(world.fake.paneIds().filter(id => world.fake.labelOf(id) === PANE_LABELS.todo).length, 1);
 });
 
 test('LT-4 duplicate: a second install delegates and appends its warning to the single result line', async t => {
@@ -728,7 +728,7 @@ test('LT-6: a different module URL in the same pane delegates and warns once, si
 });
 
 // ------------------------------------------------- AC1.4 / AC1.5 / AC1.10 / AC1.11 / AC1.2 ----
-test('AC1.4: three /dashboard calls leave exactly one GJC Todo pane', async t => {
+test('AC1.4: three /dashboard calls leave exactly one Todo pane', async t => {
   const world = await makeWorld(t);
   const pi = piOf();
   const handle = createInstance(pi, world.deps());
@@ -740,7 +740,7 @@ test('AC1.4: three /dashboard calls leave exactly one GJC Todo pane', async t =>
   assert.equal(splitsAfterFirst, 2, `L2 opens the band: ${JSON.stringify(world.fake.paneIds())}`);
   await pi.commands.get('dashboard').handler({}, ctx);
   await pi.commands.get('dashboard').handler({}, ctx);
-  const label = `GJC Todo · ${world.layoutKey.slice(0, 8)}`;
+  const label = PANE_LABELS.todo;
   const ours = world.fake.paneIds().filter(id => world.fake.labelOf(id) === label);
   assert.equal(ours.length, 1, `panes: ${JSON.stringify(world.fake.paneIds())}`);
   assert.equal(world.fake.calls.filter(call => call.argv[1] === 'split').length, splitsAfterFirst,

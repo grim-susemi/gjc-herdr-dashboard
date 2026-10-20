@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { createDataWriter } from '../../src/core/data.mjs';
 import { BAND_LAYOUT } from '../../src/core/layout.mjs';
 import { createReconciler } from '../../src/core/reconciler.mjs';
-import { dataPaths, key8Of, labelOf, layoutKeyOf, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
+import { dataPaths, key8Of, labelOf, layoutKeyOf, PANE_LABELS, scopeKeyOf, slotPaths } from '../../src/core/slot.mjs';
 import { createInstance, REGISTRY_KEY } from '../../src/host/instance.mjs';
 import { createWorkersTracker, WORKERS_SCHEMA } from '../../src/host/sources/workers.mjs';
 import { writeJson } from '../../src/storage.mjs';
@@ -122,7 +122,7 @@ test('AC2.1: an explicit pass opens Todo then Workers, anchored on the Todo pane
   assert.equal(slot.roles.workers.state, 'pending');
   assert.equal(slot.roles.todo.label, labelOf('todo', key8Of(world.layoutKey)));
   assert.equal(slot.roles.workers.label, labelOf('workers', key8Of(world.layoutKey)));
-  assert.equal(slot.roles.workers.label, `GJC Workers · ${world.layoutKey.slice(0, 8)}`);
+  assert.equal(slot.roles.workers.label, PANE_LABELS.workers);
   // The run target of each split is that split's own pane (LT-8), and nothing foreign was touched.
   assert.deepEqual(world.tracer.record.runTargets, world.tracer.record.splitPaneIds);
   assert.deepEqual(world.fake.paneIds().sort(), [PARENT, todoPaneId, pass.roles.workers.paneId].sort());

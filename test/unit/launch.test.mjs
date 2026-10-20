@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { readSlot, slotPaths } from '../../src/core/slot.mjs';
+import { labelOf, readSlot, slotPaths } from '../../src/core/slot.mjs';
 import { CRASH_FAIL_POINTS, directionBetween, launchRole, preflight, readFailpoints,
   resolveRoleViewerPath, shellTrailer, viewerArgs, viewerCommand } from '../../src/core/launch.mjs';
 import { createFakeClock, createFakeHerdr, createPassTracer } from './fake-herdr.mjs';
@@ -35,7 +35,7 @@ function fixture({ stateDir, clock = createFakeClock(), fake = null, failpoint =
     layoutKey: KEY,
     stateDir,
     role: 'todo',
-    label: `GJC Todo · ${KEY.slice(0, 8)}`,
+    label: labelOf('todo', KEY.slice(0, 8)),
     token: 'tok-1',
     parent: { socket: binding.socket, paneId: binding.parentPaneId, tabId: binding.tabId },
     scope: { sessionId: 's-1', scopeKey: 'k'.repeat(24), scopeEpoch: 1, language: 'ko' },
@@ -196,6 +196,13 @@ test('the launch sequence issues split, process-info, rename and run in plan 7.3
   // The parent pane was never renamed, never closed and never had a command run in it.
   assert.equal(fx.fake.labelOf('w1:p1'), 'shell');
   assert.equal(fx.fake.commandOf('w1:p1'), null);
+  // The pane name is still the recorded identity label, but it is a zero-width marker: Herdr's
+  // border renderer trims Unicode whitespace (U+200B is not whitespace) and draws no visible text,
+  // so the viewer's own header is the only visible title. The exact string is what isO compares.
+  const paneLabel = fx.fake.labelOf(result.paneId);
+  assert.equal(paneLabel, labelOf('todo', KEY.slice(0, 8)));
+  assert.equal(paneLabel, '\u200b');
+  assert.equal(paneLabel.trim(), paneLabel);
 });
 
 test('a split failure is one failed:herdr-split with no pane and no leftover intent (LT-1)', async t => {
@@ -274,7 +281,7 @@ test('a failure after the split keeps the evidence the FP table names and never 
   const fp3 = fixture({ stateDir: await scratch(t), clock, failpoint: 'fp3' });
   const three = await fp3.launch();
   assert.equal(three.detail, 'fp3:after-rename');
-  assert.equal(fp3.fake.labelOf(three.paneId), 'GJC Todo · ' + KEY.slice(0, 8));
+  assert.equal(fp3.fake.labelOf(three.paneId), labelOf('todo', KEY.slice(0, 8)));
   assert.equal(fp3.fake.commandOf(three.paneId), null);
   const fp4 = fixture({ stateDir: await scratch(t), clock, failpoint: 'fp4' });
   const four = await fp4.launch();
@@ -382,6 +389,6 @@ test('a process-info or rename failure leaves the record (or the intent) for the
   const third = await run.launch();
   assert.equal(third.code, 'failed:herdr-run');
   assert.equal((await readSlot(run.paths.slot)).slot.roles.todo.state, 'pending');
-  assert.equal(run.fake.labelOf(third.paneId), 'GJC Todo · ' + KEY.slice(0, 8));
+  assert.equal(run.fake.labelOf(third.paneId), labelOf('todo', KEY.slice(0, 8)));
 });
 

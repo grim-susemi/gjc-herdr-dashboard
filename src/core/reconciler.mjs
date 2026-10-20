@@ -59,7 +59,7 @@ import { readJson } from '../storage.mjs';
 import { BAND_LAYOUT, foreignPanes, isBandShape, planBand } from './layout.mjs';
 import { launchRole } from './launch.mjs';
 import { ageMs, isO, isOPlus, pidAlive as probePid, viewerState } from './liveness.mjs';
-import { OWNER_SCHEMA, acquireLock, clearIntent, generationIsCurrent, key8Of, labelOf, layoutKeyOf,
+import { OWNER_SCHEMA, acquireLock, clearIntent, generationIsCurrent, labelOf, layoutKeyOf,
   lockPaths, ownerRecord, quarantineSlot, readIntent, readOwner, readSlot, releaseLock, scopeKeyOf,
   slotPaths, writeIntent, writeOwner as writeOwnerFile, writeSlot } from './slot.mjs';
 import { decideOwnerPhase, decideRole } from './transitions.mjs';
@@ -194,7 +194,6 @@ export function createReconciler(deps = {}) {
     });
     const paths = pathsFor(binding);
     const layoutKey = layoutKeyFor(binding);
-    const key8 = key8Of(layoutKey);
     const rolesResult = emptyRoles(roles);
     const focus = { before: null, after: null, restored: true };
     const result = { ok: false, mode, code: 'pending', roles: rolesResult, focus, gen, budgetMs,
@@ -629,7 +628,7 @@ export function createReconciler(deps = {}) {
               continue;
             }
             const token = newToken();
-            const label = labelOf(role, key8);
+            const label = labelOf(role);
             const scope = applyScope(slot ?? { scope: {} }, binding);
             const launch = await launchRole({
               herdr: call, paths, layoutKey, stateDir, role, token, label, language,

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AGE_SLOW_MS, AGE_STALLED_MS, HEARTBEAT_READY_MS, ageMs, heartbeatAgeMs, isO, isOPlus,
   pidAlive, viewerState } from '../../src/core/liveness.mjs';
+import { PANE_LABELS } from '../../src/core/slot.mjs';
 
 const killOf = table => (pid, signal) => {
   if (signal !== 0) throw Object.assign(new Error(`unexpected signal ${signal}`), { code: 'EINVAL' });
@@ -50,7 +51,7 @@ test('heartbeat and age are clamped so a future timestamp never yields a negativ
 });
 
 test('viewerState follows the R2 first-match order, including the exact 15.000 s boundary', () => {
-  const record = { token: 'tok', paneId: 'w1:p5', tabId: 'w1:t1', label: 'GJC Todo · aaaaaaaa' };
+  const record = { token: 'tok', paneId: 'w1:p5', tabId: 'w1:t1', label: PANE_LABELS.todo };
   const probe = pidAlive;
   const ready = (overrides = {}) => ({ pid: process.pid, token: 'tok', paneId: 'w1:p5',
     startedAt: 0, heartbeatAt: 1000, ...overrides });
@@ -78,13 +79,13 @@ test('viewerState follows the R2 first-match order, including the exact 15.000 s
 });
 
 test('isO requires the exact label plus matching pane and tab in the same pane list', () => {
-  const record = { paneId: 'w1:p5', tabId: 'w1:t1', label: 'GJC Todo · aaaaaaaa' };
-  const pane = { pane_id: 'w1:p5', tab_id: 'w1:t1', label: 'GJC Todo · aaaaaaaa' };
+  const record = { paneId: 'w1:p5', tabId: 'w1:t1', label: PANE_LABELS.todo };
+  const pane = { pane_id: 'w1:p5', tab_id: 'w1:t1', label: PANE_LABELS.todo };
   assert.equal(isO(record, [pane]), true);
   // Any of the three identifiers disagreeing is not ownership.
-  assert.equal(isO(record, [{ ...pane, label: 'GJC Todo · bbbbbbbb' }]), false);
+  assert.equal(isO(record, [{ ...pane, label: PANE_LABELS.workers }]), false);
   assert.equal(isO(record, [{ ...pane, label: 'DAG · aaaaaaaa' }]), false);
-  assert.equal(isO(record, [{ ...pane, label: 'GJC Todo · aaaaaaaa ' }]), false);
+  assert.equal(isO(record, [{ ...pane, label: `${PANE_LABELS.todo} ` }]), false);
   assert.equal(isO(record, [{ ...pane, pane_id: 'w1:p6' }]), false);
   assert.equal(isO(record, [{ ...pane, tab_id: 'w2:t1' }]), false);
   // Another tab's identically labelled pane does not count either.
@@ -94,12 +95,12 @@ test('isO requires the exact label plus matching pane and tab in the same pane l
   assert.equal(isO(null, [pane]), false);
   assert.equal(isO({ ...record, label: null }, [pane]), false);
   // camelCase field spellings are accepted for fakes that use them.
-  assert.equal(isO(record, [{ paneId: 'w1:p5', tabId: 'w1:t1', label: 'GJC Todo · aaaaaaaa' }]), true);
+  assert.equal(isO(record, [{ paneId: 'w1:p5', tabId: 'w1:t1', label: PANE_LABELS.todo }]), true);
 });
 
 test('isOPlus adds the shell identity check and treats a shell-less pane as ours', () => {
-  const record = { paneId: 'w1:p5', tabId: 'w1:t1', label: 'GJC Todo · aaaaaaaa', shellPid: 4242 };
-  const pane = { pane_id: 'w1:p5', tab_id: 'w1:t1', label: 'GJC Todo · aaaaaaaa' };
+  const record = { paneId: 'w1:p5', tabId: 'w1:t1', label: PANE_LABELS.todo, shellPid: 4242 };
+  const pane = { pane_id: 'w1:p5', tab_id: 'w1:t1', label: PANE_LABELS.todo };
   const info = shellPid => ({ process_info: { pane_id: 'w1:p5', shell_pid: shellPid } });
   assert.equal(isOPlus(record, [pane], info(4242)), true);
   // A different shell is the T12/T17/T22 branch: ownership cannot be proven.
@@ -115,7 +116,7 @@ test('isOPlus adds the shell identity check and treats a shell-less pane as ours
   assert.equal(isOPlus(record, [pane], { process_info: { pane_id: 'w1:p6', shell_pid: 4242 } }), false);
   // O is a precondition: no list match means no O+.
   assert.equal(isOPlus(record, [], info(4242)), false);
-  assert.equal(isOPlus(record, [{ ...pane, label: 'GJC Todo · 00000000' }], info(4242)), false);
+  assert.equal(isOPlus(record, [{ ...pane, label: PANE_LABELS.workers }], info(4242)), false);
   // Missing process-info entirely is not ownership evidence.
   assert.equal(isOPlus(record, [pane], null), false);
   assert.equal(isOPlus(record, [pane], {}), true);

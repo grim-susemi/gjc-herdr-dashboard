@@ -7,11 +7,11 @@ import * as fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { HEARTBEAT_MS, LOCK_FILE_PATTERN, OWNER_SCHEMA, SLOT_SCHEMA, acquireLock, classifyGeneration,
-  clearIntent, dataPaths, generationIsCurrent, intentRecord, key8Of, labelOf, layoutKeyOf,
-  lockFileName, maxGeneration, ownerRecord, prefsPaths, quarantineSlot, readIntent, readOwner,
-  readSlot, releasedFileName, releaseLock, scopeKeyOf, slotPaths, validateSlot, writeIntent,
-  writeOwner, writeSlot } from '../../src/core/slot.mjs';
+import { HEARTBEAT_MS, LOCK_FILE_PATTERN, OWNER_SCHEMA, PANE_LABELS, SLOT_SCHEMA, acquireLock,
+  classifyGeneration, clearIntent, dataPaths, generationIsCurrent, intentRecord, key8Of, labelOf,
+  layoutKeyOf, lockFileName, maxGeneration, ownerRecord, prefsPaths, quarantineSlot, readIntent,
+  readOwner, readSlot, releasedFileName, releaseLock, scopeKeyOf, slotPaths, validateSlot,
+  writeIntent, writeOwner, writeSlot } from '../../src/core/slot.mjs';
 
 const KEY = 'a'.repeat(24);
 const OTHER_KEY = 'b'.repeat(24);
@@ -46,7 +46,7 @@ async function scratch(t) {
 
 const alive = alivePids => pid => (alivePids.has(pid) ? true : false);
 
-test('keys are the first 24 hex chars of sha256 over the JSON tuple, and labels use key8', () => {
+test('keys are the first 24 hex chars of sha256 over the JSON tuple, and labels are invisible role markers', () => {
   const layout = layoutKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1' });
   const scope = scopeKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1', sessionId: 's-1' });
   const same = layoutKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1' });
@@ -58,9 +58,20 @@ test('keys are the first 24 hex chars of sha256 over the JSON tuple, and labels 
   assert.notEqual(layout, layoutKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p2' }));
   assert.notEqual(scope, scopeKeyOf({ socket: '/tmp/h.sock', parentPaneId: 'w1:p1', sessionId: 's-2' }));
   assert.equal(key8Of(layout), layout.slice(0, 8));
-  assert.equal(labelOf('todo', key8Of(layout)), `GJC Todo · ${layout.slice(0, 8)}`);
-  assert.equal(labelOf('workers', 'deadbeef'), 'GJC Workers · deadbeef');
-  assert.equal(labelOf('progress', 'deadbeef'), 'GJC Progress · deadbeef');
+  // The pane label is a real, exact string (identity), but no longer embeds key8: it is a
+  // zero-width character that Herdr's border renderer draws as nothing.
+  assert.equal(labelOf('todo', key8Of(layout)), PANE_LABELS.todo);
+  assert.equal(labelOf('workers', 'deadbeef'), PANE_LABELS.workers);
+  assert.equal(labelOf('progress', 'deadbeef'), PANE_LABELS.progress);
+  assert.equal(PANE_LABELS.todo, '\u200b');
+  assert.equal(PANE_LABELS.workers, '\u200c');
+  assert.equal(PANE_LABELS.progress, '\u200d');
+  for (const role of ['todo', 'workers', 'progress']) {
+    const label = labelOf(role, key8Of(layout));
+    assert.equal(label.trim(), label, "survives Herdr's whitespace trim");
+    assert.equal(label.isWellFormed(), true);
+  }
+  assert.equal(new Set(Object.values(PANE_LABELS)).size, 3, 'the three roles stay distinguishable');
   // The label never looks like an Omo dashboard pane (plan 7.10 coexistence).
   const omoPredicate = name => typeof name === 'string' &&
     (name.startsWith('DAG · ') || name === 'OmO DAG');

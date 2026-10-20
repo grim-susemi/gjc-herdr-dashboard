@@ -14,8 +14,8 @@
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { createFixture, REPO, SANDBOX } from './fixture.mjs';
-import { assert, createCase, evidenceDirFor, launchGjc, notifyLines, runScript, sendSlash,
-  viewerPanes, writeEvidence, writeEvidenceJson } from './case.mjs';
+import { assert, createCase, evidenceDirFor, isDashboardPaneLabel, launchGjc, notifyLines,
+  runScript, sendSlash, viewerPanes, writeEvidence, writeEvidenceJson } from './case.mjs';
 
 const LV = 'LV-9';
 const CASE = 'l4coexist';
@@ -80,7 +80,7 @@ async function scenario(how, evidence) {
     const created = fixture.listPanes().map((p) => p.pane_id).filter((id) => !panesBefore.includes(id));
     const ours = created.map((id) => fixture.listPanes().find((p) => p.pane_id === id)?.label ?? '');
     writeEvidenceJson(evidence, `${how}-created.json`, { created, ours, panes: fixture.listPanes() });
-    assert(ours.every((label) => /^GJC (Todo|Workers) · /.test(label)),
+    assert(ours.every(isDashboardPaneLabel),
       `AC4.5 (${how}): every pane the pass created is one of ours`, { created, ours });
     const todo = viewerPanes(fixture, 'todo').length;
     const workers = viewerPanes(fixture, 'workers').length;

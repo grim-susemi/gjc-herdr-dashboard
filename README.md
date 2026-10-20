@@ -18,8 +18,12 @@ GJC 네이티브 원천으로 다시 만들어, Herdr pane 안에서 현재 세�
 
 - `/dashboard` 슬래시 명령 하나로 이 세션의 대시보드 pane을 연다. 계획상 다시 부르면 새 pane을
   만들지 않고 기존 pane을 다시 쓴다(T2/T6/T13, `adopted`·`ready`).
-- 첫 역할은 **Todo**다. 계획상 `GJC Todo · <key8>` 제목의 pane이 부모 pane 오른쪽에 생기고,
-  부모 pane의 포커스는 그대로 남는다(`pane split --no-focus`, L0 G6에서 focused 집합 불변을 실측).
+- 첫 역할은 **Todo**다. 계획상 부모 pane 오른쪽 **1/3** 폭에 Todo pane이 생기고, 그 안에서
+  Todo 위·Workers 아래로 밴드가 만들어진다. 부모 pane의 포커스는 그대로 남는다(`pane split
+  --no-focus`, L0 G6에서 focused 집합 불변을 실측). pane 이름은 식별용 zero-width role
+  표식(`src/core/slot.mjs`의 `PANE_LABELS`)이라 Herdr 테두리에는 제목이 그려지지 않고, 화면에는
+  뷰어 자신의 머리줄만 보인다. 이름 문자열은 `isO`/`O+`가 record와 exact match하므로 그대로
+  유지된다.
 - 데이터는 `<state>/data/<scopeKey>/todo.json`에 있고 viewer가 그 파일을 읽어 그린다. 상태 파일과
   데이터 파일의 위치·스키마는 `src/core/slot.mjs`가 정한다.
 - Todo 투영(`gjc-herdr-dashboard/todo/1`)은 `ctx.getTodoState()`를 먼저 쓰고, 그 호스트 표면이
