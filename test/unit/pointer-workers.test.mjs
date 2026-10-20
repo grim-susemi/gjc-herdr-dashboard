@@ -149,7 +149,7 @@ async function open(t, { fake = fakeFocus(), options = {}, deps = {} } = {}) {
 test("the body really scrolls, so the wheel clamps are observable", async (t) => {
   const { viewer } = await open(t);
   const frame = viewer.frame;
-  assert.equal(frame.bodyLines.length - frame.bodyRows, 16, "12 cards x 3 rows over 20 body rows");
+  assert.equal(frame.bodyLines.length - frame.bodyRows, 27, "12 cards x 3 rows + 11 dividers over 20 body rows");
   assert.equal(frame.bodyStart, 2, "the header and its divider are above the body");
   assert.deepEqual(frame.ranges.c0, { start: 0, end: 3, status: "running" });
 });
@@ -165,7 +165,7 @@ test("wheel down scrolls +3 and wheel up -3, clamped to [0, maxScroll]", async (
   assert.equal(viewer.frame.scroll, 6);
   f.input.emit("data", wheelUp());
   assert.equal(viewer.frame.scroll, 3);
-  for (let step = 0; step < 6; step++) f.input.emit("data", wheelDown());
+  for (let step = 0; step < 10; step++) f.input.emit("data", wheelDown());
   const max = viewer.frame.bodyLines.length - viewer.frame.bodyRows;
   assert.equal(viewer.frame.scroll, max);
   f.input.emit("data", wheelDown());
@@ -192,6 +192,9 @@ test("a wheel turns follow off and persists the scroll it landed on", async (t) 
 
 test("a click on a card selects it and a second click folds it, like Space/Enter", async (t) => {
   const { f, viewer } = await open(t);
+  // The divider rows make the lower cards taller than the initial window; scroll once
+  // so c5 is visible, then click the row the frame actually drew for it.
+  f.input.emit("data", wheelDown());
   const target = "c5";
   const y = rowOfCard(viewer, target);
   f.input.emit("data", click(y));
@@ -275,14 +278,14 @@ test("blur returns follow ON, closes the detail view and re-arms the reveal; foc
   // Drag the selected card out of the window, then leave the pane: follow ON pulls it back.
   f.input.emit("data", motion(2));
   f.input.emit("data", motion(1));
-  assert.equal(viewer.frame.scroll, 14, "the drag panned past the selected card");
-  assert.equal(viewer.frame.scroll > viewer.frame.ranges.c4.start, true);
+  const panned = viewer.frame.scroll;
+  assert.ok(panned > viewer.frame.ranges.c4.start, "the drag panned past the selected card");
   const writes = f.writes.length;
 
   f.input.emit("data", focusIn);
   assert.equal(viewer.state.prefs.follow, false, "gaining focus changes nothing");
   assert.equal(viewer.state.detail, true);
-  assert.equal(viewer.frame.scroll, 14);
+  assert.equal(viewer.frame.scroll, panned);
   assert.equal(f.writes.length, writes, "and writes nothing");
 
   f.input.emit("data", blur);

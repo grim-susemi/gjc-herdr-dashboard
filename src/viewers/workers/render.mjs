@@ -281,9 +281,14 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
 // rules; hidden completed cards have no range and are not selectable.
 function body(cards, { columns, color, language, now, spin, view, selection }) {
   const bodyLines = [], ranges = Object.create(null);
+  let drawnCards = 0;
   for (const card of cards) {
     const id = String(card?.id ?? "");
     const status = statusOf(card?.status);
+    // OMO packages/dag/src/render.mjs:568-579: one dim full-width divider between
+    // consecutive drawn cards, never before the first or after the last. It is not
+    // part of any card's range, so click/selection ranges still start at the title.
+    if (drawnCards++) bodyLines.push(divider(columns, color));
     const start = bodyLines.length;
     bodyLines.push(...cardLines(card, { columns, color, language, now, spin, selection,
       selected: id !== "" && id === selection,

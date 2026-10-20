@@ -256,16 +256,17 @@ test("completed cards hide behind `done N ▸`, show as one row under `▾`, and
   assert.equal(folded.bodyLines.length, 3, "the failed card keeps its title, role and metrics rows");
   assert.match(folded.bodyLines[0], /failed one/);
   assert.equal(folded.lines[0], " Workers [1/2]  run 0 · failed 1 · done 1 ▸");
-  // `c` unfolds the group to row 1 only and turns the mark.
+  // `c` unfolds the group to row 1 only and turns the mark. The separator row
+  // between the failed card and the shown completed card is part of the body budget.
   const all = frame({ showCompleted: true });
-  assert.equal(all.bodyLines.length, 4);
+  assert.equal(all.bodyLines.length, 5);
   assert.equal(all.ranges.c1.end - all.ranges.c1.start, 1);
   assert.doesNotMatch(all.bodyLines[0], /finished/, "a folded card has no detail rows");
   assert.equal(all.lines[0], " Workers [1/2]  run 0 · failed 1 · done 1 ▾");
   assert.deepEqual(all.selectable, ["c1", "c2"]);
   // An explicit expand draws the full completed card.
   const expanded = frame({ expanded: { c1: true } });
-  assert.equal(expanded.bodyLines.length, 6);
+  assert.equal(expanded.bodyLines.length, 7);
   assert.equal(expanded.ranges.c1.end - expanded.ranges.c1.start, 3);
   assert.match(expanded.bodyLines[1], /\[subagent\]/);
   assert.match(expanded.bodyLines[2], /0 tok/);
@@ -283,7 +284,7 @@ test("completed cards hide behind `done N ▸`, show as one row under `▾`, and
   // Failed and aborted never fold: both keep title, role and metrics rows.
   const problems = frameOf([card("a", { title: "alpha", status: "failed" }),
     card("b", { title: "beta", status: "aborted" })]);
-  assert.equal(problems.bodyLines.length, 6);
+  assert.equal(problems.bodyLines.length, 7);
   assert.equal(problems.ranges.a.end - problems.ranges.a.start, 3);
   assert.equal(problems.ranges.b.end - problems.ranges.b.start, 3);
 });
@@ -349,7 +350,7 @@ test("AC2.6: `background` rides on card row 2", () => {
   for (const [language, word] of [["ko", "background"], ["en", "background"], ["zh-cn", "后台"]]) {
     const frame = frameOf(cards, { language });
     assert.equal(plainLine(frame.bodyLines[1]).slice(2), "[subagent]");
-    assert.match(plainLine(frame.bodyLines[4]), new RegExp(`\\[subagent\\] ${word}`));
+    assert.match(plainLine(frame.bodyLines[5]), new RegExp(`\\[subagent\\] ${word}`));
     assert.doesNotMatch(plainLine(frame.bodyLines.slice(0, 3).join("\n")), new RegExp(word));
   }
   // A background card with no agent still names the mark.
@@ -463,9 +464,10 @@ test("a selected card is marked in column 0 and the selection resolves against d
   const cards = [card("c1", { title: "newest" }), card("c2", { title: "older" })];
   const frame = (selection, options = {}) => frameOf(cards, { view: { follow: false, selection }, ...options });
   assert.equal(frame("c2").selection, "c2");
-  // Each running card is three rows, so the second card's title is bodyLines[3].
+  // Each running card is three rows and consecutive cards are separated by one
+  // divider row, so the second card's title is bodyLines[4].
   assert.equal(frame("c2").bodyLines[0][0], " ", "an unselected card carries no marker");
-  assert.equal(frame("c2").bodyLines[3][0], ">", "the selected card carries the marker");
+  assert.equal(frame("c2").bodyLines[4][0], ">", "the selected card carries the marker");
   assert.equal(frame("c1").bodyLines[0][0], ">");
   assert.equal(frame("gone").selection, "c1");
   assert.equal(frame(null).selection, "c1");
@@ -484,7 +486,7 @@ test("a selected card is marked in column 0 and the selection resolves against d
 test("Tab/n/p step the selection and clamp at both ends", () => {
   const cards = [card("c1"), card("c2"), card("c3")];
   const frame = frameOf(cards, { view: { follow: false, selection: "c1" } });
-  assert.deepEqual(stepSelection(frame, 1), { selection: "c2", scroll: frame.scroll });
+  assert.deepEqual(stepSelection(frame, 1), { selection: "c2", scroll: 4 });
   assert.deepEqual(stepSelection({ ...frame, selection: "c2" }, -1),
     { selection: "c1", scroll: frame.scroll });
   assert.equal(stepSelection(frame, -1).selection, "c1", "the first card cannot step back");
@@ -504,7 +506,8 @@ test("Tab/n/p step the selection and clamp at both ends", () => {
 });
 
 test("scrolling is clamped to the body and follow ON pulls the selection back", () => {
-  // One-row running cards make the body math exact: ten cards, ten body rows.
+  // One-row running cards plus the divider between every pair: ten cards make
+  // nineteen body rows, so the scroll math stays observable.
   const cards = Array.from({ length: 10 }, (_, index) =>
     card(`c${index + 1}`, { title: `card ${index + 1}`, status: "running", agent: "",
       tokens: null, toolCount: null, contextPercent: null }));
@@ -512,15 +515,15 @@ test("scrolling is clamped to the body and follow ON pulls the selection back", 
   const bodyRows = 8 - 2 - 1 - 1;
   const far = renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: 99 } });
   assert.equal(far.bodyRows, bodyRows);
-  assert.equal(far.maxScroll, 10 - bodyRows);
+  assert.equal(far.maxScroll, 19 - bodyRows);
   assert.equal(far.scroll, far.maxScroll, "a scroll past the end is clamped");
   assert.equal(far.lines.length, 8);
-  assert.ok(far.bodyLines[far.scroll].includes("card 7"));
+  assert.ok(far.bodyLines.slice(far.scroll).join("\n").includes("card 9"));
   assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: -4 } }).scroll, 0);
   // A mistyped scroll is clamped to a number, never NaN, so the frame's own scroll can
-  // be persisted straight back to disk ("9" is read as 9 and then clamped to the end).
-  assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: "9" } }).scroll,
-    6);
+  // be persisted straight back to disk ("99" is read as 99 and then clamped to the end).
+  assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: "99" } }).scroll,
+    15);
   for (const scroll of [NaN, {}, [], undefined]) {
     assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll } }).scroll, 0,
       JSON.stringify(scroll));
@@ -539,7 +542,7 @@ test("scrolling is clamped to the body and follow ON pulls the selection back", 
   }
   // A tall enough pane never scrolls, and a missing view object is a valid frame.
   const roomy = renderWorkers(projection(cards),
-    { columns: 40, rows: 20, color: false, language: "en", view: { follow: false, scroll: 3 }, footer: ["F"] });
+    { columns: 40, rows: 24, color: false, language: "en", view: { follow: false, scroll: 3 }, footer: ["F"] });
   assert.equal(roomy.maxScroll, 0);
   assert.equal(roomy.scroll, 0);
   assert.equal(renderWorkers(projection(cards), wide).scroll, 0);

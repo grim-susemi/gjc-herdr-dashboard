@@ -534,9 +534,9 @@ test("j/k scroll the card list without moving the selection", async (t) => {
   assert.equal(f.readPrefs().scroll, at + 1);
   await viewer.key("k");
   assert.equal(viewer.state.prefs.scroll, at, "k scrolls back up");
-  // k at the top is a clamped no-op, never a negative scroll.
-  await viewer.key("k");
-  await viewer.key("k");
+  // k at the top is a clamped no-op, never a negative scroll. `at` can be positive
+  // because the divider rows make one body window hold fewer than two whole cards.
+  for (let step = 0; step <= at; step += 1) await viewer.key("k");
   assert.equal(viewer.state.prefs.scroll, 0);
 });
 

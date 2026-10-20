@@ -57,6 +57,8 @@ A card has up to three rows plus one alert row. Column 0 is the selection column
 
 Cost, current tool, intent and last output live in the `d` detail view. Mirrors OMO `packages/dag/src/render.mjs:375-445` (compactTaskLines: three rows, the 10-cell time rule at `:409-410`, the alert row at `:413-415`).
 
+Consecutive drawn cards are separated by one dim full-width `─` row, and only between cards: never before the first card and never after the last. The divider is not part of either card's range, so selection, click and scroll offsets still point at card rows. Mirrors OMO `packages/dag/src/render.mjs:568-579` (the `cards++` separator before each card after the first, `:575`).
+
 ## G8. Glyphs and colours
 
 | status | glyph | colour |
