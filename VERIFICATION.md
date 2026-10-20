@@ -2,6 +2,45 @@
 
 증거는 `.evidence/` 아래에 있고 git에서 제외된다. 아래 기록은 실제로 실행한 명령의 결과만 적는다.
 
+## 2026-10-20 OMO grammar alignment
+
+pane 문법을 omo `3242ad4`에 맞췄다. 규칙과 의도된 차이는 `GRAMMAR.md`(G1..G13, Deviations 18행)에 있다. 아래 기존 절들은 당시 사실 기록이라 고치지 않았다.
+
+수정된 계약:
+
+- **AC-F4** (GRAMMAR.md 그대로): at 24 columns the title keeps at least one cell and the status indicator survives: the glyph for running and done, glyph plus word for the other states. Running and done show the glyph only. (Owner decision Q3=A, 2026-10-20)
+- **L5b**: goal 행은 Todo pane 2행, 헤더 구분선 바로 아래에 있다(전에는 0행). 예: ` ◎ align the todo pane~ · active · 12K tok · ⧖ 5m 3s`. 헤더 위에는 아무것도 없다.
+- PLAN-NOTE: 24열에서 Todo·Workers footer `Follow ON · SOURCE ERROR`는 24셀이라 쓸 수 있는 23셀을 넘는다. 이름 붙인 예외다(`task-4-workers-frames.txt`의 `footer-exception` 줄).
+- PLAN-NOTE: "옛 정규식은 아무것도 맞히지 않는다"는 교체된 옛 chrome 판정식에만 적용된다.
+
+단위 테스트 수(기준선 593, 실패 이름은 기준선과 같음 = 없음):
+
+| 단계 | 테스트 수 |
+|---|---|
+| 기준선 | 593 |
+| todo 2 | 595 |
+| todo 4 | 601 |
+| todo 5 | 608 |
+| todo 3 (테스트 21개 포함) | 629 |
+| todo 4b | 633 |
+| todo 6 | 683 |
+
+라이브 결과(todo 7). 네 스크립트는 shim을 뗀 guarded window 두 번에서 모두 PASS였다.
+
+| 스크립트 | window 1 (00:21:12Z..00:28:10Z) | window 2 (00:41:02Z..00:48:11Z) |
+|---|---|---|
+| l1-behaviour | PASS 170672 ms | PASS 156182 ms |
+| l2-width | PASS 20338 ms | PASS 22190 ms |
+| l2-workers | PASS 143889 ms | PASS 167343 ms |
+| l5-goal | PASS 81972 ms | PASS 82925 ms |
+
+- window 1의 omo-protected 수령증은 샌드박스 HOME에서 찍혀 경로가 MISSING이다. **유효한 증거가 아니다.**
+- window 2는 `HOME=USERPROFILE=C:/Users/USER`로 omo-protected를 찍었고 전후가 바이트 동일하다: wrapper `25c376b0...`, pointer `5d6c0120...`, main `d8836c7b...`.
+- 두 window 모두 GJC `current.json` `950a9d67...`, shim `07acd7cc...`가 전후 바이트 동일하고 `--doctor`는 ok, `generation-000001`이다.
+- 갱신했지만 라이브로 다시 돌리지 않은 스크립트: l3-pointer, l4-adopt, l6-drills, l6-userscope(계획상 todo 7에서 `--confirm-user-scope` 금지), kill-recovery, lt3-delay.
+
+증거(`C:/Users/USER/orca/projects/기타 작업/.omo/evidence/gjc-dashboard-omo-align/`): `task-3-todo-frames.txt`, `task-4-workers-frames.txt`, `task-7-live-pass.txt`, `task-7-rerun-live-pass.txt`, `task-8-docs-review.txt`, `task-8-docs-before.txt`.
+
 ## L0
 
 실행 환경: Windows, Node v24.12.0, Herdr 0.9.3, gjc 0.18.11. 라이브 프로브는 harness가 만든 별도 Herdr session `gjcdash-probe`에서만 실행했다. 소유자 pane에는 입력하지 않았다.

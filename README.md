@@ -83,13 +83,17 @@ K1 실측: 구독 모델이라 서브에이전트 `cost`가 모든 시점에서 
 
 F1 실측: GJC 0.18.11의 대화형 main ctx에서 `typeof ctx.getProjectProgress === 'undefined'`다.
 검증된 네이티브 원천이 없으므로 Progress pane(세 번째 pane)을 만들지 않는다. 2역할 band가 최종이다.
-가짜 DAG도, gjc CLI 폴링도 없다. 대신 Todo pane 맨 위에 목표 1줄을 넣는다(L5b).
+가짜 DAG도, gjc CLI 폴링도 없다. 대신 Todo pane 헤더 구분선 바로 아래(2행)에 목표 1줄을 넣는다(L5b, 2026-10-20 수정).
 
 - 원천은 `ctx.getGoalState()`와 `goal_updated`뿐이다. `data/<scopeKey>/goal.json`에는 objective·status·
   tokensUsed·timeUsedSeconds만 쓴다(id·provenance는 경계 밖).
-- goal이 있을 때만 `◎ <objective> · <상태> · <토큰(예: 215K)> · <경과 시간>` 한 줄을 그린다.
-  objective만 pane 폭에 맞춰 자르고(`~`), goal이 없으면 줄도 빈 행도 없다. `goal_updated` 뒤 2초
-  안에 갱신된다.
+- goal이 있을 때만 헤더 구분선 아래에 ` ◎ <objective> · <상태> · <NK tok> · ⧖ <경과 시간>` 한 줄을 그린다.
+  예: ` ◎ align the todo pane~ · active · 12K tok · ⧖ 5m 3s`. 헤더 위에는 아무것도 없고, 이 줄은 스크롤되는
+  본문 위에 고정된다. objective만 pane 폭에 맞춰 자르고(`~`), 좁으면 `tok`부터, 그다음 `◎ `를 뺀다.
+  goal이 없으면 줄도 빈 행도 없다. `goal_updated` 뒤 2초 안에 갱신된다.
+- 실제 프레임 예(54열): 헤더 ` Todo [0/2]  done:0 · drop:0`, footer ` Follow ON · LIVE`, 빈 상태
+  `The checklist is empty.`(footer ` Follow ON · EMPTY`). Workers pane은 헤더 ` Workers [0/0]  run 0`,
+  빈 상태 `  ○  No workers yet`, 카드 `>▌⠋ ship it · ⧖ 5m 0s`를 쓴다. pane 문법 전체는 [`GRAMMAR.md`](GRAMMAR.md)에 있다.
 - `goal_updated`는 초당 1회 정도 오므로 자동 pass의 병합(실행 1 + 대기 1)과 200ms writer 병합을
   그대로 탄다. 소유자 phase가 `me`일 때만 쓰고, Todo record가 closed면 쓰지 않는다.
 
