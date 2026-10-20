@@ -328,7 +328,7 @@ test("task rows build a tree: ├─ for a later task, └─ for the phase's la
   for (const line of frame.lines) assert.ok(width(line) <= 34, JSON.stringify(line));
 });
 
-test("GJC task ink: kelp done, dangerRed strike dropped, claw bold live, mutedShell pending", () => {
+test("GJC task ink: dim strike kelp done, dangerRed strike dropped, claw bold live, mutedShell pending", () => {
   const snapshot = projection([{ name: "Build", tasks: [
     { content: "done work", status: "completed" },
     { content: "dropped work", status: "abandoned" },
@@ -336,8 +336,8 @@ test("GJC task ink: kelp done, dangerRed strike dropped, claw bold live, mutedSh
     { content: "queued work", status: "pending" }] }]);
   const frame = renderFrame(snapshot, { columns: 52, rows: 14, color: true, language: "en" });
   const row = (needle) => frame.bodyLines.find((line) => stripVTControlCharacters(line).includes(needle));
-  // Completed work is kelp with no strike; only dropped work is struck through.
-  assert.equal(row("done work"), "\x1b[38;2;110;231;183m├─ ☑ done work\x1b[0m");
+  // Completed work is dim and struck through in kelp; only completed and dropped rows are struck.
+  assert.equal(row("done work"), "\x1b[2;9;38;2;110;231;183m├─ ☑ done work\x1b[0m");
   assert.equal(row("dropped work"), "\x1b[9;38;2;255;77;94m├─ ☐ dropped work\x1b[0m");
   assert.equal(row("live work"), "\x1b[1;38;2;255;106;61m├─ ☐ live work\x1b[0m");
   assert.equal(row("queued work"), "\x1b[38;2;185;143;134m└─ ☐ queued work\x1b[0m");
@@ -351,11 +351,71 @@ test("GJC task ink: kelp done, dangerRed strike dropped, claw bold live, mutedSh
   { columns: 52, rows: 14, color: true, language: "en", expanded: true, follow: false });
   assert.ok(closed.bodyLines[0].includes("\x1b[38;2;185;143;134mI. Done  1/1\x1b[0m"), closed.bodyLines[0]);
   assert.ok(closed.bodyLines[2].includes("\x1b[1;38;2;255;138;101mII. Queued  0/1\x1b[0m"), closed.bodyLines[2]);
-  // With colour off the same rows are plain and carry no strike or escape at all.
+  // With colour off the same rows are plain and carry no dim, strike or escape at all.
   const plain = renderFrame(snapshot, { columns: 52, rows: 14, color: false, language: "en" });
   assert.doesNotMatch(plain.text, /\x1b/, "color:false stays escape-free");
-  assert.doesNotMatch(plain.text, /\u001b\[9m|\u001b\[0m/);
+  assert.doesNotMatch(plain.text, /\u001b\[2;|\u001b\[9m|\u001b\[0m/);
   assert.match(plain.text, /^├─ ☑ done work$/m);
+});
+
+test("every wrapped physical row of a completed task carries dim, strike and a reset, selected or not", () => {
+  const long = "ship the wrapped done work so every physical row keeps the dim strike ink";
+  const snapshot = projection([
+    { name: "Build", tasks: [
+      { content: long, status: "completed" },
+      { content: "dropped work", status: "abandoned" },
+      { content: "live work", status: "in_progress" },
+      { content: "queued work", status: "pending" }] },
+    { name: "Finish", tasks: [
+      { content: "last queued work", status: "pending" },
+      { content: long, status: "completed" }] },
+  ]);
+  const keys = taskKeys(snapshot);
+  const completedInk = /^\x1b\[2;9;38;2;110;231;183m[^\x1b]*\x1b\[0m$/;
+  const rowsOf = (frame, key) => {
+    const range = frame.taskRanges[key];
+    assert.ok(range, `task range for ${key}`);
+    return { range, lines: frame.bodyLines.slice(range.start, range.end) };
+  };
+  // The middle completed task is selected: its rail continuation rows are styled too.
+  const selected = renderFrame(snapshot, { columns: 34, rows: 24, color: true, language: "en",
+    expanded: true, selection: keys[0] });
+  assert.equal(selected.selection, keys[0], "the completed task really is the selection");
+  const middle = rowsOf(selected, keys[0]);
+  assert.equal(middle.range.status, "completed");
+  assert.ok(middle.lines.length >= 2, "the completed task wraps onto continuation rows");
+  for (const [index, line] of middle.lines.entries()) {
+    assert.match(line, completedInk, `completed row ${index} is dim, struck and reset`);
+    assert.equal(stripVTControlCharacters(line).slice(0, 1), index === 0 ? "├" : "│",
+      `row ${index} keeps the branch or rail prefix`);
+  }
+  // The last completed task of a phase blanks its continuation and is styled the same way.
+  const last = rowsOf(selected, keys[keys.length - 1]);
+  assert.equal(last.range.status, "completed");
+  assert.ok(last.lines.length >= 2, "the last completed task wraps too");
+  for (const [index, line] of last.lines.entries()) {
+    assert.match(line, completedInk, `last completed row ${index} is dim, struck and reset`);
+    assert.equal(stripVTControlCharacters(line).slice(0, 1), index === 0 ? "└" : " ",
+      `last completed row ${index} keeps the tree or blank prefix`);
+  }
+  // Abandoned work stays exactly as before: struck dangerRed and not dim.
+  const dropped = rowsOf(selected, keys[1]);
+  assert.equal(dropped.lines[0], "\x1b[9;38;2;255;77;94m├─ ☐ dropped work\x1b[0m");
+  // Neither neighbour gains dim or strike: exact in-progress and pending ink survives.
+  const live = rowsOf(selected, keys[2]);
+  assert.equal(live.lines[0], "\x1b[1;38;2;255;106;61m├─ ☐ live work\x1b[0m");
+  const pending = rowsOf(selected, keys[3]);
+  assert.equal(pending.lines[0], "\x1b[38;2;185;143;134m└─ ☐ queued work\x1b[0m");
+  assert.doesNotMatch(live.lines[0], /\x1b\[2;|\x1b\[9;/);
+  assert.doesNotMatch(pending.lines[0], /\x1b\[2;|\x1b\[9;/);
+  // With colour off the same wrapped, selected fixture has no escapes at all.
+  const plain = renderFrame(snapshot, { columns: 34, rows: 24, color: false, language: "en",
+    expanded: true, selection: keys[0] });
+  assert.equal(plain.selection, selected.selection);
+  assert.doesNotMatch(plain.text, /\x1b/, "color:false text stays escape-free");
+  for (const line of plain.bodyLines) assert.doesNotMatch(line, /\x1b/, "color:false body stays escape-free");
+  assert.equal(plain.bodyLines.slice(middle.range.start, middle.range.end).join("\n"),
+    middle.lines.map(stripVTControlCharacters).join("\n"), "colour only changes the escapes");
 });
 
 // Short panes: present optional rows (goal, error, header divider) fill the room

@@ -19,9 +19,9 @@
 // and tree task rows `├─ ☐ <content>` / `└─ ☐ <content>`, where the roman numeral is the
 // phase's one-based position among ALL phases and folding never renumbers it. Colours are the
 // GJC `red-claw` 24-bit palette, so the pane reads as GJC's own chrome: dropped rows are struck
-// through (`9;` + dangerRed), completed rows are kelp, in-progress is bold claw and pending is
-// mutedShell. With follow ON the phase that holds the in-progress task is pinned to the top of
-// the body. `color: false` stays free of every escape sequence.
+// through (`9;` + dangerRed), completed rows are dim struck kelp (`2;9;` + kelp), in-progress is
+// bold claw and pending is mutedShell. With follow ON the phase that holds the in-progress task is
+// pinned to the top of the body. `color: false` stays free of every escape sequence.
 //
 // Exported signatures
 //   marks: Record<status, string>                  // ☐ pending/in_progress/abandoned, ☑ completed
@@ -51,11 +51,12 @@ const style = { accent: "38;2;255;106;61", phase: "38;2;255;138;101", muted: "38
   in_progress: "38;2;255;106;61", warning: "38;2;245;184;75",
   error: "38;2;255;77;94", activePhase: "38;2;255;106;61", goal: "38;2;255;138;101",
   secondary: "38;2;185;143;134" };
-// GJC row ink: only abandoned work strikes the row through (SGR 9); in-progress work is bold
-// claw, completed work is kelp and pending work is mutedShell (dimShell is too dark to read).
-// `strike`/`bold` are combinable flags on `paint`.
+// GJC row ink: completed work is dim (SGR 2) and struck through (SGR 9) in kelp, abandoned work is
+// struck in dangerRed, in-progress work is bold claw and pending work is mutedShell (dimShell is too
+// dark to read). `dim`/`strike`/`bold` are combinable flags on `paint`.
 const rowInk = { pending: { token: "secondary" }, in_progress: { token: "in_progress", bold: true },
-  completed: { token: "completed" }, abandoned: { token: "abandoned", strike: true } };
+  completed: { token: "completed", dim: true, strike: true },
+  abandoned: { token: "abandoned", strike: true } };
 // No lead indent: the tree starts at column 0 so a narrow pane spends its cells on the task text.
 const taskIndent = "";
 export const marks = { pending: "☐", in_progress: "☐", completed: "☑", abandoned: "☐" };
@@ -66,9 +67,9 @@ const railPrefix = `${taskIndent}│  `;
 const layout = { taskInset: width(`${taskIndent}├─ ${marks.pending} `),
   fallbackColumns: 16, fallbackRows: 3 };
 
-const paint = (text, token, enabled, { bold = false, strike = false } = {}) =>
+const paint = (text, token, enabled, { bold = false, dim = false, strike = false } = {}) =>
   enabled && style[token]
-    ? `\x1b[${bold ? "1;" : ""}${strike ? "9;" : ""}${style[token]}m${text}\x1b[0m` : text;
+    ? `\x1b[${bold ? "1;" : ""}${dim ? "2;" : ""}${strike ? "9;" : ""}${style[token]}m${text}\x1b[0m` : text;
 
 const ROMAN_PAIRS = Object.freeze([[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
   [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"],
