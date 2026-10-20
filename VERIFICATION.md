@@ -16,7 +16,7 @@ F4/F1/F3 final-wave 지적 중 rows 11, 12, 13, 17, 16을 고쳤다. 이 절은 
 
 검증자 지적 2건을 반영했다. `5897fbe`는 identity wrap 경계에서 첫 행이 agent 전체를 소비해 닫는 `]`가 빠지던 문제를 닫는 continuation 행으로 고치고, 4개 폭 × background on/off × 7개 agent 길이의 56개 경계 grid 회귀 테스트를 추가했으며 GRAMMAR G7의 "세 행" 문구를 continuation 행과 일치시켰다. `7159676`은 divider 도입 뒤 약해진 두 단언을 복원했다: 12장/11 divider geometry에서 drag 목적지는 18행(`c4.start 16` + `bodyStart 2` + 1 = 19행에서 1행까지)이고, 10장/9 divider의 maxScroll 15에서는 첫 스크롤 행이 card 9 위 divider, 다음 행이 card 9, 이어 divider와 card 10이다. 전체 단위 테스트는 **686/686** 통과했다(기존 685 + G7 경계 회귀 1, fail 0). 증거는 `task-fix2-unit.txt`, `task-fix2-boundaries.txt`, `task-fix2-mutation.txt`다.
 
-사용자 스코프의 generation-000002는 이 수정들보다 먼저 설치되었다. 따라서 현재 설치된 pane은 rows 11-17 수정을 포함하지 않으며, 새 generation 설치는 owner 승인 대기 중이다. generation-000001 rollback은 그대로 유지된다.
+사용자 스코프의 generation-000002는 이 수정들보다 먼저 설치되었다. 따라서 그 pane은 rows 11-17 수정을 포함하지 않는다. 이후 owner 승인 아래 rows 11-17을 포함한 generation-000003을 설치했고, generation-000001과 generation-000002 rollback은 그대로 유지된다(아래 `사용자 범위 설치 (generation-000003)`).
 
 ## 2026-10-20 OMO grammar alignment
 
@@ -81,6 +81,34 @@ pane 문법을 omo `3242ad4`에 맞췄다. 규칙과 의도된 차이는 `GRAMMA
 | models.yml | `29747daa...` | `29747daa...` | `29747daa...` |
 
 gjc sessions that are already open keep generation-000001 until they are restarted (PROVENANCE.md:238); restart them to see the new panes.
+
+### 사용자 범위 설치 (generation-000003)
+
+소유자 승인 Q2=A에 따라 rows 11-17 수정 뒤의 소스를 generation-000003으로 설치했다. push와 merge는 하지 않았다. 첫 l6 시도는 로그를 남기지 못한 채 중단되었고(0-byte `task-9b-l6-userscope.log.txt`, harness pid 53608, orphan herdr 74964 -> gjc 4852), orchestrator가 identity 확인 뒤 그 트리를 종료했다. 남은 slot `b3bb2c3900a490a040f7a2e4`(owner pid 4852)는 baseline에 없고 pid가 죽은 것을 확인한 뒤 그 slot만 제거했다(`task-9c-state-before.txt`, `task-9c-state-after-cleanup.txt`). 아래 수치는 재실행 결과다.
+
+- 단위: `node scripts/test.mjs` -> 686 tests, 686 pass, 0 fail, 0 skipped, 0 todo; 실패 이름은 기준선(593 pass, 0 fail)과 같다 = 없음 (`task-9b-unit.txt`, `task-0-baseline-failing.txt`).
+- 패키지 스모크: scratch agent dir에 `--lang ko` 설치 exit 0; `scripts/verify-package.mjs` exit 0, `pass:true`, 28 required files, `importOk:true`, `defaultExport:"function"`, `localeHeader:"ext gen-000001"`, shim `targetMatches:true`/`envDefaults:false`/`failpointPlumbing:false` (`task-9c-package-install.json`, `task-9c-package-verify.json`).
+- 실제 설치: `--dry-run` exit 0 -> `generation-000003`, `previous: generation-000002`; 설치 exit 0 (29 files); 설치된 트리 verify-package exit 0, `pass:true`, `localeHeader:"ext gen-000003"` (`task-9b-install-dry-run.json`, `task-9b-install.json`, `task-9b-verify-installed.json`).
+- l6-userscope: `--confirm-user-scope` PASS (exit 0, 103572 ms). notify `ext gen-000003 · Todo 열림 · Workers 열림`; frame-todo row 0 ` Todo [0/0]  done:0 · drop:0`, row 1 구분선, footer ` Follow ON · EMPTY`; frame-workers row 0 ` Workers [0/0]  run 0`, row 1 구분선, footer ` Follow ON · EMPTY`; AC6.3에서 shim 제거 시 ext notify 없음. outer finally의 `--select generation-000003` exit 0, current/shim은 설치 직후 기록과 바이트 동일 (`task-9c-l6-userscope.log.txt`, `task-9c-l6-guard.json`, `task-9c-l6-frames.txt`).
+- doctor: 설치 전 두 세대(`generation-000002` selected, `generation-000001` usable) -> 설치 후 세 세대(`generation-000003` selected, `generation-000001`/`generation-000002` usable), mismatches 없음. 정확히 한 세대만 추가되고 제거된 세대는 없다 (`task-9b-doctor-diff.txt`, `task-9c-doctor-post.json`, `task-9c-doctor-check.json`).
+- state: l6가 만든 slot `d63e48d0...`과 data `5433373b...`는 l6가 스스로 제거했고, 종료 후 state는 baseline과 같다. l6/guard 프로세스와 `gjcdash-userscope` 세션은 남지 않았다 (`task-9c-state-compare.json`, `task-9c-l6-state-cleanup.json`, `task-9c-processes-after.txt`).
+- 설치된 generation-000003 트리는 eaf4553의 repo 파일과 28/28 해시 동일하다 (`task-9c-installed-vs-repo.json`).
+- 롤백 명령: `node scripts/install.mjs --agent-dir C:/Users/USER/.gjc/agent --select generation-000002` (또는 `generation-000001`; 이번 단계에서는 실행하지 않음).
+- OMO protected는 전후 바이트 동일: wrapper `2ae22897...`, pointer `685978bb...`, main `6690857a...`, status 0 (`task-9c-protected-before.txt`, `task-9c-protected-after.txt`, `task-9c-protected-diff.txt`).
+- 증거: `task-9c-release.txt` 및 위 파일들.
+
+해시 표 (sha256; 트리는 정렬된 `<sha256>  <path>` manifest의 sha256):
+
+| 항목 | 설치 전 (gen-2) | 설치 후 (gen-3) | l6 이후 |
+|---|---|---|---|
+| current.json | `42689392...` | `aa747c89...` | `aa747c89...` |
+| shim | `75a25c93...` | `0dfaf4bb...` | `0dfaf4bb...` |
+| generation-000001 tree | `a9adb2c0...` | `a9adb2c0...` | `a9adb2c0...` |
+| generation-000002 tree | `b29388d6...` | `b29388d6...` | `b29388d6...` |
+| generation-000003 tree | - | `6a165014...` | `6a165014...` |
+| models.yml | `29747daa...` | `29747daa...` | `29747daa...` |
+
+gjc sessions that are already open keep generation-000002 (or generation-000001) until they are restarted (PROVENANCE.md:238); restart them to see the new panes.
 
 ## L0
 
