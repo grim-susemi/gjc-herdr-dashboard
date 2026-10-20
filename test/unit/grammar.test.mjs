@@ -293,7 +293,7 @@ const TODO_EXPECTED = {
       "24": [
         " Todo [2/4]",
         "───────────────────────",
-        " ~ · active · 12K · ⧖~",
+        " ~ · active · 12K · ⧖ ~",
         "─ Implementation 0/2 ──",
         ">[•] Wire the grammar",
         " [ ] Pin the frames",
@@ -309,7 +309,7 @@ const TODO_EXPECTED = {
       "26": [
         " Todo [2/4]",
         "─────────────────────────",
-        " ~ · active · 12K · ⧖ 5~",
+        " ~ · active · 12K · ⧖ 5m~",
         "─ Implementation 0/2 ────",
         ">[•] Wire the grammar",
         " [ ] Pin the frames",
@@ -325,7 +325,7 @@ const TODO_EXPECTED = {
       "34": [
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────",
-        " ◎ Ali~ · active · 12K · ⧖ 5m 3s",
+        " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "─ Implementation 0/2 ────────────",
         ">[•] Wire the grammar",
         " [ ] Pin the frames",
@@ -375,7 +375,7 @@ const TODO_EXPECTED = {
       "24": [
         " Todo [2/4]",
         "───────────────────────",
-        " ~ · active · 12K · ⧖~",
+        " ~ · active · 12K · ⧖ ~",
         "Read error: todo.json ~",
         "─ Implementation 0/2 ──",
         ">[•] Wire the grammar",
@@ -391,7 +391,7 @@ const TODO_EXPECTED = {
       "26": [
         " Todo [2/4]",
         "─────────────────────────",
-        " ~ · active · 12K · ⧖ 5~",
+        " ~ · active · 12K · ⧖ 5m~",
         "Read error: todo.json un~",
         "─ Implementation 0/2 ────",
         ">[•] Wire the grammar",
@@ -407,7 +407,7 @@ const TODO_EXPECTED = {
       "34": [
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────",
-        " ◎ Ali~ · active · 12K · ⧖ 5m 3s",
+        " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
         "─ Implementation 0/2 ────────────",
         ">[•] Wire the grammar",
@@ -457,7 +457,7 @@ const TODO_EXPECTED = {
       "24": [
         " Todo [2/4]",
         "───────────────────────",
-        " ~ · active · 12K · ⧖~",
+        " ~ · active · 12K · ⧖ ~",
         "─ Implementation 0/2 ──",
         ">[•] Wire the grammar",
         " [ ] Pin the frames",
@@ -473,7 +473,7 @@ const TODO_EXPECTED = {
       "26": [
         " Todo [2/4]",
         "─────────────────────────",
-        " ~ · active · 12K · ⧖ 5~",
+        " ~ · active · 12K · ⧖ 5m~",
         "─ Implementation 0/2 ────",
         ">[•] Wire the grammar",
         " [ ] Pin the frames",
@@ -489,7 +489,7 @@ const TODO_EXPECTED = {
       "34": [
         " Todo [2/4]  done:1 · drop:1",
         "─────────────────────────────────",
-        " ◎ Ali~ · active · 12K · ⧖ 5m 3s",
+        " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "─ Implementation 0/2 ────────────",
         ">[•] Wire the grammar",
         " [ ] Pin the frames",
@@ -903,11 +903,12 @@ test("colour runs: header chrome, connection footer and EMPTY colours - G1 G2 G3
     // G2: the header divider is 90 on the Todo pane and dim on the Workers pane.
     assert.ok(todo.lines[1].startsWith("\x1b[90m─"));
     assert.ok(workers.lines[1].startsWith("\x1b[2m─"));
-    // G3: Todo WAITING and EMPTY are yellow, Workers EMPTY shares the live colour.
+    // G3: Todo WAITING is yellow; EMPTY is cyan in both panes, and Workers EMPTY
+    // shares the live colour.
     assert.equal(frame(TODO_CASES.find((entry) => entry.id === "waiting"), columns).lines.at(-1),
       " \x1b[33mFollow ON · WAITING\x1b[0m");
     assert.equal(frame(TODO_CASES.find((entry) => entry.id === "empty"), columns).lines.at(-1),
-      " \x1b[33mFollow ON · EMPTY\x1b[0m");
+      " \x1b[36mFollow ON · EMPTY\x1b[0m");
     assert.equal(frame(WORKER_CASES.find((entry) => entry.id === "empty"), columns).lines.at(-1),
       " \x1b[36mFollow ON · EMPTY\x1b[0m");
   }
@@ -957,7 +958,7 @@ const RULE_IDS = Object.freeze(["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", 
   "G11", "G12", "G13"]);
 const DEVIATION_IDS = Object.freeze(["AC-F1", "AC-F3", "AC1.9", "AC2.2", "AC-F4", "selection",
   "data-absent", "truncation", "zh-cn", "L5b", "d", "g", "h", "i", "j", "todo-body",
-  "todo-footer", "k"]);
+  "k"]);
 
 function sectionOf(text, heading) {
   const start = text.indexOf(heading);
@@ -985,7 +986,7 @@ test("GRAMMAR.md states every rule and deviation row, each with its citation", (
   assert.match(sectionOf(GRAMMAR, "## Deviations"), /3242ad4/, "the deviation table names its OMO baseline");
   const rows = deviationRows(GRAMMAR);
   assert.deepEqual(rows.map((cells) => cells[0]), [...DEVIATION_IDS],
-    "all 18 deviation ids, in table order (todo-body and todo-footer included)");
+    "all 17 deviation ids, in table order (todo-body included)");
   for (const cells of rows) {
     assert.equal(cells.length, 4, `${cells[0]} keeps four columns`);
     assert.ok(cells[1] !== "" && cells[2] !== "" && cells[3] !== "",

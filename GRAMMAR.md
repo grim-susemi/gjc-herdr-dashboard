@@ -23,7 +23,7 @@ Row 1 of both panes is a full-width `─` divider directly under the header row.
 The last two rows of both panes: the pane's own divider (Todo `90`, Workers `2`, as in G2), then the footer ` Follow ON · <connection>` or ` Follow OFF · <connection>`. The colour depends on the connection only, never on the follow word, and each pane has its own rule:
 
 - Workers: `36` for LIVE and EMPTY, `33` for WAITING, OFFLINE and SOURCE ERROR (GJC `src/viewers/workers/render.mjs:376`). This matches OMO, which paints `36` when the source is current or empty (`packages/todo/src/render.mjs:230,236`).
-- Todo: `36` for LIVE only, `33` for every other state, EMPTY included (GJC `src/viewers/todo/render.mjs:245-246`). OMO paints EMPTY `36` (`:230,236`), so this is a deviation (see Deviations, todo-footer).
+- Todo: `36` for LIVE and EMPTY, `33` for WAITING, OFFLINE and SOURCE ERROR (GJC `src/viewers/todo/render.mjs:245-246`). This matches OMO, which paints `36` when the source is current or empty (`packages/todo/src/render.mjs:230,236`).
 
 The footer gets the one-column inset only when `width(footer) + 1 <= columns`. It is never truncated and has no short form (see Deviations, AC-F1/AC-F3). Mirrors OMO `packages/todo/src/render.mjs:232-236`.
 
@@ -117,9 +117,8 @@ Every place where GJC differs from OMO `3242ad4` on purpose, with the contract b
 | i | No scroll range in the footer. | Footer may carry position text. | AC-F1 (footer never truncated, so it stays short). |
 | j | `background` mark on card row 2. | No background mark. | GJC contract AC2.6. |
 | todo-body | Todo body keeps GJC semantics (G5): done and dropped `90`, no strike or strike animation, open phases never folded, no ` ▸` fold suffix. | Done `2;32` struck, dropped `2;31`, strike reveal, open phases outside the in-progress set (or, with nothing in progress, every open phase after the first) folded with ` ▸` (`packages/todo/src/render.mjs:24-40,141-143,149-153`). | IS-7: Todo body and fold semantics are unchanged by this plan. |
-| todo-footer | The Todo footer paints EMPTY `33` (G3). | EMPTY counts as live and is `36` (`packages/todo/src/render.mjs:230,236`). | Existing GJC Todo footer colour, unchanged under IS-7. |
 | k | The en catalogue takes the same English wording as ko. | ko block is English (`packages/dag/src/i18n.mjs`). | One English chrome in ko and en. |
 
 ## 요약 (Korean summary)
 
-이 문서는 GJC 대시보드의 Todo, Workers 패널이 OMO `3242ad4`와 같은 모양으로 읽히도록 정한 규칙입니다. G1부터 G13까지 머리줄, 구분선, 바닥줄, 연결 상태, 본문, 목표 줄, 작업자 카드, 기호와 색, 완료 접기, 빈 화면, 잘림 표시, 선택 열, 스피너를 다루고, 규칙마다 따라 한 OMO 소스 줄을 적었습니다. OMO와 다르게 남긴 부분은 Deviations 표에 GJC 계약(AC-F1, AC-F3, AC1.9, AC2.2, AC2.6, 수정된 AC-F4와 L5b)이나 IS-7과 함께 정리했습니다. 표에는 모두 18개 항목이 있습니다.
+이 문서는 GJC 대시보드의 Todo, Workers 패널이 OMO `3242ad4`와 같은 모양으로 읽히도록 정한 규칙입니다. G1부터 G13까지 머리줄, 구분선, 바닥줄, 연결 상태, 본문, 목표 줄, 작업자 카드, 기호와 색, 완료 접기, 빈 화면, 잘림 표시, 선택 열, 스피너를 다루고, 규칙마다 따라 한 OMO 소스 줄을 적었습니다. OMO와 다르게 남긴 부분은 Deviations 표에 GJC 계약(AC-F1, AC-F3, AC1.9, AC2.2, AC2.6, 수정된 AC-F4와 L5b)이나 IS-7과 함께 정리했습니다. 표에는 모두 17개 항목이 있습니다.
