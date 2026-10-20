@@ -611,7 +611,19 @@ test("scrolling is clamped to the body and follow ON pulls the selection back", 
   assert.equal(far.maxScroll, 19 - bodyRows);
   assert.equal(far.scroll, far.maxScroll, "a scroll past the end is clamped");
   assert.equal(far.lines.length, 8);
-  assert.ok(far.bodyLines.slice(far.scroll).join("\n").includes("card 9"));
+  // Ten one-row cards plus nine dividers make 19 body rows; rows 8 leaves 4 body
+  // rows and maxScroll 15. card k starts at 2 * (k - 1), so card 9 starts at 16 and
+  // the divider above it is row 15. From maxScroll the window is exactly the
+  // divider, card 9, the divider, then card 10 at the next position.
+  const usableColumns = wide.columns - 1;
+  assert.equal(far.bodyLines[far.scroll], "─".repeat(usableColumns),
+    "the divider above card 9 is the first scrolled row");
+  assert.equal(far.bodyLines[far.scroll + 1], "  ⠋ card 9 · ⧖ 0s",
+    "card 9 sits directly under that divider");
+  assert.equal(far.bodyLines[far.scroll + 2], "─".repeat(usableColumns),
+    "the divider above card 10 follows card 9");
+  assert.equal(far.bodyLines[far.scroll + 3], "  ⠋ card 10 · ⧖ 0s",
+    "card 10 is at the next position, not elsewhere in the window");
   assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: -4 } }).scroll, 0);
   // A mistyped scroll is clamped to a number, never NaN, so the frame's own scroll can
   // be persisted straight back to disk ("99" is read as 99 and then clamped to the end).

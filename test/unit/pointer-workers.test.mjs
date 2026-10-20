@@ -278,6 +278,11 @@ test("blur returns follow ON, closes the detail view and re-arms the reveal; foc
   // Drag the selected card out of the window, then leave the pane: follow ON pulls it back.
   f.input.emit("data", motion(2));
   f.input.emit("data", motion(1));
+  // Geometry: 12 three-row cards plus 11 dividers = 47 body rows; at 24 rows the
+  // body keeps 20. c4 starts at 4 * (3 + 1) = 16, so its press row is
+  // 16 + bodyStart 2 + 1 = 19. Dragging from SGR row 19 to row 1 moves 18 rows,
+  // which is past c4.start (16) and below maxScroll 27.
+  assert.equal(viewer.frame.scroll, 18, "the drag lands on the divider-adjusted row");
   const panned = viewer.frame.scroll;
   assert.ok(panned > viewer.frame.ranges.c4.start, "the drag panned past the selected card");
   const writes = f.writes.length;
