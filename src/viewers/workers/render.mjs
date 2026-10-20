@@ -76,19 +76,8 @@ const connections = new Set(["live", "waiting", "empty", "disconnected", "source
 
 const paint = (text, token, enabled, heading = false) => enabled && style[token]
   ? `\x1b[${heading ? "1;" : ""}${style[token]}m${text}\x1b[0m` : text;
-// Grapheme-aware prefix for the long-identity continuation lines. `fit` only returns
-// a fitted string; wrapping needs the untouched head of the remaining text.
+// Grapheme-aware splitting for the long-identity continuation rows.
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-const takeCells = (value, cells) => {
-  if (cells < 1) return "";
-  let out = "", used = 0;
-  for (const { segment } of segmenter.segment(value)) {
-    const size = width(segment);
-    if (used + size > cells) break;
-    out += segment; used += size;
-  }
-  return out;
-};
 // Owner #259: at most six continuation rows after the first `[agent` row. A corrupt
 // projection therefore cannot grow one card past eight identity rows; beyond the cap
 // the last continuation ends `…]` instead of hiding the remaining text silently.
@@ -300,56 +289,55 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
             // row; a `]`-only row is never drawn for a badge that could have fitted.
             pushIdentity(paint(full, "badge", color), width(full));
           } else {
-            let remaining = agent;
-            let first = takeCells(remaining, rowRoom - 1);
-            remaining = remaining.slice(first.length);
-            if (remaining === "") {
-              // The first chunk used the whole row and left no cell for `]`. Move the
-              // trailing grapheme down when it fits beside `]` on a continuation row,
-              // so the bracket ends agent text. Only a degenerate rowRoom, where no
-              // trailing text fits with it, leaves the closing bracket alone.
-              const lastGrapheme = [...segmenter.segment(first)].at(-1)?.segment ?? "";
-              if (first.length > lastGrapheme.length && width(lastGrapheme) + 1 <= rowRoom - 2) {
-                first = first.slice(0, first.length - lastGrapheme.length);
-                remaining = lastGrapheme;
+            // Close by construction: the badge is the single string `[` + agent +
+            // `]`, consumed grapheme by grapheme into whole chunks. The first row
+            // holds up to rowRoom cells (columns-1 minus marker and bar); every
+            // continuation row holds rowRoom-2 after its two-cell indent. Because
+            // `]` is the last grapheme of the input, the final chunk always carries
+            // it. The only chunk that can end up as a lone `]` is that final one,
+            // when the previous row consumed exactly the last agent grapheme: moving
+            // that grapheme down (`  a]`) makes the close share agent text. That
+            // move needs a two-cell grapheme plus `]`, i.e. three cells, so it is
+            // valid whenever the continuation room is at least 3. Badge rows are
+            // drawn only from input columns 17 (internal rowRoom 14, continuation
+            // room 12); the narrower plain fallback never draws them.
+            const continuationRoom = rowRoom - 2;
+            const parts = [...segmenter.segment(full)].map((part) => part.segment);
+            const chunks = [];
+            let at = 0;
+            const takeChunk = (cells) => {
+              const start = at;
+              let used = 0;
+              while (at < parts.length) {
+                const size = width(parts[at]);
+                if (used + size > cells) break;
+                used += size; at += 1;
               }
+              return parts.slice(start, at).join("");
+            };
+            chunks.push(takeChunk(rowRoom));
+            // At most six continuation rows. When the sixth cannot hold the rest,
+            // it ends `…]` so the cap drops the tail but never the closing bracket.
+            for (let continuation = 1;
+              continuation <= MAX_IDENTITY_CONTINUATION && at < parts.length;
+              continuation += 1) {
+              const rest = parts.slice(at).join("");
+              if (continuation === MAX_IDENTITY_CONTINUATION &&
+                width(rest) > continuationRoom) {
+                chunks.push(takeChunk(Math.max(0, continuationRoom - 2)) + "…]");
+                break;
+              }
+              chunks.push(takeChunk(continuationRoom));
             }
-            pushIdentity(paint(`[${first}`, "badge", color), 1 + width(first));
-            if (remaining === "") {
-              // No agent text fits under columns-1 with the closing bracket.
-              pushIdentity(`  ${paint("]", "badge", color)}`, 3);
+            if (chunks.length > 1 && chunks.at(-1) === "]") {
+              const previous = [...segmenter.segment(chunks.at(-2))].map((part) => part.segment);
+              const moved = previous.pop();
+              chunks[chunks.length - 2] = previous.join("");
+              chunks[chunks.length - 1] = `${moved}]`;
             }
-            let continuation = 0;
-            while (remaining !== "") {
-              const lastRoom = rowRoom - 2;
-              // At most six continuation rows; when the sixth still cannot close, it
-              // becomes the `…]` capped row instead of growing the card.
-              if (continuation >= MAX_IDENTITY_CONTINUATION ||
-                (continuation === MAX_IDENTITY_CONTINUATION - 1 &&
-                  width(remaining) + 1 > lastRoom)) {
-                const chunk = takeCells(remaining, Math.max(0, lastRoom - 2));
-                const capped = fit(`${chunk}…]`, Math.max(1, lastRoom), false, "…");
-                pushIdentity(`  ${paint(capped, "badge", color)}`, 2 + width(capped));
-                remaining = "";
-                break;
-              }
-              // The whole rest fits on a closing row: `  text]`.
-              if (width(remaining) + 1 <= lastRoom) {
-                pushIdentity(`  ${paint(`${remaining}]`, "badge", color)}`,
-                  2 + width(remaining) + 1);
-                remaining = "";
-                break;
-              }
-              const chunk = takeCells(remaining, lastRoom);
-              if (chunk === "") {
-                pushIdentity(`  ${paint(fit(`${remaining}]`, lastRoom, false, "…"), "badge", color)}`,
-                  lastRoom);
-                remaining = "";
-                break;
-              }
-              pushIdentity(`  ${paint(chunk, "badge", color)}`, 2 + width(chunk));
-              remaining = remaining.slice(chunk.length);
-              continuation += 1;
+            for (const [index, chunk] of chunks.entries()) {
+              pushIdentity(`${index === 0 ? "" : "  "}${paint(chunk, "badge", color)}`,
+                (index === 0 ? 0 : 2) + width(chunk));
             }
           }
           addTail(tail);

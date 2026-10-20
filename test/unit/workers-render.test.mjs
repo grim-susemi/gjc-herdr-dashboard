@@ -518,6 +518,85 @@ test("G7: every wrapped agent badge closes at the wrap boundary", () => {
   }
 });
 
+// G7 property: every badge closes exactly once, on a row that also carries agent
+// text, for every agent length up to well past the seven-row cap. Expectations come
+// from GRAMMAR G7 rather than renderer output: opener on the first identity row,
+// two-cell continuation indent, at most six continuation rows, visible ` background`,
+// one closing `]` with no bracket-only row, agent text preserved in order (minus the
+// `…` cap), and every row inside columns-1. The old loop missed exactly the lengths
+// where the remaining text filled a continuation row, so every length is covered.
+test("G7: every agent length closes exactly once across widths and scripts", () => {
+  const scripts = [
+    ["ascii", (count) => "a".repeat(count), 7],
+    ["cjk", (count) => "漢".repeat(count), 5],
+    ["combining", (count) => "e\u0301".repeat(count), 5],
+    ["emoji", (count) => "😀".repeat(count), 5],
+    ["zwj", (count) => "👨‍👩‍👧‍👦".repeat(count), 5],
+  ];
+  for (const columns of [17, 18, 24, 26, 34, 54, 80]) {
+    for (const background of [false, true]) {
+      for (const [script, make, lengthsPerColumn] of scripts) {
+        for (let count = 1; count <= lengthsPerColumn * columns; count += 1) {
+          const label = `${columns}/${background}/${script}/${count}`;
+          const frame = frameOf([card("c1", { title: "alpha", status: "running",
+            agent: make(count), background, tokens: 48000, toolCount: 12,
+            durationMs: 12000 })], { columns, rows: 14 });
+          const lines = frame.bodyLines.map(plainLine);
+          // The title row is first and the metrics row last; between them is the
+          // identity block, optionally followed by one background-only dim row.
+          const identity = lines.slice(1, -1);
+          const backgroundRow = identity.length > 1 && identity.at(-1) === " ▌  background"
+            ? identity.pop() : "";
+          assert.ok(identity.length >= 1, `${label}: identity rows`);
+          assert.ok(lines[0].startsWith(">▌"), `${label}: title row`);
+          assert.doesNotMatch(lines.at(-1), /^ ▌\[|^ ▌  /, `${label}: metrics row follows the badge`);
+          // The badge opens on the first identity row; every continuation row is
+          // indented two cells under the badge and there are at most six of them.
+          assert.ok(identity[0].startsWith(" ▌["), `${label}: opener ${JSON.stringify(identity[0])}`);
+          assert.ok(identity.length - 1 <= 6, `${label}: ${identity.length - 1} continuations`);
+          for (const line of identity.slice(1)) {
+            assert.ok(line.startsWith(" ▌  "), `${label}: indent ${JSON.stringify(line)}`);
+          }
+          // Exactly one `]`, it ends the badge, and it shares its row with agent text
+          // (background may follow the bracket on that row).
+          assert.equal(identity.join("").split("]").length - 1, 1,
+            `${label}: one closing bracket ${JSON.stringify(identity)}`);
+          const closed = identity.findIndex((line) => line.includes("]"));
+          assert.notEqual(closed, -1, `${label}: badge closes`);
+          const closeRow = identity[closed];
+          assert.match(closeRow, /\]( background)?$/, `${label}: bracket ends its row`);
+          const beforeClose = closeRow.replace(/^ ▌(?:  )?/, "").replace(/\] background$|\]$/, "");
+          assert.match(beforeClose, /\S/u, `${label}: no bracket-only row ${JSON.stringify(closeRow)}`);
+          for (const line of identity.slice(closed + 1)) {
+            assert.equal(line, " ▌  background", `${label}: only background follows the close`);
+          }
+          // Reconstruct the emitted agent text; a capped badge ends `…]`, so its
+          // `…` replaces the tail while the prefix it did emit stays in order.
+          const shown = identity.map((line, index) => line
+            .replace(index === 0 ? /^ ▌\[/ : /^ ▌  /, "")
+            .replace(/\] background$|\]$/, "")).join("");
+          const capped = shown.endsWith("…");
+          const agentShown = capped ? shown.slice(0, -1) : shown;
+          assert.ok(agentShown.length > 0 && make(count).startsWith(agentShown),
+            `${label}: agent text in order`);
+          if (!capped) assert.equal(agentShown, make(count), `${label}: whole agent preserved`);
+          // The background mark is visible whenever requested and absent otherwise.
+          const visible = [...identity, backgroundRow].join("\n");
+          assert.equal(visible.includes("background"), background,
+            `${label}: background visibility`);
+          // Every row of the frame, drawn or scrolled, stays inside columns-1.
+          for (const line of frame.bodyLines.map(plainLine)) {
+            assert.ok(width(line) <= columns - 1, `${label}: ${JSON.stringify(line)}`);
+          }
+          for (const line of frame.lines.map(plainLine)) {
+            assert.ok(width(line) <= columns - 1, `${label}: ${JSON.stringify(line)}`);
+          }
+        }
+      }
+    }
+  }
+});
+
 // K1: a reported 0 is exactly the "never measured" ambiguity, so the detail view
 // prints `?`, never a confident `$0.0000`. The list has no cost row at all.
 test("K1: an unknown cost is `?` in the detail view only", () => {
