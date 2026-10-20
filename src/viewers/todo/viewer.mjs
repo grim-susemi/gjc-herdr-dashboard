@@ -99,7 +99,9 @@ export function parseViewerArgs(args) {
   return result;
 }
 
-export const EMPTY_PREFS = Object.freeze({ scroll: 0, expanded: false, selection: null, follow: true });
+// `collapsed` hides fully closed phases; the default keeps them listed so finished work stays on record
+// until a new todo list replaces it.
+export const EMPTY_PREFS = Object.freeze({ scroll: 0, collapsed: false, selection: null, follow: true });
 
 const message = (cause) => String(cause?.message ?? cause ?? "error");
 const enoent = (path) => Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });
@@ -177,13 +179,13 @@ export function loadPreferences(path, scopeKey, { read = defaultPort.read } = {}
     return { prefs: { ...EMPTY_PREFS }, error: "prefs schema" };
   }
   const integer = (candidate) => (Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : 0);
-  return { prefs: { scroll: integer(value.scroll), expanded: value.expanded === true,
+  return { prefs: { scroll: integer(value.scroll), collapsed: value.collapsed === true,
     selection: typeof value.selection === "string" ? value.selection : null, follow: true }, error: "" };
 }
 
 export async function savePreferences(path, prefs, { write = defaultPort.write } = {}) {
   const record = { schema: PREFS_SCHEMA, scopeKey: prefs.scopeKey, scroll: prefs.scroll,
-    expanded: prefs.expanded, selection: prefs.selection };
+    collapsed: prefs.collapsed === true, selection: prefs.selection };
   await write(path, record);
   return record;
 }
@@ -265,7 +267,7 @@ export async function startViewer(options, {
 
   function draw() {
     frame = renderFrame(projection, { columns: columnsOf(), rows: rowsOf(),
-      language: language.language, color: isInteractive, expanded: prefs.expanded,
+      language: language.language, color: isInteractive, expanded: !prefs.collapsed,
       scroll: prefs.scroll, selection: prefs.selection, follow: prefs.follow,
       connection: connection(), notices, revealSelection, goal });
     return frame;
@@ -472,7 +474,7 @@ export async function startViewer(options, {
       prefs.follow = !prefs.follow;
     } else if (sequence === "c") {
       prefs.follow = false;
-      prefs.expanded = !prefs.expanded;
+      prefs.collapsed = !prefs.collapsed;
     } else if (["j", "k", "\x1b[B", "\x1b[A"].includes(sequence)) {
       prefs.follow = false;
       const current = frame ?? draw();

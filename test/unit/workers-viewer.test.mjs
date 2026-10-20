@@ -176,7 +176,7 @@ test("prefs round-trip per scope, never restore follow OFF, and report a bad fil
   assert.notEqual(bad.error, "");
   // A file written for another scope is ignored rather than applied to this one.
   writeFileSync(path, JSON.stringify({ schema: "gjc-herdr-dashboard/prefs/1", scopeKey: "z".repeat(24),
-    scroll: 9, expanded: { c1: true }, selection: "c1", showCompleted: true }));
+    scroll: 9, expanded: { c1: true }, selection: "c1", hideCompleted: true }));
   assert.deepEqual(loadPreferences(path, f.scopeKey).prefs, { ...EMPTY_PREFS, expanded: {} });
 });
 
@@ -184,15 +184,15 @@ test("savePreferences persists folds, selection, scroll and the completed filter
   const f = fixture(t);
   const path = join(f.state, "prefs", f.scopeKey, "workers.json");
   const written = await savePreferences(path, { scopeKey: f.scopeKey, scroll: 7,
-    expanded: { c1: true, bad: "yes" }, selection: "c2", showCompleted: true, follow: false });
+    expanded: { c1: true, bad: "yes" }, selection: "c2", showCompleted: false, follow: false });
   assert.equal("follow" in written, false, "follow is not persisted");
   assert.equal("detail" in written, false, "the detail view is never persisted");
   const onDisk = JSON.parse(readFileSync(path, "utf8"));
   assert.deepEqual(onDisk, { schema: "gjc-herdr-dashboard/prefs/1", scopeKey: f.scopeKey,
-    scroll: 7, expanded: { c1: true }, selection: "c2", showCompleted: true });
+    scroll: 7, expanded: { c1: true }, selection: "c2", hideCompleted: true });
   // Reloading it restores everything except follow, which comes back ON (AC1.3).
   assert.deepEqual(loadPreferences(path, f.scopeKey).prefs,
-    { scroll: 7, expanded: { c1: true }, selection: "c2", follow: true, showCompleted: true });
+    { scroll: 7, expanded: { c1: true }, selection: "c2", follow: true, showCompleted: false });
 });
 
 test("startViewer writes its ready file, renders the cards and shows the footer", async (t) => {
@@ -329,13 +329,16 @@ test("Space/Enter fold the selected completed card into a per-card map and persi
       lastIntent: "beta intent" })]));
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
-  // The completed card is hidden behind the header count, so it is not a step target yet.
+  // A completed card stays on record by default: folded to one row and a step target.
   const listFrame = plain(viewer);
-  assert.ok(!listFrame.includes("done one"), "a completed card is hidden");
+  assert.ok(listFrame.includes("done one"), "a completed card stays listed");
+  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
+  // `c` hides the group; only the running card remains a step target.
+  await viewer.key("c");
+  assert.equal(viewer.state.prefs.showCompleted, false);
   assert.deepEqual(viewer.frame.selectable, ["c1"]);
   await viewer.key("n");
   assert.equal(viewer.state.prefs.selection, "c1", "a hidden completed card is not stepped onto");
-  // `c` shows the group folded to one row; only then can the selection step onto it.
   await viewer.key("c");
   assert.equal(viewer.state.prefs.showCompleted, true);
   assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
@@ -453,6 +456,9 @@ test("Tab away from a completed default card folds it again", async (t) => {
     card("c2", { title: "beta" })]));
   viewer.refresh();
   assert.deepEqual(viewer.frame.selectable, ["c1", "c2"]);
+  await viewer.key("c");
+  assert.equal(viewer.state.prefs.showCompleted, false, "hide the completed group first");
+  assert.deepEqual(viewer.frame.selectable, ["c1", "c2"], "the selected completed card stays drawn");
   await viewer.key("\t");
   assert.equal(viewer.state.prefs.selection, "c2", "Tab steps off the completed card");
   assert.deepEqual(viewer.frame.selectable, ["c2"], "the completed card folds once it is no longer selected");
@@ -469,14 +475,15 @@ test("c toggles completed cards and persists the filter; f toggles follow", asyn
     card("c2", { title: "done one", status: "completed", lastIntent: "finished work" })]));
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
-  assert.equal(viewer.state.prefs.showCompleted, false);
+  assert.equal(viewer.state.prefs.showCompleted, true, "finished cards stay on record by default");
   assert.match(footerOf(viewer), /Follow ON/);
+  assert.match(plain(viewer), /done one/);
   const folded = plain(viewer);
   await viewer.key("c");
-  assert.equal(viewer.state.prefs.showCompleted, true);
+  assert.equal(viewer.state.prefs.showCompleted, false);
   assert.equal(viewer.state.prefs.follow, false, "c pauses follow like the Todo viewer");
-  assert.equal(f.readPrefs().showCompleted, true);
-  assert.match(plain(viewer), /done one/);
+  assert.equal(f.readPrefs().hideCompleted, true);
+  assert.doesNotMatch(plain(viewer), /done one/);
   await viewer.key("f");
   assert.equal(viewer.state.prefs.follow, true);
   assert.match(footerOf(viewer), /Follow ON/);
@@ -556,10 +563,11 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with folds and selec
   await first.key("f");
   assert.equal(first.state.prefs.follow, false);
   await first.key("c");
+  await first.key("c");
   await first.key("n");
   const wantSelection = first.state.prefs.selection;
   assert.equal(wantSelection, "c2");
-  // Fold state: the completed card is hidden until `c`, then Space unfolds it explicitly.
+  // Fold state: the completed card is listed folded by default; Space unfolds it explicitly.
   await first.key(" ");
   assert.equal(first.state.prefs.expanded.c2, true);
   await first.close();
@@ -747,7 +755,7 @@ test("refresh drops a selection and a fold whose card left the projection", asyn
   f.writeSlot(slotFor());
   f.writeProjection(projectionFor([card("c1"), card("c2")]));
   f.writePrefs({ schema: "gjc-herdr-dashboard/prefs/1", scopeKey: f.scopeKey, scroll: 99,
-    expanded: { c1: true, gone: true }, selection: "gone", showCompleted: false });
+    expanded: { c1: true, gone: true }, selection: "gone", hideCompleted: true });
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
   assert.equal(viewer.state.prefs.selection, null, "a stale selection is dropped");
@@ -765,7 +773,7 @@ test("scope switch: a new scopeKey rebinds data and prefs without touching the p
   f.writeProjection(projectionFor([card("c1", { title: "OLD_SCOPE_CARD" })]));
   f.writeProjection(projectionFor([card("c9", { title: "NEW_SCOPE_CARD" })]), otherScope);
   f.writePrefs({ schema: "gjc-herdr-dashboard/prefs/1", scopeKey: otherScope, scroll: 3,
-    expanded: { c9: true }, selection: "c9", showCompleted: true }, otherScope);
+    expanded: { c9: true }, selection: "c9", hideCompleted: false }, otherScope);
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
   assert.match(plain(viewer), /OLD_SCOPE_CARD/);
@@ -794,6 +802,9 @@ test("scope switch: a fresh scope selects its own card, not the old scope's", as
     card("a", { title: "alpha", status: "completed" })]), otherScope);
   const viewer = await startViewer(options(f), deps(f));
   t.after(() => viewer.stop());
+  // This test is about selection leaking across scopes, so hide the completed group first.
+  await viewer.key("c");
+  assert.equal(viewer.state.prefs.showCompleted, false);
   // The old scope's selection is implicit: nothing is stored, but `a` is what is drawn.
   assert.equal(viewer.state.prefs.selection, null);
   assert.equal(viewer.frame.selection, "a");
@@ -804,6 +815,9 @@ test("scope switch: a fresh scope selects its own card, not the old scope's", as
   f.writeSlot(slotFor({ scopeKey: otherScope }));
   viewer.refresh();
   assert.deepEqual(await switched, { scopeKey: otherScope });
+  // The new scope loads its own prefs, so the completed group is listed again by default.
+  assert.equal(viewer.state.prefs.showCompleted, true);
+  await viewer.key("c");
   // The old selection must not leak in as a drawn hint: the new scope resolves its own
   // first visible card, and the completed old id stays folded away and unselectable.
   assert.equal(viewer.state.prefs.selection, null, "the new scope's selection stays implicit");

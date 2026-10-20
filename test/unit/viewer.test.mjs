@@ -158,22 +158,22 @@ test("prefs round-trip per scope, never restore follow OFF, and report a bad fil
   assert.notEqual(bad.error, "");
   // A file written for another scope is ignored rather than applied to this one.
   writeFileSync(path, JSON.stringify({ schema: "gjc-herdr-dashboard/prefs/1", scopeKey: "z".repeat(24),
-    scroll: 9, expanded: true, selection: null }));
+    scroll: 9, collapsed: true, selection: null }));
   assert.deepEqual(loadPreferences(path, f.scopeKey).prefs, { ...EMPTY_PREFS });
 });
 
 test("savePreferences persists fold, selection and scroll but deliberately drops follow", async () => {
   const f = fixture({ after: () => {} }, {});
   const path = join(f.state, "prefs", f.scopeKey, "todo.json");
-  const written = await savePreferences(path, { scopeKey: f.scopeKey, scroll: 7, expanded: true,
+  const written = await savePreferences(path, { scopeKey: f.scopeKey, scroll: 7, collapsed: true,
     selection: "[\"P\",0,\"c\",0]", follow: false });
   assert.equal("follow" in written, false, "follow is not persisted");
   const onDisk = JSON.parse(readFileSync(path, "utf8"));
   assert.deepEqual(onDisk, { schema: "gjc-herdr-dashboard/prefs/1", scopeKey: f.scopeKey,
-    scroll: 7, expanded: true, selection: "[\"P\",0,\"c\",0]" });
+    scroll: 7, collapsed: true, selection: "[\"P\",0,\"c\",0]" });
   // Reloading it restores everything except follow, which comes back ON (AC1.3).
   assert.deepEqual(loadPreferences(path, f.scopeKey).prefs,
-    { scroll: 7, expanded: true, selection: "[\"P\",0,\"c\",0]", follow: true });
+    { scroll: 7, collapsed: true, selection: "[\"P\",0,\"c\",0]", follow: true });
 });
 
 test("startViewer writes its ready file, renders the projection and shows the footer", async (t) => {
@@ -212,17 +212,18 @@ test("'f', 'c' and 'j' change only this role's view and persist it", async (t) =
   await viewer.key("f");
   assert.equal(viewer.state.prefs.follow, false);
   assert.match(stripVTControlCharacters(viewer.text), /Follow OFF/);
-  // 'c' expands closed phases and pauses follow, as in omo.
-  await viewer.key("c");
-  assert.equal(viewer.state.prefs.expanded, true);
+  // Closed phases stay on record by default; 'c' collapses them and pauses follow.
   assert.match(stripVTControlCharacters(viewer.text), /done one/);
+  await viewer.key("c");
+  assert.equal(viewer.state.prefs.collapsed, true);
+  assert.doesNotMatch(stripVTControlCharacters(viewer.text), /done one/);
   // 'j' moves the selection and pauses follow.
   const before = viewer.frame.selection;
   await viewer.key("j");
   assert.notEqual(viewer.frame.selection, before);
   assert.equal(viewer.state.prefs.follow, false);
   const saved = f.readPrefs();
-  assert.equal(saved.expanded, true);
+  assert.equal(saved.collapsed, true);
   assert.equal(saved.selection, viewer.frame.selection);
   assert.equal("follow" in saved, false);
   // An unhandled key changes nothing at all.
@@ -256,10 +257,10 @@ test("AC1.3: f(OFF) then q then reopen comes back FOLLOW ON with fold and select
   const second = await startViewer(options(f), deps);
   t.after(() => second.stop());
   assert.equal(second.state.prefs.follow, true, "follow is never restored OFF");
-  assert.equal(second.state.prefs.expanded, true, "the fold toggle is restored");
+  assert.equal(second.state.prefs.collapsed, true, "the fold toggle is restored");
   assert.equal(second.state.prefs.selection, wantSelection, "the selection is restored");
   assert.match(stripVTControlCharacters(second.text), /Follow ON/);
-  assert.match(stripVTControlCharacters(second.text), /done one/);
+  assert.doesNotMatch(stripVTControlCharacters(second.text), /done one/);
 });
 
 test("the ready-delay-25s failpoint postpones the first ready write", async (t) => {
@@ -366,7 +367,7 @@ test("scope switch: a new scopeKey rebinds data and prefs without touching the p
   f.writeProjection(projectionFor([{ name: "First", tasks: [{ content: "OLD_SCOPE_TASK", status: "pending" }] }]));
   f.writeProjection(projectionFor([{ name: "Second", tasks: [{ content: "NEW_SCOPE_TASK", status: "pending" }] }]), otherScope);
   f.writePrefs({ schema: "gjc-herdr-dashboard/prefs/1", scopeKey: otherScope, scroll: 3,
-    expanded: true, selection: null }, otherScope);
+    collapsed: true, selection: null }, otherScope);
   const viewer = await startViewer(options(f), { port: f.port, clock: f.clock, env: f.env,
     output: f.output, input: f.input, herdr: f.herdr, exit: () => {} });
   t.after(() => viewer.stop());
@@ -381,7 +382,7 @@ test("scope switch: a new scopeKey rebinds data and prefs without touching the p
   assert.match(stripVTControlCharacters(viewer.text), /NEW_SCOPE_TASK/);
   assert.doesNotMatch(stripVTControlCharacters(viewer.text), /OLD_SCOPE_TASK/);
   // The new scope's prefs were loaded, and follow came back ON.
-  assert.equal(viewer.state.prefs.expanded, true);
+  assert.equal(viewer.state.prefs.collapsed, true);
   assert.equal(viewer.state.prefs.follow, true);
   assert.deepEqual(f.calls, []);
 });

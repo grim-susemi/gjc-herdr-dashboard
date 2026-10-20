@@ -114,11 +114,12 @@ export function parseViewerArgs(args) {
 // `detail` is intentionally absent: it is a transient view toggle (contract: `d` is
 // not saved), so it can never be restored from disk. `follow` is present so a fresh
 // prefs object is complete, but the on-disk record never carries it (AC1.3).
+// Finished cards stay listed (one row each) by default so a run leaves a record; `c` hides them.
 export const EMPTY_PREFS = Object.freeze({ scroll: 0, expanded: Object.freeze({}), selection: null,
-  follow: true, showCompleted: false });
+  follow: true, showCompleted: true });
 
 const freshPrefs = () => ({ scroll: 0, expanded: {}, selection: null, follow: true,
-  showCompleted: false });
+  showCompleted: true });
 
 const message = (cause) => String(cause?.message ?? cause ?? "error");
 const enoent = (path) => Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });
@@ -194,13 +195,13 @@ export function loadPreferences(path, scopeKey, { read = defaultPort.read } = {}
   const integer = (candidate) => (Number.isSafeInteger(candidate) && candidate >= 0 ? candidate : 0);
   return { prefs: { scroll: integer(value.scroll), expanded: readExpanded(value.expanded),
     selection: typeof value.selection === "string" ? value.selection : null, follow: true,
-    showCompleted: value.showCompleted === true }, error: "" };
+    showCompleted: value.hideCompleted !== true }, error: "" };
 }
 
 export async function savePreferences(path, prefs, { write = defaultPort.write } = {}) {
   const record = { schema: PREFS_SCHEMA, scopeKey: prefs.scopeKey, scroll: prefs.scroll,
     expanded: readExpanded(prefs.expanded), selection: prefs.selection,
-    showCompleted: prefs.showCompleted === true };
+    hideCompleted: prefs.showCompleted === false };
   await write(path, record);
   return record;
 }

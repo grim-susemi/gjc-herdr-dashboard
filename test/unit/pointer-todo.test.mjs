@@ -412,7 +412,7 @@ test("an SGR report is decoded in place of the key path, and a real key in the s
   assert.equal(viewer.frame.scroll, 0, "the wheel step is clamped at the top");
   assert.equal(viewer.state.prefs.follow, false, "but the wheel was decoded, not typed");
   assert.equal(viewer.frame.selection, "[\"P\",0,\"t1\",0]", "the arrow key arrived as one key");
-  assert.equal(viewer.state.prefs.expanded, false, "no report byte toggled the fold");
+  assert.equal(viewer.state.prefs.collapsed, false, "no report byte toggled the fold");
   assert.equal(f.input.listenerCount("data"), 1, "exactly one decoder listens (no second onData path)");
 });
 

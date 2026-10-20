@@ -79,8 +79,9 @@ export function taskKeys(projection) {
 
 // Body rows. `expanded` only ever reveals fully closed phases: a phase that still
 // holds pending or in-progress work always lists its tasks, because hiding pending
-// work would defeat the point of a todo list. Closed phases collapse to nothing
-// until `c` expands them, and their counts stay visible in the header.
+// work would defeat the point of a todo list. Closed phases collapse to nothing unless
+// `expanded`; the viewer passes `expanded` by default so finished work stays on record, and
+// `c` collapses them (their counts stay visible in the header either way).
 function body(projection, { columns, expanded, color, language }) {
   const bodyLines = [];
   const taskRanges = Object.create(null), phaseRanges = Object.create(null);
