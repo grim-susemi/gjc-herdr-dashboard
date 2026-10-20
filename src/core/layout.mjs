@@ -8,14 +8,20 @@
 // MIT License, Copyright (c) 2026 omo-herdr-dashboard contributors.
 //
 // Fresh shape: the parent is split right once and keeps `chatShare` of the width on the left;
-// Todo keeps the new right half, and Todo is then split down with ratio `todoHeight`, so Todo
+// Todo keeps the new right third, and Todo is then split down with ratio `todoHeight`, so Todo
 // keeps 35% of the rows on top and Workers gets the row below at Todo's full width.
 //
-//   +-------------+-------------------+
-//   |             |        Todo       |
-//   |   parent    +-------------------+
-//   |   (chat)    |      Workers      |
-//   +-------------+-------------------+
+//   +-----------------------+-------------+
+//   |                       |    Todo     |
+//   |        parent         +-------------+
+//   |        (chat)         |   Workers   |
+//   +-----------------------+-------------+
+//
+// `chatShare` is the exact fraction 2/3, so the dashboard region is 1/3 of the split width by
+// construction (the product owner asked for 1/3 rather than 1/2: fewer panes than OMO). Herdr
+// rounds the first child as `round(fround(length * fround(ratio)))`; at the common tab widths this
+// is deterministic: 120 -> parent 80 / dashboard 40, 160 -> 107/53, 240 -> 160/80. The 160 case
+// cannot be an exact cell split, so it rounds to the nearest cell and stays within 1/160 of 1/3.
 //
 // Rounding is Herdr's: `first child = round(fround(length * fround(ratio)))`. `childRects`
 // returns [first, second], where the FIRST child is the original pane — so `right` puts the new
@@ -49,7 +55,9 @@
 // `chatShare`), not an export: nothing outside this module needs the intermediate rect.
 
 export const BAND_LAYOUT = Object.freeze({
-  chatShare: 0.5,
+  // Parent (chat) share; the remaining 1/3 is the dashboard region. Written as an exact fraction
+  // so the intent is visible at the single source of the band numbers.
+  chatShare: 2 / 3,
   todoHeight: 0.35,
   minTodoRows: 8,
   minLowerRows: 12,

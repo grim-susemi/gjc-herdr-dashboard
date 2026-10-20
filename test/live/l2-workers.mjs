@@ -87,12 +87,16 @@ await runScript('l2-workers (LV-7)', async () => {
     assert(rw.x === rt.x && rw.width === rt.width && rw.y === rt.y + rt.height,
       'Workers is directly below Todo with the same width', { rt, rw });
     assert(rt.height + rw.height === layout.area.height, 'Todo + Workers fill the dashboard column', { rt, rw });
+    const dashShare = rt.width / layout.area.width;
+    assert(Math.abs(dashShare - 1 / 3) < 0.03,
+      `the dashboard column is about one third of the tab width (${dashShare.toFixed(3)})`,
+      { area: layout.area, rt, rw });
     const todoShare = rt.height / layout.area.height;
     assert(Math.abs(todoShare - 0.35) < 0.08, `Todo holds about 35 % of the rows (${todoShare.toFixed(2)})`, { rt, rw });
     assert(rt.height >= 8 && rw.height >= 12 && rw.width >= 24, 'band floors hold', { rt, rw });
     const focusAfter = fixture.listPanes().find((p) => p.focused)?.pane_id ?? null;
     assert(focusAfter === focusBefore, 'the parent kept focus', { focusBefore, focusAfter });
-    result.ac21 = { parent: rp, todo: rt, workers: rw, todoShare };
+    result.ac21 = { parent: rp, todo: rt, workers: rw, todoShare, dashShare };
 
     const workersPane = workers[0].pane_id;
     const readWorkers = () => stripAnsi(fixture.readPane(workersPane));

@@ -25,7 +25,7 @@ const rect = ([x, y, width, height]) => ({ x, y, width, height });
 const paneOf = (layout, role) => layout.panes.find((pane) => pane.pane_id === IDS[role]);
 // A whole tab of `width` x `height` columns holding the fresh band. `parentRect` is the pane the
 // band splits — here the parent pane owns the whole tab before the band exists — so the parent
-// keeps the left `chatShare` and Todo + Workers take the right half (the module's internal
+// keeps the left `chatShare` (2/3) and Todo + Workers take the right third (the module's internal
 // `freshBandRegion`). Exact numbers are hand-asserted in 'fresh 2-role band geometry matches
 // Herdr rounding at 200x50 and 120x40'.
 function tabOf([width, height], ids = IDS, roles = ROLES) {
@@ -38,7 +38,7 @@ function tabOf([width, height], ids = IDS, roles = ROLES) {
 
 test('BAND_LAYOUT carries the contract values and is frozen', () => {
   assert.deepEqual(BAND_LAYOUT, {
-    chatShare: 0.5,
+    chatShare: 2 / 3,
     todoHeight: 0.35,
     minTodoRows: 8,
     minLowerRows: 12,
@@ -60,10 +60,20 @@ test('childRects rounds a Herdr split as round(fround(length * fround(ratio)))',
     { x: 10, y: 5, width: 100, height: 50 },
     { x: 110, y: 5, width: 100, height: 50 },
   ]);
+  // The product's chatShare 2/3 at the same width: parent 133, dashboard 67.
+  assert.deepEqual(childRects(rect([10, 5, 200, 50]), 'right', BAND_LAYOUT.chatShare), [
+    { x: 10, y: 5, width: 133, height: 50 },
+    { x: 143, y: 5, width: 67, height: 50 },
+  ]);
   // 79 columns at 0.5 rounds down to 40/39 in float32.
-  assert.deepEqual(childRects(rect([0, 0, 79, 4]), 'right', BAND_LAYOUT.chatShare), [
+  assert.deepEqual(childRects(rect([0, 0, 79, 4]), 'right', 0.5), [
     { x: 0, y: 0, width: 40, height: 4 },
     { x: 40, y: 0, width: 39, height: 4 },
+  ]);
+  // At chatShare 2/3 the same 79 columns give 53/26, so the dashboard stays about one third.
+  assert.deepEqual(childRects(rect([0, 0, 79, 4]), 'right', BAND_LAYOUT.chatShare), [
+    { x: 0, y: 0, width: 53, height: 4 },
+    { x: 53, y: 0, width: 26, height: 4 },
   ]);
 });
 
@@ -92,19 +102,32 @@ test('childRects reproduces the recorded live pane split at 120x40', () => {
   assert.deepEqual(childRects(measured.area, 'right', 0.5), [measured.panes.first, measured.panes.second]);
 });
 
-test('the fresh region is the right half of the parent at chatShare, floors measured on it', () => {
-  // 200 columns: the parent keeps 100, the fresh region is 100 columns at the parent's full
-  // height. 79 columns split 40/39 — a 39-column region is below the 40-column readable width.
-  const cases = [[[0, 0, 200, 50], [100, 0, 100, 50]], [[0, 0, 120, 40], [60, 0, 60, 40]],
-    [[0, 0, 79, 24], [40, 0, 39, 24]], [[5, 3, 48, 50], [29, 3, 24, 50]]];
+test('the fresh region is the right third of the parent at chatShare, floors measured on it', () => {
+  // 200 columns: the parent keeps 133, the fresh region is 67 columns at the parent's full height.
+  // 79 columns split 53/26 — a 26-column region is above the 24-column hard floor.
+  const cases = [[[0, 0, 200, 50], [133, 0, 67, 50]], [[0, 0, 120, 40], [80, 0, 40, 40]],
+    [[0, 0, 79, 24], [53, 0, 26, 24]], [[5, 3, 48, 50], [37, 3, 16, 50]]];
   for (const [input, expected] of cases) {
     const [, region] = childRects(rect(input), 'right', BAND_LAYOUT.chatShare);
     assert.deepEqual(region, rect(expected), input.join(','));
   }
-  // The floors are measured on that region: 48 parent columns leave exactly 24 dashboard columns,
-  // which is the minimum, and 46 leave 23, which lowers the band to Todo only.
-  assert.equal(bandSizes(childRects(rect([0, 0, 48, 50]), 'right', BAND_LAYOUT.chatShare)[1]).fits, true);
-  assert.equal(bandSizes(childRects(rect([0, 0, 46, 50]), 'right', BAND_LAYOUT.chatShare)[1]).fits, false);
+  // The floors are measured on that region: 71 parent columns leave exactly 24 dashboard columns,
+  // which is the minimum, and 70 leave 23, which lowers the band to Todo only.
+  assert.equal(bandSizes(childRects(rect([0, 0, 71, 50]), 'right', BAND_LAYOUT.chatShare)[1]).fits, true);
+  assert.equal(bandSizes(childRects(rect([0, 0, 70, 50]), 'right', BAND_LAYOUT.chatShare)[1]).fits, false);
+});
+
+test('the dashboard region is one third of the window at 120, 160 and 240 columns', () => {
+  // Exact float32/Herdr cells for chatShare 2/3. 120 and 240 are exact thirds; 160 rounds the
+  // parent to 107 and leaves 53, which is within one cell of 160/3 and within 1/160 of 1/3.
+  for (const [width, parentWidth, dashboardWidth] of [[120, 80, 40], [160, 107, 53],
+    [240, 160, 80]]) {
+    const [parent, region] = childRects(rect([0, 0, width, 40]), 'right', BAND_LAYOUT.chatShare);
+    assert.equal(parent.width, parentWidth, `${width}: parent`);
+    assert.equal(region.width, dashboardWidth, `${width}: dashboard`);
+    assert.ok(Math.abs(region.width / width - 1 / 3) <= 1 / width,
+      `${width}: dashboard is within one cell of one third`);
+  }
 });
 
 test('bandSizes reports the split of the dashboard region, with the floors and readability', () => {
@@ -187,16 +210,16 @@ test('the lower-row floor cannot bind alone at this ratio, but bandSizes still e
 });
 
 test('fresh 2-role band geometry matches Herdr rounding at 200x50 and 120x40', () => {
-  // parent keeps round(200 * 0.5) = 100 columns; Todo takes round(50 * 0.35) = 18 of the 50 rows.
+  // parent keeps round(200 * 2/3) = 133 columns; Todo takes round(50 * 0.35) = 18 of the 50 rows.
   assert.deepEqual(tabOf([200, 50]).panes, [
-    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 100, height: 50 } },
-    { pane_id: IDS.todo, rect: { x: 100, y: 0, width: 100, height: 18 } },
-    { pane_id: IDS.workers, rect: { x: 100, y: 18, width: 100, height: 32 } },
+    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 133, height: 50 } },
+    { pane_id: IDS.todo, rect: { x: 133, y: 0, width: 67, height: 18 } },
+    { pane_id: IDS.workers, rect: { x: 133, y: 18, width: 67, height: 32 } },
   ]);
   assert.deepEqual(tabOf([120, 40]).panes, [
-    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 60, height: 40 } },
-    { pane_id: IDS.todo, rect: { x: 60, y: 0, width: 60, height: 14 } },
-    { pane_id: IDS.workers, rect: { x: 60, y: 14, width: 60, height: 26 } },
+    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 80, height: 40 } },
+    { pane_id: IDS.todo, rect: { x: 80, y: 0, width: 40, height: 14 } },
+    { pane_id: IDS.workers, rect: { x: 80, y: 14, width: 40, height: 26 } },
   ]);
   // The fresh region is the right-hand region of that first split, and the floors are measured on
   // exactly that region.
@@ -219,15 +242,15 @@ test('planBand allows Todo and Workers on a fresh band that fits', () => {
   // The parent's origin does not change the floors: only the region's width and height matter.
   assert.deepEqual(planBand({ parentRect: rect([100, 10, 200, 50]), roles: ['todo', 'workers'] }),
     { roles: ['todo', 'workers'], lowered: false, reason: null });
-  // 48 columns is exactly the minimum parent width: the fresh region is 24 columns, which fits
+  // 71 columns is exactly the minimum parent width: the fresh region is 24 columns, which fits
   // (readable false) and is still allowed.
-  assert.deepEqual(planBand({ parentRect: rect([0, 0, 48, 50]), roles: ['todo', 'workers'] }),
+  assert.deepEqual(planBand({ parentRect: rect([0, 0, 71, 50]), roles: ['todo', 'workers'] }),
     { roles: ['todo', 'workers'], lowered: false, reason: null });
 });
 
 test('planBand lowers to Todo only when the region fails a floor, and to nothing when tiny', () => {
-  // 46 parent columns leave 23 dashboard columns, below the 24-column floor: nothing for Workers.
-  assert.deepEqual(planBand({ parentRect: rect([0, 0, 46, 50]), roles: ['todo', 'workers'] }),
+  // 70 parent columns leave 23 dashboard columns, below the 24-column floor: nothing for Workers.
+  assert.deepEqual(planBand({ parentRect: rect([0, 0, 70, 50]), roles: ['todo', 'workers'] }),
     { roles: ['todo'], lowered: true, reason: 'size' });
   // 20 parent rows leave round(20 * 0.35) = 7 Todo rows, below the 8-row floor: Todo keeps the
   // whole 20-row region (its own row floor passes), Workers is dropped.
@@ -241,7 +264,7 @@ test('planBand lowers to Todo only when the region fails a floor, and to nothing
   // No measurable parent rect and no existing Todo: nothing to place, still reported as size.
   assert.deepEqual(planBand({ parentRect: null, roles: ['todo', 'workers'] }),
     { roles: [], lowered: true, reason: 'size' });
-  assert.equal(bandSizes(childRects(rect([0, 0, 46, 50]), 'right', BAND_LAYOUT.chatShare)[1]).fits, false);
+  assert.equal(bandSizes(childRects(rect([0, 0, 70, 50]), 'right', BAND_LAYOUT.chatShare)[1]).fits, false);
 });
 
 test('planBand floors an existing Todo band on the Todo rect itself', () => {
@@ -282,7 +305,7 @@ test('planBand floors an existing Todo band on the Todo rect itself', () => {
   // report `partial:no-anchor` because no live Todo record exists (contract, Roles/ordering).
   assert.deepEqual(planBand({ parentRect: rect([0, 0, 200, 50]), roles: ['workers'] }),
     { roles: ['workers'], lowered: false, reason: null });
-  assert.deepEqual(planBand({ parentRect: rect([0, 0, 46, 50]), roles: ['workers'] }),
+  assert.deepEqual(planBand({ parentRect: rect([0, 0, 70, 50]), roles: ['workers'] }),
     { roles: [], lowered: true, reason: 'size' });
   // The result always follows the product's role order (Todo then Workers) and counts a role the
   // caller named twice only once.
@@ -318,17 +341,17 @@ test('planBand keeps open panes and ignores roles this layer does not have', () 
 test('isBandShape accepts the fresh band at typical sizes, with and without Workers', () => {
   // The literal hand-computed 200x50 band, independent of the module's own arithmetic.
   assert.equal(isBandShape({ area: rect([0, 0, 200, 50]), panes: [
-    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 100, height: 50 } },
-    { pane_id: IDS.todo, rect: { x: 100, y: 0, width: 100, height: 18 } },
-    { pane_id: IDS.workers, rect: { x: 100, y: 18, width: 100, height: 32 } },
+    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 133, height: 50 } },
+    { pane_id: IDS.todo, rect: { x: 133, y: 0, width: 67, height: 18 } },
+    { pane_id: IDS.workers, rect: { x: 133, y: 18, width: 67, height: 32 } },
   ] }, IDS), true);
   for (const size of [[200, 50], [120, 40], [100, 30]]) {
     assert.equal(isBandShape(tabOf(size), IDS), true, size.join('x'));
   }
   // Workers is optional: parent left, Todo right at the full height.
   const todoOnly = { area: rect([0, 0, 200, 50]), panes: [
-    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 100, height: 50 } },
-    { pane_id: IDS.todo, rect: { x: 100, y: 0, width: 100, height: 50 } },
+    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 133, height: 50 } },
+    { pane_id: IDS.todo, rect: { x: 133, y: 0, width: 67, height: 50 } },
   ] };
   assert.equal(isBandShape(todoOnly, { parent: IDS.parent, todo: IDS.todo }), true);
   assert.equal(isBandShape(todoOnly, { parent: IDS.parent, todo: IDS.todo, workers: undefined }), true);
@@ -340,9 +363,9 @@ test('isBandShape accepts the fresh band at typical sizes, with and without Work
   reversed.panes.reverse();
   assert.equal(isBandShape(reversed, IDS), true, 'pane order does not matter');
   const shifted = { area: rect([20, 10, 200, 50]), panes: [
-    { pane_id: IDS.parent, rect: { x: 20, y: 10, width: 100, height: 50 } },
-    { pane_id: IDS.todo, rect: { x: 120, y: 10, width: 100, height: 18 } },
-    { pane_id: IDS.workers, rect: { x: 120, y: 28, width: 100, height: 32 } },
+    { pane_id: IDS.parent, rect: { x: 20, y: 10, width: 133, height: 50 } },
+    { pane_id: IDS.todo, rect: { x: 153, y: 10, width: 67, height: 18 } },
+    { pane_id: IDS.workers, rect: { x: 153, y: 28, width: 67, height: 32 } },
   ] };
   assert.equal(isBandShape(shifted, IDS), true, 'a band inside an offset tab area');
   const wrongOrigin = tabOf([200, 50]);
@@ -376,22 +399,22 @@ test('isBandShape rejects any role shifted by one cell in any dimension', () => 
 test('isBandShape rejects flipped layouts and foreign siblings', () => {
   const spec = rect([0, 0, 200, 50]);
   const flippedVertical = { area: spec, panes: [
-    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 100, height: 50 } },
-    { pane_id: IDS.workers, rect: { x: 100, y: 0, width: 100, height: 32 } },
-    { pane_id: IDS.todo, rect: { x: 100, y: 32, width: 100, height: 18 } },
+    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 133, height: 50 } },
+    { pane_id: IDS.workers, rect: { x: 133, y: 0, width: 67, height: 32 } },
+    { pane_id: IDS.todo, rect: { x: 133, y: 32, width: 67, height: 18 } },
   ] };
   assert.equal(isBandShape(flippedVertical, IDS), false, 'Workers above Todo');
   // The old columns shape: Workers to the right of Todo instead of below it.
   const flippedHorizontal = { area: spec, panes: [
-    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 100, height: 50 } },
-    { pane_id: IDS.todo, rect: { x: 100, y: 0, width: 50, height: 50 } },
-    { pane_id: IDS.workers, rect: { x: 150, y: 0, width: 50, height: 50 } },
+    { pane_id: IDS.parent, rect: { x: 0, y: 0, width: 133, height: 50 } },
+    { pane_id: IDS.todo, rect: { x: 133, y: 0, width: 34, height: 50 } },
+    { pane_id: IDS.workers, rect: { x: 167, y: 0, width: 33, height: 50 } },
   ] };
   assert.equal(isBandShape(flippedHorizontal, IDS), false, 'Workers beside Todo');
   const parentRight = { area: spec, panes: [
-    { pane_id: IDS.parent, rect: { x: 100, y: 0, width: 100, height: 50 } },
-    { pane_id: IDS.todo, rect: { x: 0, y: 0, width: 100, height: 18 } },
-    { pane_id: IDS.workers, rect: { x: 0, y: 18, width: 100, height: 32 } },
+    { pane_id: IDS.parent, rect: { x: 67, y: 0, width: 133, height: 50 } },
+    { pane_id: IDS.todo, rect: { x: 0, y: 0, width: 67, height: 18 } },
+    { pane_id: IDS.workers, rect: { x: 0, y: 18, width: 67, height: 32 } },
   ] };
   assert.equal(isBandShape(parentRight, IDS), false, 'parent on the right');
   const parentShort = tabOf([200, 50]);
@@ -399,13 +422,13 @@ test('isBandShape rejects flipped layouts and foreign siblings', () => {
   assert.equal(isBandShape(parentShort, IDS), false, 'parent shorter than the area');
   // Workers narrower than Todo, or not starting at Todo's left edge, breaks the band.
   const workersNarrow = tabOf([200, 50]);
-  paneOf(workersNarrow, 'workers').rect.width = 99;
+  paneOf(workersNarrow, 'workers').rect.width = 66;
   assert.equal(isBandShape(workersNarrow, IDS), false, 'Workers narrower than Todo');
   const workersGap = tabOf([200, 50]);
-  paneOf(workersGap, 'workers').rect.x = 101;
+  paneOf(workersGap, 'workers').rect.x = 134;
   assert.equal(isBandShape(workersGap, IDS), false, 'Workers not aligned with Todo');
   const todoShort = tabOf([200, 50]);
-  paneOf(todoShort, 'todo').rect.width = 99;
+  paneOf(todoShort, 'todo').rect.width = 66;
   assert.equal(isBandShape(todoShort, IDS), false, 'Todo does not reach the area edge');
   const heightsGap = tabOf([200, 50]);
   paneOf(heightsGap, 'workers').rect.height = 31;
@@ -419,7 +442,7 @@ test('isBandShape rejects flipped layouts and foreign siblings', () => {
   paneOf(replaced, 'workers').pane_id = 'foreign';
   assert.equal(isBandShape(replaced, IDS), false, 'a foreign pane in place of Workers');
   const duplicated = tabOf([200, 50]);
-  duplicated.panes.push({ pane_id: IDS.workers, rect: { x: 100, y: 18, width: 100, height: 32 } });
+  duplicated.panes.push({ pane_id: IDS.workers, rect: { x: 133, y: 18, width: 67, height: 32 } });
   assert.equal(isBandShape(duplicated, IDS), false, 'our pane twice');
 });
 

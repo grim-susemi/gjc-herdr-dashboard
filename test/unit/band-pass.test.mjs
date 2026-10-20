@@ -3,8 +3,9 @@
 //
 // What this file pins (plan 7.8, contract "Launch parameters"/"Roles/ordering", AC2.1, AC2.7, AC2.8):
 //   * an explicit pass opens Todo first and then Workers, and the SECOND split's anchor is the Todo
-//     pane this pass created, with `--direction down --ratio 0.35 --no-focus`; the Todo split keeps
-//     the L1 argv exactly (parent anchor, `--direction right --no-focus`, no `--ratio`);
+//     pane this pass created, with `--direction down --ratio 0.35 --no-focus`; the Todo split uses
+//     the parent as anchor with `--direction right --ratio 2/3 --no-focus`, leaving the dashboard
+//     one third of the tab;
 //   * a region below a floor lowers the ladder (Todo+Workers -> Todo only -> nothing) and reports
 //     `partial:size` with a detail naming Workers;
 //   * a foreign sibling in the tab makes the result `partial:shape` while the foreign pane keeps its
@@ -93,9 +94,9 @@ test('AC2.1: an explicit pass opens Todo then Workers, anchored on the Todo pane
   assert.equal(pass.roles.workers.code, 'opened', JSON.stringify(pass.roles));
   const splits = world.splitCalls();
   assert.equal(splits.length, 2, JSON.stringify(splits));
-  // 1. Todo keeps the L1 argv byte for byte: the parent as anchor, `right`, and NO `--ratio` flag
-  // (Herdr's own default is 0.5; adding the flag would be a second spelling of the same geometry).
-  assert.deepEqual(splits[0], ['pane', 'split', PARENT, '--direction', 'right', '--no-focus']);
+  // 1. Todo anchors on the parent, `right`, at the band's chatShare 2/3 (the dashboard keeps 1/3).
+  assert.deepEqual(splits[0], ['pane', 'split', PARENT, '--direction', 'right',
+    '--ratio', '0.6666666666666666', '--no-focus']);
   // 2. Workers anchors on the Todo pane this pass created, and states `down` + the plan's 0.35.
   const todoPaneId = await world.paneOf('todo');
   assert.equal(pass.roles.todo.paneId, todoPaneId);
@@ -103,17 +104,17 @@ test('AC2.1: an explicit pass opens Todo then Workers, anchored on the Todo pane
     '--ratio', '0.35', '--no-focus']);
   assert.equal(BAND_LAYOUT.todoHeight, 0.35);
 
-  // The band really is a band in the tab the fixture models. The fixture halves every split and
-  // ignores `--ratio` (it models Herdr's pane table, not its rounding), so its Todo row is 40 of 80;
-  // the ratio itself is asserted on the argv above, and `isBandShape` deliberately checks geometry
-  // only, never ratios. On a real Herdr the same two calls produce 28/52 because 0.35 is passed.
+  // The band really is a band in the tab the fixture models. The fixture now honours `--ratio`
+  // with Herdr's rounding, so 400 columns give a 267/133 split and 80 rows give 28/52.
   const layout = world.fake.layout();
   assert.equal(layout.panes.length, 3, JSON.stringify(layout.panes));
   const rectOf = id => layout.panes.find(pane => pane.pane_id === id)?.rect ?? null;
   const [parent, todo, workers] = [rectOf(PARENT), rectOf(todoPaneId), rectOf(pass.roles.workers.paneId)];
-  assert.deepEqual(parent, { x: 0, y: 0, width: 200, height: 80 });
-  assert.deepEqual(todo, { x: 200, y: 0, width: 200, height: 40 });
-  assert.deepEqual(workers, { x: 200, y: 40, width: 200, height: 40 });
+  assert.deepEqual(parent, { x: 0, y: 0, width: 267, height: 80 });
+  assert.deepEqual(todo, { x: 267, y: 0, width: 133, height: 28 });
+  assert.deepEqual(workers, { x: 267, y: 28, width: 133, height: 52 });
+  assert.ok(Math.abs(todo.width / layout.area.width - 1 / 3) <= 1 / layout.area.width,
+    'the dashboard is within one cell of one third of the tab');
 
   // Both records are pending in the slot, with the labels the contract names.
   const slot = await world.slot();
@@ -197,8 +198,8 @@ test('the partial:no-anchor row has localized wording in all three languages, no
 
 // --------------------------------------------------------------------------------- AC2.1 -----
 test('AC2.1: a region below a floor lowers the ladder and reports partial:size naming Workers', async t => {
-  // 46 parent columns leave 23 dashboard columns: Todo fits, Workers' 24-column floor does not.
-  const narrow = await bandWorld(t, { fake: { parentRect: { x: 0, y: 0, width: 46, height: 50 } } });
+  // 70 parent columns leave 23 dashboard columns: Todo fits, Workers' 24-column floor does not.
+  const narrow = await bandWorld(t, { fake: { parentRect: { x: 0, y: 0, width: 70, height: 50 } } });
   const lowered = await narrow.explicit();
   assert.equal(lowered.roles.todo.code, 'opened', JSON.stringify(lowered.roles));
   assert.equal(lowered.roles.workers.code, 'partial:size');
@@ -280,7 +281,7 @@ test('AC2.8: a layout our panes do not form a band with is reported as partial:s
   // Nothing was done TO the mis-shaped pane to make the shape true: no rename, close, focus or run
   // was ever aimed at it, and it keeps its label and shell. (Its rect moves only because it is the
   // split ANCHOR of the Workers create that just happened, which is the documented existing-Todo
-  // case - the fixture halves the axis it splits.)
+  // case - the fixture now applies the 0.35 ratio the reconciler passes.)
   assert.equal(world.fake.labelOf('w1:p5'), labelOf('todo', key8Of(world.layoutKey)));
   assert.equal(world.fake.shellOf('w1:p5'), 550);
   for (const entry of world.tracer.trace) {
@@ -288,8 +289,8 @@ test('AC2.8: a layout our panes do not form a band with is reported as partial:s
       assert.notEqual(entry.argv[2], 'w1:p5', `a repair was attempted: ${entry.argv.join(' ')}`);
     }
   }
-  assert.equal(world.fake.rects.get('w1:p5').height, 40,
-    'only the anchor split touched it, exactly as the fake models a down split');
+  assert.equal(world.fake.rects.get('w1:p5').height, 28,
+    'only the anchor split touched it, at the 0.35 ratio');
   assert.equal(world.splitCalls().length, 1, 'Workers was still created where the floors allowed it');
   assert.equal((await world.slot()).roles.workers.state, 'pending');
 });

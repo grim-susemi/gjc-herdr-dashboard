@@ -19,7 +19,7 @@
 //   5 pane process-info (shell_pid)  6 pending record in slot.json  7 delete intent.json
 //   8 pane rename  9 pane run (viewer)  10 focus check
 // U12 would fuse 4/8/9 into one command; L0 G7/U12 measured no such command (split has no
-// `--label`/direct-command option), so this module issues the three separate calls.
+// `--label`/direct-command option), so this module issues the separate calls.
 //
 // Crash failpoints (FP1-FP5) are simulated through GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT so the
 // unit tests can stop the sequence exactly where a process death would, and then assert what a
@@ -51,9 +51,10 @@
 //   launchRole(options)            -> {ok, code, paneId?, tabId?, shellPid?, token, label, record?,
 //                                      slot?, splitPaneIds, focus, detail?}
 //     L2 adds `anchorPaneId` (default: the parent pane), `direction` (default 'right') and `ratio`
-//     (default null = no `--ratio` flag). Todo keeps the L1 argv exactly: the parent as anchor,
-//     `--direction right --no-focus` and no ratio flag. Workers: anchor = the Todo record's
-//     paneId, `--direction down --ratio 0.35 --no-focus`.
+//     (default null = no `--ratio` flag). The reconciler passes the band geometry explicitly:
+//     Todo uses the parent as anchor with `--direction right --ratio 2/3` (layout chatShare, so
+//     the dashboard keeps 1/3) and Workers uses the Todo record's paneId with `--direction down
+//     --ratio 0.35`. The null default keeps direct L1 callers byte-for-byte compatible.
 import { accessSync, constants } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { resolveHerdrVector, shellCommand } from '../herdr.mjs';
@@ -63,9 +64,9 @@ export const LAUNCH_FAILPOINT_ENV = 'GJC_HERDR_DASHBOARD_LAUNCH_FAILPOINT';
 export const VIEWER_FAILPOINT_ENV = 'GJC_HERDR_DASHBOARD_VIEWER_FAILPOINT';
 export const CRASH_FAIL_POINTS = ['fp1', 'fp2', 'fp3', 'fp4', 'fp5'];
 export const VIEWER_FAILPOINTS = ['ready-delay-25s'];
-// The L1 default: Todo is the first role, it is split to the right of the parent, and Herdr's own
-// default ratio (0.5) is used, so the argv carries no `--ratio` at all. Every later role states its
-// anchor and direction explicitly (contract "Launch parameters").
+// The L1 default: Todo is the first role, it is split to the right of the parent, and a direct
+// caller that passes no ratio gets Herdr's own default (0.5). The reconciler always states the
+// band ratio explicitly (contract "Launch parameters").
 const SPLIT_DIRECTION = 'right';
 
 // `fp5` is the viewer-side delay, not a crash: the launch itself completes normally.
@@ -195,10 +196,9 @@ export async function launchRole(options = {}) {
     checkNode, viewerAccess, resolveVector, vector = null,
     failpoint = undefined, focusCheck = true,
     // L2 (contract "Launch parameters"): which pane this role splits, in which direction, and at
-    // what ratio. The defaults reproduce the L1 Todo argv byte for byte: anchor = the parent pane,
-    // direction `right`, no `--ratio` flag at all (Herdr's own default is already 0.5, and adding
-    // the flag would be a second, unverified spelling of the same geometry). Workers passes the
-    // Todo pane as its anchor with `down` + 0.35.
+    // what ratio. The defaults reproduce the L1 argv for direct callers: anchor = the parent pane,
+    // direction `right`, no `--ratio` flag at all. The reconciler passes the band geometry
+    // explicitly (Todo chatShare = 2/3, Workers 0.35) so the dashboard is one third of the tab.
     anchorPaneId = null, direction = SPLIT_DIRECTION, ratio = null,
     // The reconciler passes guarded writers so the pass's budget check and generation re-check
     // also cover the state writes this sequence makes (steps 3, 6, 7). Defaults keep the module

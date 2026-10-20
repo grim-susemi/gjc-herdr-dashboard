@@ -6,7 +6,8 @@
 //   pane list          -> { panes:[{pane_id, tab_id, focused, label}] }
 //   pane layout        -> { layout:{ tab_id, focused_pane_id, area, panes:[{pane_id, rect}] } }
 //   pane process-info  -> { process_info:{ pane_id, shell_pid } }
-//   pane split         -> { pane:{ pane_id, tab_id }, type:'pane_info' }
+//   pane split         -> { pane:{ pane_id, tab_id }, type:'pane_info' } (honours --ratio with
+//                         Herdr's round(fround(length * fround(ratio))) rule)
 //   pane rename/run/close/focus -> {}
 // `send-text`, `send-keys` and every other verb are unimplemented and throw `unknown_command`
 // AFTER being recorded, so a test can prove the count is zero (LT-8) rather than trusting a scan.
@@ -112,19 +113,24 @@ export function createFakeHerdr(options = {}) {
       number += 1;
       const paneId = `${prefix}${number.toString(36).toUpperCase()}`;
       const base = rects.get(parent);
-      const half = Math.max(1, Math.round(base.width / 2));
       const direction = args[args.indexOf('--direction') + 1] ?? 'right';
       // Measured Herdr split geometry (omo split-tree helper, calibrated at L0): the source pane
       // keeps the first child with `--ratio`, and the new pane takes the second child. So a
-      // `right` split puts the new pane to the RIGHT of the source.
+      // `right` split puts the new pane to the RIGHT of the source. The first child is rounded with
+      // Herdr's own float32 rule; a missing or invalid ratio is Herdr's 0.5 default.
+      const ratioArg = args.indexOf('--ratio') >= 0 ? Number(args[args.indexOf('--ratio') + 1]) : NaN;
+      const ratio = Number.isFinite(ratioArg) && ratioArg > 0 && ratioArg < 1 ? ratioArg : 0.5;
+      const firstChild = length => Math.max(1,
+        Math.round(Math.fround(length * Math.fround(ratio))));
       if (direction === 'down') {
-        const halfRow = Math.max(1, Math.round(base.height / 2));
-        rects.set(parent, { ...base, height: halfRow });
-        add(paneId, { rect: { x: base.x, y: base.y + halfRow, width: base.width,
-          height: base.height - halfRow } });
+        const firstRow = firstChild(base.height);
+        rects.set(parent, { ...base, height: firstRow });
+        add(paneId, { rect: { x: base.x, y: base.y + firstRow, width: base.width,
+          height: base.height - firstRow } });
       } else {
-        rects.set(parent, { ...base, width: half });
-        add(paneId, { rect: { x: base.x + half, y: base.y, width: base.width - half,
+        const firstColumn = firstChild(base.width);
+        rects.set(parent, { ...base, width: firstColumn });
+        add(paneId, { rect: { x: base.x + firstColumn, y: base.y, width: base.width - firstColumn,
           height: base.height } });
       }
       shells.set(paneId, createdShellPid);

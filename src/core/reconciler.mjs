@@ -634,11 +634,12 @@ export function createReconciler(deps = {}) {
             const launch = await launchRole({
               herdr: call, paths, layoutKey, stateDir, role, token, label, language,
               parent: { socket: binding.socket, paneId: binding.parentPaneId, tabId: binding.tabId },
-              // Todo keeps the L1 argv (the parent as anchor, `right`, no ratio); every other role
-              // states its anchor, direction and ratio explicitly (contract "Launch parameters").
+              // Todo anchors on the parent and states the band's chat share (2/3, leaving the
+              // dashboard 1/3 of the tab); every other role states its anchor, direction and ratio
+              // explicitly (contract "Launch parameters").
               anchorPaneId: role === 'todo' ? binding.parentPaneId : todoRecord.paneId,
               direction: role === 'todo' ? 'right' : 'down',
-              ratio: role === 'todo' ? null : BAND_LAYOUT.todoHeight,
+              ratio: role === 'todo' ? BAND_LAYOUT.chatShare : BAND_LAYOUT.todoHeight,
               scope: { sessionId: binding.sessionId, scopeKey: scope.scopeKey,
                 scopeEpoch: scope.scopeEpoch, language },
               slot, viewerPath: viewerPathFor(role), nodePath, checkNode, env, now, platform,
