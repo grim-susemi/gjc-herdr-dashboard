@@ -152,7 +152,7 @@ function elapsedText(language, seconds) {
 
 // Exported for the render matrix tests and for a drill that wants the row without a frame.
 // `inset` adds the pane's one-column inset and counts it inside `columns`, so a frame can
-// pass the same `edge` it uses for the header.
+// pass its full pane width and let the goal row keep the same usable edge as the header.
 export function goalLine(goal, { columns = 80, language = "ko", color = true, inset = false } = {}) {
   if (!goal || typeof goal !== "object" || typeof goal.objective !== "string" ||
     typeof goal.status !== "string" || goal.status.trim() === "") return null;
@@ -243,7 +243,7 @@ export function renderFrame(projection, {
   // whether that happened so a test can assert it precisely. The one-column inset is
   // used only when the whole row, inset included, fits.
   const footerLine = (width(footer) + 1 <= columns ? " " : "") +
-    paint(footer, kind === "live" ? "accent" : "warning", color);
+    paint(footer, kind === "live" || kind === "empty" ? "accent" : "warning", color);
 
   const drawn = body(projection, { columns, expanded, color, language: languageCode, selection: resolved });
   const { bodyLines, taskRanges, phaseRanges, selectableKeys } = drawn;
@@ -269,7 +269,7 @@ export function renderFrame(projection, {
   const divider = paint("─".repeat(columns), "muted", color);
   // A goal row exists only when `goal.json` carries a goal. There is no placeholder row and no
   // blank spacer when the host reports none, so an ordinary Todo frame keeps its header and divider.
-  const goalRow = goalLine(goal, { columns: inset ? edge : columns, inset: Boolean(inset),
+  const goalRow = goalLine(goal, { columns, inset: Boolean(inset),
     language: languageCode, color });
   const errorLine = sourceError
     ? paint(fit(t(languageCode, "readError", { error: clean(sourceError) }), columns), "error", color) : "";
