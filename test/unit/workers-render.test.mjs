@@ -60,7 +60,7 @@ test("status glyphs are one cell each and keep the six states apart", () => {
   for (const status of STATUSES) {
     const line = plainLine(frameOf([card("c1", { title: "item one", status })],
       { view: { follow: false, showCompleted: true } }).bodyLines[0]);
-    const glyph = line[2];
+    const glyph = line[1];
     assert.equal(width(glyph), 1, `${status} glyph is one cell: ${JSON.stringify(glyph)}`);
     assert.equal(glyph, GLYPHS[status], status);
     glyphs.add(glyph);
@@ -69,9 +69,9 @@ test("status glyphs are one cell each and keep the six states apart", () => {
   // AC2.2: failed and aborted are two different glyphs and two different words.
   const line = (status) => plainLine(frameOf([card("c1", { title: "item one", status })],
     { view: { follow: false, showCompleted: true } }).bodyLines[0]);
-  assert.equal(line("failed")[2], "×");
-  assert.equal(line("aborted")[2], "⊘");
-  assert.notEqual(line("failed")[2], line("aborted")[2]);
+  assert.equal(line("failed")[1], "×");
+  assert.equal(line("aborted")[1], "⊘");
+  assert.notEqual(line("failed")[1], line("aborted")[1]);
   assert.match(line("failed"), / · failed/);
   assert.match(line("aborted"), / · aborted/);
   assert.doesNotMatch(line("failed"), /aborted/);
@@ -95,7 +95,7 @@ test("Q3=A: running and done show the glyph only, the other states keep their wo
         `${language}/${status}: status word: ${line(status)}`);
     }
     // The glyph always survives, in every language and state.
-    for (const status of STATUSES) assert.equal(line(status)[2], GLYPHS[status], `${language}/${status}`);
+    for (const status of STATUSES) assert.equal(line(status)[1], GLYPHS[status], `${language}/${status}`);
   }
 });
 
@@ -112,7 +112,7 @@ for (const columns of [24, 40, 54]) {
         const line = plainLine(frameOf([card("c1", { title, status })],
           { columns, language, view: { follow: false, showCompleted: true } }).bodyLines[0]);
         assert.ok(line.includes(title), `${columns}/${language}/${status}: title: ${line}`);
-        assert.equal(line[2], GLYPHS[status], `${columns}/${language}/${status}: glyph: ${line}`);
+        assert.equal(line[1], GLYPHS[status], `${columns}/${language}/${status}: glyph: ${line}`);
         if (status === "running" || status === "completed") {
           assert.ok(!line.includes(` · ${WORDS[language][status]}`),
             `${columns}/${language}/${status}: glyph only: ${line}`);
@@ -133,7 +133,7 @@ test("a long title truncates with `…` but never pushes the status off a 24-col
     const frame = frameOf([card("c1", { title: "x".repeat(80), status: "failed" })],
       { columns: 24, language });
     const line = plainLine(frame.bodyLines[0]);
-    assert.equal(line[2], "×", language);
+    assert.equal(line[1], "×", language);
     assert.ok(line.includes(` · ${WORDS[language].failed}`), `${language}: ${line}`);
     assert.match(line, /x{4,}…/);
     assert.ok(width(line) <= 23);
@@ -270,12 +270,13 @@ test("completed cards hide behind `done N ▸`, show as one row under `▾`, and
   assert.equal(expanded.ranges.c1.end - expanded.ranges.c1.start, 3);
   assert.match(expanded.bodyLines[1], /\[subagent\]/);
   assert.match(expanded.bodyLines[2], /0 tok/);
-  // A selected card that completes stays drawn with the marker, and Space's expand
+  // A selected card that completes stays drawn while it is selected, and Space's expand
   // flag then opens that same id; the header still says the group is hidden.
   const selected = frame({ selection: "c1" });
   assert.equal(selected.selection, "c1");
   assert.deepEqual(selected.selectable, ["c1", "c2"]);
-  assert.equal(selected.bodyLines[0][0], ">");
+  assert.equal(selected.bodyLines[0][0], " ", "no marker column: a folded card starts with its no-bar space");
+  assert.doesNotMatch(selected.bodyLines[0], /^>/);
   assert.match(selected.bodyLines[0], /done one/);
   // A collapsed completed card carries OMO's per-card chevron, selected or not.
   assert.match(selected.bodyLines[0], /✓ ▸ done one/);
@@ -298,9 +299,9 @@ test("a folded completed card is one row with no bar", () => {
   assert.equal(frame.bodyLines.length, 1);
   const line = plainLine(frame.bodyLines[0]);
   assert.match(line, /✓ ▸ done one/);
-  assert.equal(line[0], ">", "the only drawn card is the resolved selection");
-  assert.equal(line[1], " ", "a one-row card gets a space instead of the bar");
-  assert.equal(line[2], "✓");
+  assert.equal(line[0], " ", "a one-row card gets a space instead of the bar");
+  assert.equal(line[1], "✓", "the glyph follows the bar column at column 1");
+  assert.doesNotMatch(line, /^>/, "no selection marker is drawn");
   assert.match(line, / · ⧖ 12s/);
 });
 
@@ -310,24 +311,24 @@ test("a running card is the three-row OMO card; tool, intent and output are deta
     contextPercent: 41 })]);
   assert.equal(frame.bodyLines.length, 3);
   assert.match(frame.bodyLines[0], /live/);
-  assert.equal(plainLine(frame.bodyLines[1]).slice(2), "[subagent]");
-  assert.equal(plainLine(frame.bodyLines[2]).slice(2), "48K tok · 12 tools · ctx 41%");
+  assert.equal(plainLine(frame.bodyLines[1]).slice(1), "[subagent]");
+  assert.equal(plainLine(frame.bodyLines[2]).slice(1), "48K tok · 12 tools · ctx 41%");
   const joined = plainLine(frame.bodyLines.join("\n"));
   assert.doesNotMatch(joined, /read|reading the plan|line 4/);
   // A bare card with nothing on rows 2 and 3 is one row and carries no bar.
   const bare = frameOf([card("c1", { title: "bare", status: "running", agent: "",
     tokens: null, toolCount: null, contextPercent: null })]);
   assert.equal(bare.bodyLines.length, 1);
-  assert.equal(plainLine(bare.bodyLines[0])[1], " ");
+  assert.equal(plainLine(bare.bodyLines[0])[0], " ", "a one-row card gets a space instead of the bar");
   assert.doesNotMatch(plainLine(bare.bodyLines[0]), /▌/);
   // A running row always keeps its spinner glyph even without a word.
-  assert.equal(plainLine(bare.bodyLines[0])[2], "⠋");
+  assert.equal(plainLine(bare.bodyLines[0])[1], "⠋");
 });
 
 test("the metrics row is tokens, tools, context and omits every missing value", () => {
   const metrics = (extra, options = {}) => {
     const frame = frameOf([card("c1", { title: "t", status: "running", ...extra })], options);
-    return frame.bodyLines[2] === undefined ? null : plainLine(frame.bodyLines[2]).slice(2);
+    return frame.bodyLines[2] === undefined ? null : plainLine(frame.bodyLines[2]).slice(1);
   };
   assert.equal(metrics({ tokens: 48000, toolCount: 12, contextPercent: 41.6 }),
     "48K tok · 12 tools · ctx 42%");
@@ -351,14 +352,14 @@ test("AC2.6: `background` rides on card row 2", () => {
     card("c2", { title: "beta", status: "running", background: true })];
   for (const [language, word] of [["ko", "background"], ["en", "background"], ["zh-cn", "后台"]]) {
     const frame = frameOf(cards, { language });
-    assert.equal(plainLine(frame.bodyLines[1]).slice(2), "[subagent]");
+    assert.equal(plainLine(frame.bodyLines[1]).slice(1), "[subagent]");
     assert.match(plainLine(frame.bodyLines[5]), new RegExp(`\\[subagent\\] ${word}`));
     assert.doesNotMatch(plainLine(frame.bodyLines.slice(0, 3).join("\n")), new RegExp(word));
   }
   // A background card with no agent still names the mark.
   const bare = frameOf([card("c1", { title: "alpha", status: "running", agent: "",
     background: true })]);
-  assert.equal(plainLine(bare.bodyLines[1]).slice(2), "background");
+  assert.equal(plainLine(bare.bodyLines[1]).slice(1), "background");
 });
 
 // Owner #259: an existing long role/agent identity continues on indented rows under
@@ -372,12 +373,12 @@ test("owner #259: a long agent identity continues under the badge and keeps TAIL
     const frame = frameOf([long], { columns, rows: 14 });
     const lines = frame.bodyLines.map(plainLine);
     // The unchanged rows: title/spinner first, metrics last.
-    assert.equal(lines[0], ">▌⠋ alpha · ⧖ 5m 0s", `${columns}: title row`);
+    assert.equal(lines[0], "▌⠋ alpha · ⧖ 5m 0s", `${columns}: title row`);
     assert.match(lines.at(-1), /48K tok · 12 tools/, `${columns}: metrics row`);
     // The identity starts with the badge opener, continues with the same bar column
     // and a two-cell indent, and closes with `]`; the background mark stays visible.
-    assert.match(lines[1], /^ ▌\[architect-role-/, `${columns}: badge opener`);
-    assert.ok(lines.slice(2, -1).some((line) => line.startsWith(" ▌  ")),
+    assert.match(lines[1], /^▌\[architect-role-/, `${columns}: badge opener`);
+    assert.ok(lines.slice(2, -1).some((line) => line.startsWith("▌  ")),
       `${columns}: continuation rows`);
     assert.ok(lines.some((line) => line.includes("TAIL]")), `${columns}: TAIL and closing bracket`);
     assert.ok(lines.some((line) => line.includes("background")), `${columns}: background`);
@@ -389,7 +390,7 @@ test("owner #259: a long agent identity continues under the badge and keeps TAIL
   // A short-agent card keeps exactly its previous single `[agent] background` row.
   const short = frameOf([card("c2", { title: "alpha", status: "running", agent: "worker",
     background: true })], { columns: 24, rows: 14 });
-  assert.equal(plainLine(short.bodyLines[1]), " ▌[worker] background");
+  assert.equal(plainLine(short.bodyLines[1]), "▌[worker] background");
   // Beyond the documented cap the last identity row ends `…]`; the card stays bounded
   // and the title/metrics rows remain reachable.
   const huge = frameOf([card("c3", { title: "alpha", status: "running", agent: "x".repeat(1000) })],
@@ -409,17 +410,18 @@ test("G7: a fitting agent badge stays whole and background moves to its own row"
   const render = (agent, background, columns) => frameOf([card("c1", { title: "alpha",
     status: "running", agent, background, tokens: 48000, toolCount: 12,
     contextPercent: 41, durationMs: 12000 })], { columns, rows: 14 }).bodyLines.map(plainLine);
-  // The reported regression: `librarian` fits as `[librarian]` at the default narrow
-  // pane, but `[librarian] background` is one cell too wide.
-  assert.deepEqual(render("librarian", true, 24).slice(1, -1),
-    [" ▌[librarian]", " ▌  background"]);
-  assert.deepEqual(render("librarian", false, 24).slice(1, -1), [" ▌[librarian]"]);
+  // The reported regression shape at 24 columns: the badge fits on its first identity
+  // row while ` background` is one cell too wide. The removed selection column added
+  // one cell, so the identity is one character longer than the original `librarian`.
+  assert.deepEqual(render("librarianx", true, 24).slice(1, -1),
+    ["▌[librarianx]", "▌  background"]);
+  assert.deepEqual(render("librarianx", false, 24).slice(1, -1), ["▌[librarianx]"]);
   for (const columns of [34, 54, 80]) {
     assert.deepEqual(render("librarian", true, columns).slice(1, -1),
-      [" ▌[librarian] background"], `${columns}: the short badge keeps its one row`);
+      ["▌[librarian] background"], `${columns}: the short badge keeps its one row`);
   }
   for (const columns of [24, 34, 54, 80]) {
-    const rowRoom = columns - 3; // the renderer keeps the terminal's final cell free
+    const rowRoom = columns - 2; // columns-1 usable cells minus the bar column
     for (const background of [false, true]) {
       for (let size = 1; size <= columns - 3; size += 1) {
         const label = `${columns}/${background}/${size}`;
@@ -427,7 +429,7 @@ test("G7: a fitting agent badge stays whole and background moves to its own row"
         const identity = lines.slice(1, -1);
         // The badge opens on the first identity row, and no identity row is left
         // holding only `]` (or `] background`) when agent text could share it.
-        assert.match(identity[0], /^ ▌\[a/, `${label}: opener`);
+        assert.match(identity[0], /^▌\[a/, `${label}: opener`);
         for (const line of identity) {
           assert.doesNotMatch(line, /^\s*▌\s*\](\s+background)?$/, `${label}: bracket-only row`);
         }
@@ -437,10 +439,10 @@ test("G7: a fitting agent badge stays whole and background moves to its own row"
         const closed = identity.findIndex((line) => line.includes("]"));
         assert.match(identity[closed], /a\](\s+background)?$/, `${label}: close follows text`);
         for (const line of identity.slice(closed + 1)) {
-          assert.match(line, /^ ▌  background$/, `${label}: only background follows`);
+          assert.match(line, /^▌  background$/, `${label}: only background follows`);
         }
         if (size + 2 <= rowRoom) {
-          assert.ok(identity[0].startsWith(` ▌[${"a".repeat(size)}]`),
+          assert.ok(identity[0].startsWith(`▌[${"a".repeat(size)}]`),
             `${label}: whole badge on its first identity row`);
         }
         assert.equal(identity.join("").replaceAll(" background", "").split("a").length - 1,
@@ -476,19 +478,19 @@ test("G7: every wrapped agent badge closes at the wrap boundary", () => {
         const identity = lines.slice(1, -1); // title row first, metrics row last
         assert.ok(identity.length >= 1, `${label}: identity row`);
         // The badge opens on the first identity row, followed by the agent text.
-        assert.match(identity[0], /^ ▌\[a/, `${label}: opener`);
+        assert.match(identity[0], /^▌\[a/, `${label}: opener`);
         // A `]`-only row is never acceptable at these widths: when the whole badge
         // fits it must stay on the first row, and a wrapped identity always has a
         // trailing grapheme that fits beside `]` under columns-1.
         for (const line of identity) {
           assert.doesNotMatch(line, /^\s*▌\s*\](\s+background)?$/, `${label}: bracket-only row`);
         }
-        if (size + 2 <= columns - 3) {
-          assert.ok(identity[0].startsWith(` ▌[${"a".repeat(size)}]`),
+        if (size + 2 <= columns - 2) {
+          assert.ok(identity[0].startsWith(`▌[${"a".repeat(size)}]`),
             `${label}: whole badge on its first identity row`);
         }
         // Continuation rows align two cells under the badge, after the bar column.
-        for (const line of identity.slice(1)) assert.match(line, /^ ▌  /, `${label}: ${line}`);
+        for (const line of identity.slice(1)) assert.match(line, /^▌  /, `${label}: ${line}`);
         // Exactly one `]`, and it ends the final identity row (the background mark may
         // share that row; if it cannot, it is the only row allowed to follow).
         const closed = identity.findIndex((line) => line.includes("]"));
@@ -496,7 +498,7 @@ test("G7: every wrapped agent badge closes at the wrap boundary", () => {
         assert.equal(identity.join("").split("]").length - 1, 1, `${label}: one closing bracket`);
         assert.match(identity[closed], /\]( background)?$/, `${label}: bracket ends its row`);
         for (const line of identity.slice(closed + 1)) {
-          assert.match(line, /^ ▌  background$/, `${label}: only background follows the close`);
+          assert.match(line, /^▌  background$/, `${label}: only background follows the close`);
         }
         // No identity cell was dropped and nothing was ellipsized at these boundaries.
         assert.equal(identity.join("").replaceAll(" background", "").split("a").length - 1,
@@ -545,17 +547,17 @@ test("G7: every agent length closes exactly once across widths and scripts", () 
           // The title row is first and the metrics row last; between them is the
           // identity block, optionally followed by one background-only dim row.
           const identity = lines.slice(1, -1);
-          const backgroundRow = identity.length > 1 && identity.at(-1) === " ▌  background"
+          const backgroundRow = identity.length > 1 && identity.at(-1) === "▌  background"
             ? identity.pop() : "";
           assert.ok(identity.length >= 1, `${label}: identity rows`);
-          assert.ok(lines[0].startsWith(">▌"), `${label}: title row`);
-          assert.doesNotMatch(lines.at(-1), /^ ▌\[|^ ▌  /, `${label}: metrics row follows the badge`);
+          assert.ok(lines[0].startsWith("▌"), `${label}: title row`);
+          assert.doesNotMatch(lines.at(-1), /^▌\[|^▌  /, `${label}: metrics row follows the badge`);
           // The badge opens on the first identity row; every continuation row is
           // indented two cells under the badge and there are at most six of them.
-          assert.ok(identity[0].startsWith(" ▌["), `${label}: opener ${JSON.stringify(identity[0])}`);
+          assert.ok(identity[0].startsWith("▌["), `${label}: opener ${JSON.stringify(identity[0])}`);
           assert.ok(identity.length - 1 <= 6, `${label}: ${identity.length - 1} continuations`);
           for (const line of identity.slice(1)) {
-            assert.ok(line.startsWith(" ▌  "), `${label}: indent ${JSON.stringify(line)}`);
+            assert.ok(line.startsWith("▌  "), `${label}: indent ${JSON.stringify(line)}`);
           }
           // Exactly one `]`, it ends the badge, and it shares its row with agent text
           // (background may follow the bracket on that row).
@@ -565,15 +567,15 @@ test("G7: every agent length closes exactly once across widths and scripts", () 
           assert.notEqual(closed, -1, `${label}: badge closes`);
           const closeRow = identity[closed];
           assert.match(closeRow, /\]( background)?$/, `${label}: bracket ends its row`);
-          const beforeClose = closeRow.replace(/^ ▌(?:  )?/, "").replace(/\] background$|\]$/, "");
+          const beforeClose = closeRow.replace(/^▌(?:  )?/, "").replace(/\] background$|\]$/, "");
           assert.match(beforeClose, /\S/u, `${label}: no bracket-only row ${JSON.stringify(closeRow)}`);
           for (const line of identity.slice(closed + 1)) {
-            assert.equal(line, " ▌  background", `${label}: only background follows the close`);
+            assert.equal(line, "▌  background", `${label}: only background follows the close`);
           }
           // Reconstruct the emitted agent text; a capped badge ends `…]`, so its
           // `…` replaces the tail while the prefix it did emit stays in order.
           const shown = identity.map((line, index) => line
-            .replace(index === 0 ? /^ ▌\[/ : /^ ▌  /, "")
+            .replace(index === 0 ? /^▌\[/ : /^▌  /, "")
             .replace(/\] background$|\]$/, "")).join("");
           const capped = shown.endsWith("…");
           const agentShown = capped ? shown.slice(0, -1) : shown;
@@ -652,7 +654,7 @@ test("a retry adds one alert row in yellow and the detail keeps the retry field"
   const cards = [card("c1", { title: "alpha", status: "failed", retry: { attempt: 2, delayMs: 3000 } })];
   const list = frameOf(cards);
   assert.equal(list.bodyLines.length, 4, "title, role, metrics, alert");
-  assert.equal(plainLine(list.bodyLines[3]).slice(2), "↻ 2 · 3s");
+  assert.equal(plainLine(list.bodyLines[3]).slice(1), "↻ 2 · 3s");
   assert.match(frameOf(cards, { color: true }).bodyLines[3], /\x1b\[33m/);
   const detail = frameOf(cards, { view: { follow: false, detail: true } });
   assert.match(plainLine(detail.bodyLines.join("\n")), /retry: 2 \(3s\)/);
@@ -660,7 +662,7 @@ test("a retry adds one alert row in yellow and the detail keeps the retry field"
   assert.equal(frameOf([card("c1", { title: "alpha", status: "failed" })]).bodyLines.length, 3);
   const unknown = frameOf([card("c1", { title: "alpha", status: "failed",
     retry: { attempt: null, delayMs: null } })]);
-  assert.match(plainLine(unknown.bodyLines[3]), /^ ▌↻ \? · \?$/);
+  assert.match(plainLine(unknown.bodyLines[3]), /^▌↻ \? · \?$/);
 });
 
 test("`d` expands only the selected card's record and never changes the selection", () => {
@@ -698,15 +700,24 @@ test("`d` expands only the selected card's record and never changes the selectio
   assert.doesNotMatch(plainLine(bare.bodyLines.join("\n")), /retry:/);
 });
 
-test("a selected card is marked in column 0 and the selection resolves against drawn cards", () => {
+test("the selection resolves against drawn cards without a marker column", () => {
   const cards = [card("c1", { title: "newest" }), card("c2", { title: "older" })];
   const frame = (selection, options = {}) => frameOf(cards, { view: { follow: false, selection }, ...options });
   assert.equal(frame("c2").selection, "c2");
   // Each running card is three rows and consecutive cards are separated by one
-  // divider row, so the second card's title is bodyLines[4].
-  assert.equal(frame("c2").bodyLines[0][0], " ", "an unselected card carries no marker");
-  assert.equal(frame("c2").bodyLines[4][0], ">", "the selected card carries the marker");
-  assert.equal(frame("c1").bodyLines[0][0], ">");
+  // divider row, so the second card's title is bodyLines[4]. Every card starts with
+  // the bar at column 0; selection adds no marker and leaves the plain rows identical.
+  assert.equal(frame("c2").bodyLines[0][0], "▌");
+  assert.equal(frame("c2").bodyLines[4][0], "▌");
+  assert.equal(stripVTControlCharacters(frame("c1").bodyLines[0]),
+    stripVTControlCharacters(frame("c2").bodyLines[0]), "selection adds no plain ink");
+  assert.equal(stripVTControlCharacters(frame("c2").bodyLines[4]),
+    stripVTControlCharacters(frame("c1").bodyLines[4]), "selection adds no plain ink to card 2");
+  assert.doesNotMatch(frame("c2").bodyLines.join("\n"), /^>/m);
+  // The selected title keeps the one selection visual the renderer has: bold ink.
+  const colored = frame("c2", { color: true });
+  assert.match(colored.bodyLines[4], /\x1b\[1;36molder\x1b\[0m/);
+  assert.doesNotMatch(colored.bodyLines[0], /\x1b\[1;36mnewest\x1b\[0m/);
   assert.equal(frame("gone").selection, "c1");
   assert.equal(frame(null).selection, "c1");
   assert.equal(frame(7).selection, "c1");
@@ -763,11 +774,11 @@ test("scrolling is clamped to the body and follow ON pulls the selection back", 
   const usableColumns = wide.columns - 1;
   assert.equal(far.bodyLines[far.scroll], "─".repeat(usableColumns),
     "the divider above card 9 is the first scrolled row");
-  assert.equal(far.bodyLines[far.scroll + 1], "  ⠋ card 9 · ⧖ 0s",
+  assert.equal(far.bodyLines[far.scroll + 1], " ⠋ card 9 · ⧖ 0s",
     "card 9 sits directly under that divider");
   assert.equal(far.bodyLines[far.scroll + 2], "─".repeat(usableColumns),
     "the divider above card 10 follows card 9");
-  assert.equal(far.bodyLines[far.scroll + 3], "  ⠋ card 10 · ⧖ 0s",
+  assert.equal(far.bodyLines[far.scroll + 3], " ⠋ card 10 · ⧖ 0s",
     "card 10 is at the next position, not elsewhere in the window");
   assert.equal(renderWorkers(projection(cards), { ...wide, view: { follow: false, scroll: -4 } }).scroll, 0);
   // A mistyped scroll is clamped to a number, never NaN, so the frame's own scroll can
@@ -918,7 +929,7 @@ test("the header name is bold cyan in every state, the tally is bold yellow, the
 
 test("the spinner cycles the ten OMO frames and normalises a bad spin value", () => {
   const glyph = (spin) => plainLine(frameOf([card("c1", { title: "spin", status: "running" })],
-    { spin }).bodyLines[0])[2];
+    { spin }).bodyLines[0])[1];
   for (let frame = 0; frame < SPINNER.length; frame++) assert.equal(glyph(frame), SPINNER[frame]);
   assert.equal(glyph(10), SPINNER[0], "ten frames wrap");
   assert.equal(glyph(-1), SPINNER[9], "a negative frame wraps backwards");
@@ -976,7 +987,7 @@ test("the narrow fallback keeps the caller's footer and never claims an unknown 
   // An unknown status is a localized word and the `?` glyph, never a blank or a crash.
   const wide = renderWorkers(odd, { columns: 60, rows: 8, color: false, language: "en",
     view: { detail: true, follow: false }, footer: ["F"] });
-  assert.equal(plainLine(wide.bodyLines[0])[2], "?");
+  assert.equal(plainLine(wide.bodyLines[0])[1], "?");
   assert.match(wide.bodyLines[0], /unknown/);
   assert.match(wide.bodyLines.join("\n"), /status: unknown/);
   assert.equal(width(wide.bodyLines[0]), width(stripVTControlCharacters(wide.bodyLines[0])));

@@ -30,7 +30,7 @@ const todoProjection = (phases, extra = {}) => ({ schema: "gjc-herdr-dashboard/t
   updatedAt: 1, phases, empty: phases.every((phase) => phase.tasks.length === 0), sourceError: null, ...extra });
 
 // G5/G6 fixture: a closed phase that stays folded, one in-progress task (the default
-// selection, G12) and one pending task. The goal is the G6 row.
+// selection state, G12) and one pending task. The goal is the G6 row.
 const todoLive = (extra = {}) => todoProjection([
   { name: "Foundation", tasks: [{ content: "Confirmed authority", status: "completed" },
     { content: "Retired alternative", status: "abandoned" }] },
@@ -113,6 +113,11 @@ const plainOf = (frame) => frame.lines.map((line) => stripVTControlCharacters(li
 function assertFrame(plain, columns, exception) {
   assert.equal(plain.length, ROWS, `${ROWS} rows`);
   for (const [index, line] of plain.entries()) {
+    // The selection column is gone (G12): no row may carry the old `>` marker, and no
+    // task mark or card bar may sit one cell in behind a reserved blank column.
+    assert.doesNotMatch(line, /^>/, `row ${index} still starts with the removed marker`);
+    assert.doesNotMatch(line, /^ (?:\[[ •✓×]\]|▌)/,
+      `row ${index} still reserves the old selection column`);
     const cells = width(line);
     if (cells <= columns - 1) continue;
     assert.equal(index, plain.length - 1, `row ${index} is wider than columns-1`);
@@ -295,8 +300,8 @@ const TODO_EXPECTED = {
         "───────────────────────",
         " ~ · active · 12K · ⧖ ~",
         "─ Implementation 0/2 ──",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -311,8 +316,8 @@ const TODO_EXPECTED = {
         "─────────────────────────",
         " ~ · active · 12K · ⧖ 5m~",
         "─ Implementation 0/2 ────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -327,8 +332,8 @@ const TODO_EXPECTED = {
         "─────────────────────────────────",
         " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "─ Implementation 0/2 ────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -343,8 +348,8 @@ const TODO_EXPECTED = {
         "───────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "─ Implementation 0/2 ──────────────────────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -359,8 +364,8 @@ const TODO_EXPECTED = {
         "─────────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "─ Implementation 0/2 ────────────────────────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -378,8 +383,8 @@ const TODO_EXPECTED = {
         " ~ · active · 12K · ⧖ ~",
         "Read error: todo.json ~",
         "─ Implementation 0/2 ──",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -394,8 +399,8 @@ const TODO_EXPECTED = {
         " ~ · active · 12K · ⧖ 5m~",
         "Read error: todo.json un~",
         "─ Implementation 0/2 ────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -410,8 +415,8 @@ const TODO_EXPECTED = {
         " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
         "─ Implementation 0/2 ────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -426,8 +431,8 @@ const TODO_EXPECTED = {
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
         "─ Implementation 0/2 ──────────────────────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -442,8 +447,8 @@ const TODO_EXPECTED = {
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "Read error: todo.json unreadable",
         "─ Implementation 0/2 ────────────────────────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -459,8 +464,8 @@ const TODO_EXPECTED = {
         "───────────────────────",
         " ~ · active · 12K · ⧖ ~",
         "─ Implementation 0/2 ──",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -475,8 +480,8 @@ const TODO_EXPECTED = {
         "─────────────────────────",
         " ~ · active · 12K · ⧖ 5m~",
         "─ Implementation 0/2 ────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -491,8 +496,8 @@ const TODO_EXPECTED = {
         "─────────────────────────────────",
         " ◎ Alig~ · active · 12K · ⧖ 5m 3s",
         "─ Implementation 0/2 ────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -507,8 +512,8 @@ const TODO_EXPECTED = {
         "───────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "─ Implementation 0/2 ──────────────────────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -523,8 +528,8 @@ const TODO_EXPECTED = {
         "─────────────────────────────────────────────────────",
         " ◎ Align both panes · active · 12K tok · ⧖ 5m 3s",
         "─ Implementation 0/2 ────────────────────────────────",
-        ">[•] Wire the grammar",
-        " [ ] Pin the frames",
+        "[•] Wire the grammar",
+        "[ ] Pin the frames",
         "",
         "",
         "",
@@ -624,13 +629,13 @@ const WORKERS_EXPECTED = {
       "24": [
         " Workers [1/3]  run 1 …",
         "───────────────────────",
-        ">▌⠋ build the grammar",
-        " ▌[worker]",
-        " ▌⧖ 5m 0s · 48K tok · …",
+        "▌⠋ build the… · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · …",
         "───────────────────────",
-        " ▌× review ou… · failed",
-        " ▌[worker] background",
-        " ▌⧖ 1m 5s · 2K tok · 3…",
+        "▌× review out… · failed",
+        "▌[worker] background",
+        "▌⧖ 1m 5s · 2K tok · 3 …",
         "",
         "",
         "",
@@ -640,13 +645,13 @@ const WORKERS_EXPECTED = {
       "26": [
         " Workers [1/3]  run 1 · …",
         "─────────────────────────",
-        ">▌⠋ build the … · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · c…",
+        "▌⠋ build the g… · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ct…",
         "─────────────────────────",
-        " ▌× review outp… · failed",
-        " ▌[worker] background",
-        " ▌⧖ 1m 5s · 2K tok · 3 t…",
+        "▌× review output · failed",
+        "▌[worker] background",
+        "▌⧖ 1m 5s · 2K tok · 3 to…",
         "",
         "",
         "",
@@ -656,13 +661,13 @@ const WORKERS_EXPECTED = {
       "34": [
         " Workers [1/3]  run 1 · done 1 ▸",
         "─────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "─────────────────────────────────",
-        " ▌× review ou… · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review out… · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "",
         "",
         "",
@@ -672,13 +677,13 @@ const WORKERS_EXPECTED = {
       "52": [
         " Workers [1/3]  run 1 · failed 1 · done 1 ▸",
         "───────────────────────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "───────────────────────────────────────────────────",
-        " ▌× review output · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review output · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "",
         "",
         "",
@@ -688,13 +693,13 @@ const WORKERS_EXPECTED = {
       "54": [
         " Workers [1/3]  run 1 · failed 1 · done 1 ▸",
         "─────────────────────────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "─────────────────────────────────────────────────────",
-        " ▌× review output · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review output · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "",
         "",
         "",
@@ -706,15 +711,15 @@ const WORKERS_EXPECTED = {
       "24": [
         " Workers [1/3]  run 1 …",
         "───────────────────────",
-        ">▌⠋ build the grammar",
-        " ▌[worker]",
-        " ▌⧖ 5m 0s · 48K tok · …",
+        "▌⠋ build the… · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · …",
         "───────────────────────",
-        " ▌× review ou… · failed",
-        " ▌[worker] background",
-        " ▌⧖ 1m 5s · 2K tok · 3…",
+        "▌× review out… · failed",
+        "▌[worker] background",
+        "▌⧖ 1m 5s · 2K tok · 3 …",
         "───────────────────────",
-        "  ✓ ▸ folded ca… · ⧖ 1s",
+        " ✓ ▸ folded card · ⧖ 1s",
         "",
         "───────────────────────",
         " Follow ON · LIVE"
@@ -722,15 +727,15 @@ const WORKERS_EXPECTED = {
       "26": [
         " Workers [1/3]  run 1 · …",
         "─────────────────────────",
-        ">▌⠋ build the … · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · c…",
+        "▌⠋ build the g… · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ct…",
         "─────────────────────────",
-        " ▌× review outp… · failed",
-        " ▌[worker] background",
-        " ▌⧖ 1m 5s · 2K tok · 3 t…",
+        "▌× review output · failed",
+        "▌[worker] background",
+        "▌⧖ 1m 5s · 2K tok · 3 to…",
         "─────────────────────────",
-        "  ✓ ▸ folded card · ⧖ 1s",
+        " ✓ ▸ folded card · ⧖ 1s",
         "",
         "─────────────────────────",
         " Follow ON · LIVE"
@@ -738,15 +743,15 @@ const WORKERS_EXPECTED = {
       "34": [
         " Workers [1/3]  run 1 · done 1 ▾",
         "─────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "─────────────────────────────────",
-        " ▌× review ou… · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review out… · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "─────────────────────────────────",
-        "  ✓ ▸ folded card · ⧖ 1s",
+        " ✓ ▸ folded card · ⧖ 1s",
         "",
         "─────────────────────────────────",
         " Follow ON · LIVE"
@@ -754,15 +759,15 @@ const WORKERS_EXPECTED = {
       "52": [
         " Workers [1/3]  run 1 · failed 1 · done 1 ▾",
         "───────────────────────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "───────────────────────────────────────────────────",
-        " ▌× review output · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review output · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "───────────────────────────────────────────────────",
-        "  ✓ ▸ folded card · ⧖ 1s",
+        " ✓ ▸ folded card · ⧖ 1s",
         "",
         "───────────────────────────────────────────────────",
         " Follow ON · LIVE"
@@ -770,15 +775,15 @@ const WORKERS_EXPECTED = {
       "54": [
         " Workers [1/3]  run 1 · failed 1 · done 1 ▾",
         "─────────────────────────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "─────────────────────────────────────────────────────",
-        " ▌× review output · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review output · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "─────────────────────────────────────────────────────",
-        "  ✓ ▸ folded card · ⧖ 1s",
+        " ✓ ▸ folded card · ⧖ 1s",
         "",
         "─────────────────────────────────────────────────────",
         " Follow ON · LIVE"
@@ -788,13 +793,13 @@ const WORKERS_EXPECTED = {
       "24": [
         " Workers [1/3]  run 1 …",
         "───────────────────────",
-        ">▌⠋ build the grammar",
-        " ▌[worker]",
-        " ▌⧖ 5m 0s · 48K tok · …",
+        "▌⠋ build the… · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · …",
         "───────────────────────",
-        " ▌× review ou… · failed",
-        " ▌[worker] background",
-        " ▌⧖ 1m 5s · 2K tok · 3…",
+        "▌× review out… · failed",
+        "▌[worker] background",
+        "▌⧖ 1m 5s · 2K tok · 3 …",
         "",
         "",
         "",
@@ -804,13 +809,13 @@ const WORKERS_EXPECTED = {
       "26": [
         " Workers [1/3]  run 1 · …",
         "─────────────────────────",
-        ">▌⠋ build the … · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · c…",
+        "▌⠋ build the g… · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ct…",
         "─────────────────────────",
-        " ▌× review outp… · failed",
-        " ▌[worker] background",
-        " ▌⧖ 1m 5s · 2K tok · 3 t…",
+        "▌× review output · failed",
+        "▌[worker] background",
+        "▌⧖ 1m 5s · 2K tok · 3 to…",
         "",
         "",
         "",
@@ -820,13 +825,13 @@ const WORKERS_EXPECTED = {
       "34": [
         " Workers [1/3]  run 1 · done 1 ▸",
         "─────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "─────────────────────────────────",
-        " ▌× review ou… · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review out… · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "",
         "",
         "",
@@ -836,13 +841,13 @@ const WORKERS_EXPECTED = {
       "52": [
         " Workers [1/3]  run 1 · failed 1 · done 1 ▸",
         "───────────────────────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "───────────────────────────────────────────────────",
-        " ▌× review output · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review output · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "",
         "",
         "",
@@ -852,13 +857,13 @@ const WORKERS_EXPECTED = {
       "54": [
         " Workers [1/3]  run 1 · failed 1 · done 1 ▸",
         "─────────────────────────────────────────────────────",
-        ">▌⠋ build the grammar · ⧖ 5m 0s",
-        " ▌[worker]",
-        " ▌48K tok · 12 tools · ctx 41%",
+        "▌⠋ build the grammar · ⧖ 5m 0s",
+        "▌[worker]",
+        "▌48K tok · 12 tools · ctx 41%",
         "─────────────────────────────────────────────────────",
-        " ▌× review output · failed · ⧖ 1m 5s",
-        " ▌[worker] background",
-        " ▌2K tok · 3 tools",
+        "▌× review output · failed · ⧖ 1m 5s",
+        "▌[worker] background",
+        "▌2K tok · 3 tools",
         "",
         "",
         "",
@@ -889,6 +894,24 @@ for (const scenario of WORKER_CASES) {
     });
   }
 }
+
+// G12: selection is state only. The body starts at column 0 with the task mark or
+// the card bar, so no row can carry the removed `>` marker or leave a reserved
+// blank cell in front of the content it used to occupy.
+test("G12: neither pane draws a selection marker or reserves a leading cell", () => {
+  const todo = plainOf(TODO_CASES.find((entry) => entry.id === "live").frame(54, "en"));
+  const workers = plainOf(WORKER_CASES.find((entry) => entry.id === "hidden").frame(54, "en"));
+  for (const line of [...todo, ...workers]) {
+    assert.doesNotMatch(line, /^>/);
+    assert.doesNotMatch(line, /^ (?:\[[ •✓×]\]|▌)/);
+  }
+  const task = todo.find((line) => line.includes("Wire the grammar"));
+  assert.match(task, /^\[•\] Wire the grammar$/);
+  const card = workers.find((line) => line.includes("build the grammar"));
+  assert.match(card, /^▌⠋ build the grammar · ⧖ 5m 0s$/);
+  const role = workers.find((line) => line.includes("[worker]"));
+  assert.match(role, /^▌\[worker\]$/);
+});
 
 test("colour runs: header chrome, connection footer and EMPTY colours - G1 G2 G3 G4", () => {
   const frame = (scenario, columns, language = "en") =>
@@ -944,7 +967,7 @@ test("workers spinner cycles one frame per tick - G8 G13", () => {
     const frame = renderWorkers(workersProjection([workerCard("running", { title: "spin" })]),
       { columns: 54, rows: 6, language: "en", color: false, now: NOW, spin,
         footer: ["Follow ON · LIVE"], view: { follow: false } });
-    glyphs.push(frame.bodyLines[0][2]);
+    glyphs.push(frame.bodyLines[0][1]);
   }
   assert.deepEqual(glyphs.slice(0, SPINNER_FRAMES.length), [...SPINNER_FRAMES]);
   assert.equal(glyphs[SPINNER_FRAMES.length], SPINNER_FRAMES[0], "the tenth tick wraps to the first frame");
@@ -956,7 +979,7 @@ test("workers spinner cycles one frame per tick - G8 G13", () => {
 const GRAMMAR = readFileSync(fileURLToPath(new URL("../../GRAMMAR.md", import.meta.url)), "utf8");
 const RULE_IDS = Object.freeze(["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10",
   "G11", "G12", "G13"]);
-const DEVIATION_IDS = Object.freeze(["AC-F1", "AC-F3", "AC1.9", "AC2.2", "AC-F4", "selection",
+const DEVIATION_IDS = Object.freeze(["AC-F1", "AC-F3", "AC1.9", "AC2.2", "AC-F4",
   "data-absent", "truncation", "zh-cn", "L5b", "d", "g", "h", "i", "j", "todo-body",
   "k"]);
 
@@ -986,7 +1009,7 @@ test("GRAMMAR.md states every rule and deviation row, each with its citation", (
   assert.match(sectionOf(GRAMMAR, "## Deviations"), /3242ad4/, "the deviation table names its OMO baseline");
   const rows = deviationRows(GRAMMAR);
   assert.deepEqual(rows.map((cells) => cells[0]), [...DEVIATION_IDS],
-    "all 17 deviation ids, in table order (todo-body included)");
+    "all 16 deviation ids, in table order (todo-body included)");
   for (const cells of rows) {
     assert.equal(cells.length, 4, `${cells[0]} keeps four columns`);
     assert.ok(cells[1] !== "" && cells[2] !== "" && cells[3] !== "",

@@ -61,8 +61,8 @@ await runScript('l2-width (AC-F4)', async () => {
       const frame = whole.slice(whole.lastIndexOf('Workers ['));
       writeEvidence(evidence, `workers-${width}col.txt`, frame);
       const lines = frame.split(/\r?\n/);
-      // Column 0 is the selection marker and column 1 the status bar; the glyph comes next.
-      const cardLines = lines.filter((l) => /^[ >][▌ ][⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏○✓×⊘Ⅱ?]/.test(l));
+      // Column 0 is the status bar (a space on a folded one-row card); the glyph comes next.
+      const cardLines = lines.filter((l) => /^[▌ ][⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏○✓×⊘Ⅱ?]/.test(l));
       assert(cardLines.length === 3, `${width} cols: three card title lines are drawn`, { frame });
       assert(cardLines.every((l, i) => l.includes(['Parse', 'Write', 'Check'][i].slice(0, width >= 40 ? 5 : 3))), `${width} cols: each card title is recognisable`, { cardLines });
       // Q3=A: a running card carries the spinner glyph, not a word; the header says `run 1`.

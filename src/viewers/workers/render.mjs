@@ -21,11 +21,11 @@
 // with `status` exactly one of pending | running | completed | failed | aborted | paused.
 //
 // Card rows (GRAMMAR G7/G8):
-//   row 1  column 0 is the selection marker, then the status bar (only on a
-//          multi-row card), the glyph, the title, the Q3=A word for the non-running
-//          states and the elapsed time. The word and time are reserved before the
-//          title is sized; when the title would keep fewer than 10 cells the time
-//          moves to the front of row 3 (OMO `:409-410`).
+//   row 1  column 0 is the status bar (only on a multi-row card), then the glyph,
+//          the title, the Q3=A word for the non-running states and the elapsed
+//          time. The word and time are reserved before the title is sized; when the
+//          title would keep fewer than 10 cells the time moves to the front of row 3
+//          (OMO `:409-410`).
 //   row 2  `[agent]` in magenta plus ` background` in dim, left out when empty.
 //   row 3  `48K tok · 12 tools · ctx 41%` in grey; each part is omitted when the
 //          projection has no finite value for it.
@@ -201,8 +201,8 @@ function detailRows(card, { columns, color, language, now }) {
 
 // One card, in the OMO three-row grammar plus the retry alert. The bar spans every
 // drawn row of a multi-row card; a one-row card gets a space, so a folded completed
-// card has no bar (OMO `:507-511`). The marker is column 0 and the bar column 1;
-// rows after the title keep both columns so the card edge stays straight.
+// card has no bar (OMO `:507-511`). The bar is column 0 and stays there on every row
+// of the card, so the card edge is straight.
 function cardLines(card, { columns, color, language, now, spin, selected, expanded }) {
   const status = statusOf(card?.status);
   const name = text(card?.title) || text(card?.agent) || text(card?.id);
@@ -224,7 +224,7 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
         ? compactDuration(language, Math.max(0, retry.delayMs)) : unknown(language),
     })
     : "";
-  const room = columns - 2; // selection marker + status bar
+  const room = columns - 1; // status bar
   // OMO `:402`: a collapsed completed card keeps the per-card fold chevron after the
   // glyph (`✓ ▸ done one`), including when the card is drawn because it is selected.
   const fold = oneRow ? "▸ " : "";
@@ -236,27 +236,26 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
   const statsRow = !oneRow && (metrics !== "" || !timeInTitle);
   const multiRow = hasAgentRow || statsRow || Boolean(alert);
   const bar = paint(multiRow ? "▌" : " ", status, color);
-  const marker = selected ? paint(">", "accent", color, true) : " ";
   // Even the status word does not fit: keep the existing single coloured strip
   // (still fitted to the pane with the Workers `…` mark).
   if (titleRoom < 1) {
-    return [paint(fit(`${marker}${bar}${glyphOf(status, spin)} ${fold}${name}${word}`, columns, false, "…"),
+    return [paint(fit(`${bar}${glyphOf(status, spin)} ${fold}${name}${word}`, columns, false, "…"),
       status, color)];
   }
   const lines = [
-    `${marker}${bar}${paint(glyphOf(status, spin), status, color, true)} ${paint(fold, status, color)}` +
+    `${bar}${paint(glyphOf(status, spin), status, color, true)} ${paint(fold, status, color)}` +
     `${paint(fit(name, titleRoom, false, "…"), status, color, selected)}` +
     `${paint(word, status, color)}` +
     (timeInTitle ? paint(timeSuffix, timeToken, color) : ""),
   ];
   if (hasAgentRow) {
-    const rowRoom = columns - 2;
+    const rowRoom = columns - 1;
     if (agent) {
       const tail = background ? ` ${t(language, "workers.background")}` : "";
       const full = `[${agent}]`;
       // The ordinary short badge keeps exactly its previous one-row shape.
       if (rowRoom >= 1 && width(full) + width(tail) <= rowRoom) {
-        lines.push(` ${bar}${paint(full, "badge", color)}` +
+        lines.push(`${bar}${paint(full, "badge", color)}` +
           (tail ? paint(tail, "dim", color) : ""));
       } else {
         // OMO `:395,399,445-447`: the role keeps its own rows instead of being cut
@@ -291,7 +290,7 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
           } else {
             // Close by construction: the badge is the single string `[` + agent +
             // `]`, consumed grapheme by grapheme into whole chunks. The first row
-            // holds up to rowRoom cells (columns-1 minus marker and bar); every
+            // holds up to rowRoom cells (columns minus the bar); every
             // continuation row holds rowRoom-2 after its two-cell indent. Because
             // `]` is the last grapheme of the input, the final chunk always carries
             // it. The only chunk that can end up as a lone `]` is that final one,
@@ -299,8 +298,8 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
             // that grapheme down (`  a]`) makes the close share agent text. That
             // move needs a two-cell grapheme plus `]`, i.e. three cells, so it is
             // valid whenever the continuation room is at least 3. Badge rows are
-            // drawn only from input columns 17 (internal rowRoom 14, continuation
-            // room 12); the narrower plain fallback never draws them.
+            // drawn only from input columns 17 (internal rowRoom 15, continuation
+            // room 13); the narrower plain fallback never draws them.
             const continuationRoom = rowRoom - 2;
             const parts = [...segmenter.segment(full)].map((part) => part.segment);
             const chunks = [];
@@ -342,26 +341,26 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
           }
           addTail(tail);
         }
-        for (const identity of identities) lines.push(` ${bar}${identity.styled}`);
+        for (const identity of identities) lines.push(`${bar}${identity.styled}`);
       }
     } else {
-      lines.push(` ${bar}${paint(fit(t(language, "workers.background"), rowRoom, false, "…"),
+      lines.push(`${bar}${paint(fit(t(language, "workers.background"), rowRoom, false, "…"),
         "dim", color)}`);
     }
   }
   if (statsRow) {
     const plain = [timeInTitle ? "" : elapsed, metrics].filter(Boolean).join(" · ");
-    const fitted = fit(plain, columns - 2, false, "…");
+    const fitted = fit(plain, columns - 1, false, "…");
     if (!timeInTitle && fitted.startsWith(elapsed)) {
       const rest = fitted.slice(elapsed.length);
-      lines.push(` ${bar}${paint(elapsed, timeToken, color)}` +
+      lines.push(`${bar}${paint(elapsed, timeToken, color)}` +
         `${rest ? paint(rest, "muted", color) : ""}`);
     } else {
-      lines.push(` ${bar}${paint(fitted, "muted", color)}`);
+      lines.push(`${bar}${paint(fitted, "muted", color)}`);
     }
   }
   if (alert) {
-    lines.push(` ${bar}${paint(fit(alert, columns - 2, false, "…"), "time", color)}`);
+    lines.push(`${bar}${paint(fit(alert, columns - 1, false, "…"), "time", color)}`);
   }
   return lines;
 }
@@ -453,7 +452,7 @@ export function renderWorkers(projection, {
   const showCompleted = view?.showCompleted === true;
   const requested = view?.selection;
   // A completed card stays drawn while it is selected (OMO `:574`), so Space can
-  // always act on the card the marker points at. Failed and aborted never fold.
+  // always act on the card the selection points at. Failed and aborted never fold.
   const drawn = cards.filter((card) => {
     const id = String(card?.id ?? "");
     const status = statusOf(card?.status);

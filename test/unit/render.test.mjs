@@ -167,15 +167,22 @@ test("terminal control sequences in task content cannot clear, retitle or recolo
   assert.match(frame.text, /safe text/);
 });
 
-test("the selection marker follows the requested key and falls back to current work", () => {
+test("the selection resolves against the requested key without drawing a marker column", () => {
   const snapshot = mixed();
   const keys = taskKeys(snapshot);
   const explicit = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true,
     selection: keys[4] });
-  assert.match(stripVTControlCharacters(explicit.text), /^>\[ \] Verify source$/m);
+  const plain = stripVTControlCharacters(explicit.text);
+  // G12: the task row starts at column 0 with its mark, and no row carries a marker.
+  assert.match(plain, /^\[ \] Verify source$/m);
+  assert.doesNotMatch(plain, /^>/m);
   assert.equal(explicit.selection, keys[4]);
   assert.equal(explicit.selectionIndex, 4);
-  // No selection requested: the first in-progress task is marked.
+  // The first task row starts with its mark; wrapped continuation rows are the only
+  // body rows that begin with spaces, and nothing begins with the old marker.
+  assert.ok(explicit.bodyLines.some((line) => stripVTControlCharacters(line).startsWith("[•] ")));
+  assert.doesNotMatch(plain, /^> /m);
+  // No selection requested: the first in-progress task is the resolved selection.
   const inferred = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true });
   assert.equal(inferred.selection, keys[2]);
   assert.equal(inferred.selectionIndex, 2);
@@ -183,7 +190,8 @@ test("the selection marker follows the requested key and falls back to current w
   const stale = renderFrame(snapshot, { columns: 60, rows: 20, color: false, expanded: true,
     selection: "[\"gone\"]" });
   assert.equal(stale.selection, keys[2]);
-  assert.doesNotMatch(stripVTControlCharacters(stale.text), /^>\[ \] Verify source$/m);
+  assert.equal(stale.selectionIndex, 2);
+  assert.doesNotMatch(stripVTControlCharacters(stale.text), /^>/m);
 });
 
 test("truncation shortens a task row before it can touch the footer", () => {

@@ -249,7 +249,7 @@ export async function startViewer(options, {
   // The renderer resolves an unset `prefs.selection` to the first drawn card. That
   // implicit default is a selection the user can see, so the next paint hands it back
   // to the renderer: a completed card nobody requested anymore would be folded away
-  // and the marker would jump (OMO keeps its selected task, viewer.mjs:186). It is
+  // and the selection would jump (OMO keeps its selected task, viewer.mjs:186). It is
   // deliberately not written to prefs, so the stored selection stays null until the
   // user really moves it.
   let lastSelection = null;

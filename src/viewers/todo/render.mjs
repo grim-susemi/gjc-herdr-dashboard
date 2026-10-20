@@ -34,7 +34,9 @@
 import { clean, compactCount, fit, footerText, languageOf, t, width, wrap } from "../common.mjs";
 const style = { accent: "36", phase: "35", muted: "90", completed: "90", abandoned: "90",
   in_progress: "36", warning: "33", error: "31", activePhase: "33", goal: "35" };
-const layout = { taskInset: 5, fallbackColumns: 16, fallbackRows: 3 };
+// The task row starts with the status mark at column 0, so a continuation row is
+// indented by exactly the mark and its trailing space.
+const layout = { taskInset: 4, fallbackColumns: 16, fallbackRows: 3 };
 export const marks = { pending: "[ ]", in_progress: "[•]", completed: "[✓]", abandoned: "[×]" };
 
 const paint = (text, token, enabled, heading = false) => enabled && style[token]
@@ -79,7 +81,7 @@ export function taskKeys(projection) {
 // holds pending or in-progress work always lists its tasks, because hiding pending
 // work would defeat the point of a todo list. Closed phases collapse to nothing
 // until `c` expands them, and their counts stay visible in the header.
-function body(projection, { columns, expanded, color, language, selection }) {
+function body(projection, { columns, expanded, color, language }) {
   const bodyLines = [];
   const taskRanges = Object.create(null), phaseRanges = Object.create(null);
   const selectableKeys = [];
@@ -110,7 +112,7 @@ function body(projection, { columns, expanded, color, language, selection }) {
       contents.set(content, contentOccurrence + 1);
       const key = taskKeyOf(name, phaseOccurrence, content, contentOccurrence);
       const taskStart = bodyLines.length;
-      const prefix = `${key === selection ? ">" : " "}${marks[task.status] ?? " ? "} `;
+      const prefix = `${marks[task.status] ?? " ? "} `;
       const wrapped = wrap(content, Math.max(1, columns - layout.taskInset));
       for (const [index, line] of wrapped.entries()) {
         const inset = index === 0 ? prefix : " ".repeat(layout.taskInset);
@@ -245,7 +247,7 @@ export function renderFrame(projection, {
   const footerLine = (width(footer) + 1 <= columns ? " " : "") +
     paint(footer, kind === "live" || kind === "empty" ? "accent" : "warning", color);
 
-  const drawn = body(projection, { columns, expanded, color, language: languageCode, selection: resolved });
+  const drawn = body(projection, { columns, expanded, color, language: languageCode });
   const { bodyLines, taskRanges, phaseRanges, selectableKeys } = drawn;
   const isEmpty = projection?.empty === true || (phases.length === 0 && kind === "empty");
   if (phases.length === 0) {
