@@ -1,0 +1,23 @@
+723:function frozenHolder(world, { newToken, newPassId } = {}) {
+724-  let release, created;
+725-  const gate = new Promise(resolve => { release = resolve; });
+726-  const ready = new Promise(resolve => { created = resolve; });
+727-  const holder = world.spawn({ newToken, newPassId });
+728-  const pass = holder.explicit({ hooks: { afterLastCheck: async () => { created(); await gate; } } });
+729-  return { holder, pass, ready, release };
+730-}
+731-
+732-test('LT-7 (a): a live holder is never displaced, at +31 s or +600 s, with zero writes', async t => {
+733-  for (const advance of [31000, 600000]) {
+734-    const world = await createWorld(t);
+735-    const frozen = frozenHolder(world, { newPassId: () => 'pass-frozen' });
+736-    await frozen.ready;
+737-    world.clock.advance(advance);
+738-    const busy = world.spawn();
+739-    const blocked = await busy.explicit();
+740-    assert.equal(blocked.code, 'busy', `+${advance}`);
+741-    assert.equal(blocked.lock.generation, 1, 'the live generation is named and untouched');
+742-    assert.deepEqual(busy.tracer.trace, [], `+${advance}: zero herdr calls while busy`);
+743-    assert.equal(await world.slotBytes(), null, `+${advance}: zero slot writes while busy`);
+744-    // The holder resumes: its budget is long gone, so it stops before its first herdr call.
+745-    frozen.release();

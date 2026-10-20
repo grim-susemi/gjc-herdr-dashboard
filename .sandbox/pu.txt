@@ -1,0 +1,13 @@
+35: // the raw code with the generation token still attached, because a pass must always
+44: // never formats a pass it did not receive, and it never invents a generation it was not
+90: // module (stage-05 R4), and a generation tree has its own copy of `locale/`.
+162: // stage-05 R4 state-dir rule: the env override wins, then a `generation-NNNNNN` tree
+171:   if (/^generation-\d{6}$/.test(base) && basename(dirname(clean)) === "herdr-dashboard") {
+299:   const generation = text(gen) ?? "dev";
+309:     return `ext ${generation} · ${code}`;
+344:   // explicit `busy` object, an object `detail`, or the reconciler's `lock` (generation +
+351:     const generationValue = Number.isSafeInteger(snapshot.generation) && snapshot.generation > 0
+352:       ? String(snapshot.generation).padStart(12, "0") : "?";
+354:       { pid, generation: generationValue, path: String(snapshot.path ?? "?") });
+393:       (input.lock ? { generation: input.lock.generation, path: input.lock.dir } : null);
+397:   return `${say("notify.header", { gen: generation })} · ${segments.join(" · ")}`;

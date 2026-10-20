@@ -1,0 +1,11 @@
+{
+  "subBegin": 1792456991129,
+  "ownerPid": 26448,
+  "byPpid": {
+    "26448": 32
+  },
+  "verbs": {
+    "pane list": 16,
+    "pane process-info": 16
+  }
+}

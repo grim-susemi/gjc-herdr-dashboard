@@ -1,0 +1,21 @@
+## Verdict
+**ITERATE**
+
+## Claim Checks
+- 휠/드래그 계산, `dragY` 갱신, null frame·undefined scroll 대체 경로와 비대화형 `pause()` 방지는 소스상 정상입니다.
+- 기존 로그 확인: Todo 24/24, Workers 22/22, terminal-input 9/9 통과. 이번 검토에서 테스트를 재실행하지 않았습니다.
+- LV-8은 **19건 모두 `ok: true`**. L2 분할 비율 0.35, 폭별 최대 너비 23/39, AC-G1 전후 기록도 문서와 일치합니다. 과장했던 라이브 관측 설명은 완화됐습니다.
+
+## Missing Evidence
+클릭 후 화면 위치 유지 및 구독 시작 후 `error → close` 중복 통지 방지 테스트가 없습니다.
+
+## Approval Boundary
+아래 결함 수정 전에는 최종 승인 불가입니다.
+
+## Summary
+변경 방향·범위는 적절하나 포인터 요구가 일부 미해결이고 종료 통지 수정에 중복 호출 경로가 생겼습니다. 추가 설계나 대안 확장은 불필요합니다.
+
+## Required Changes
+1. **`src/viewers/todo/viewer.mjs:509-512`, `src/viewers/workers/viewer.mjs:601-603`** — 클릭 좌표는 drawn scroll을 쓰지만 commit은 여전히 이전 `prefs.scroll`을 사용합니다. 예: scroll 9 → blur로 화면 0 → 헤더 클릭 시 화면이 다시 9로 점프합니다. 클릭 분기에서 `prefs.scroll = at`을 반영하고, 두 viewer에 클릭 후 scroll 유지 회귀 테스트를 추가하세요. 1차 포인터 요구의 미해결 부분입니다.
+2. **`src/terminal-input.mjs:67-74`** — 구독 시작 후 `error`가 오면 `failed(cause)`, 뒤따르는 `close`에서도 `failed(closed)`가 호출됩니다. 이번 close 통지 추가로 생긴 중복 경로입니다. 모든 실패 경로에 공유 once 가드를 적용하고 `error → close`에서도 정확히 한 번 호출되는 테스트를 추가하세요.
+3. **`VERIFICATION.md:108`** — 문서는 521 tests지만 연결된 `.evidence/L2/test-report.txt:532-535`는 527 tests/pass입니다. 이번 회귀 테스트 추가분을 반영해 527로 맞추거나, 521이 과거 실행임을 명시하고 해당 실행의 별도 증거를 연결하세요.

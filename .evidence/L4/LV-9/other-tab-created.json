@@ -1,0 +1,110 @@
+{
+  "created": [
+    "w1:p5",
+    "w1:p6"
+  ],
+  "ours": [
+    "GJC Todo · 752becc2",
+    "GJC Workers · 752becc2"
+  ],
+  "panes": [
+    {
+      "agent": "gjc",
+      "agent_status": "idle",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-other-tab",
+      "focused": true,
+      "pane_id": "w1:p1",
+      "revision": 2,
+      "scroll": {
+        "max_offset_from_bottom": 11,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t1",
+      "terminal_id": "term_65e1f05ece9701",
+      "terminal_title": "GJC: case-l4coexist-other-tab",
+      "terminal_title_stripped": "GJC: case-l4coexist-other-tab",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-other-tab",
+      "focused": false,
+      "label": "GJC Todo · 752becc2",
+      "pane_id": "w1:p5",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t1",
+      "terminal_id": "term_65e1f09dd85745",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-other-tab",
+      "focused": false,
+      "label": "GJC Workers · 752becc2",
+      "pane_id": "w1:p6",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t1",
+      "terminal_id": "term_65e1f09e598196",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-other-tab",
+      "focused": false,
+      "label": "DAG · x",
+      "pane_id": "w1:p2",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t2",
+      "terminal_id": "term_65e1f068f81fe2",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-other-tab",
+      "focused": false,
+      "label": "OmO DAG",
+      "pane_id": "w1:p3",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t3",
+      "terminal_id": "term_65e1f069116f53",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-other-tab",
+      "focused": false,
+      "label": "OmO Todo · x",
+      "pane_id": "w1:p4",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t4",
+      "terminal_id": "term_65e1f0692bab84",
+      "workspace_id": "w1"
+    }
+  ]
+}

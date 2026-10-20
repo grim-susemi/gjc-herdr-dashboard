@@ -1,0 +1,30 @@
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:966:1
+✖ L4: before /dashboard adopts a stopped previous owner, no automatic trigger writes a slot or data file (244.9836ms)
+  AssertionError [ERR_ASSERTION]: the slot is untouched until /dashboard adopts it
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      herdr: [
+        'herdr.exe'
+      ],
+      layoutKey: 'c871c365cecc379c72ad3caf',
+  ...
+        language: 'en',
+  +     scopeEpoch: 2,
+  +     scopeKey: '27a846dab554744e8f714d08',
+  +     sessionId: 's-2'
+  -     scopeEpoch: 1,
+  -     scopeKey: '1a953bcff774d99bb96c970d',
+  -     sessionId: 's-1'
+      }
+    }
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/instance.test.mjs:987:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [Object],

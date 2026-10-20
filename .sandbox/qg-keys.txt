@@ -1,0 +1,15 @@
+architectReview
+executorQa
+criticReview
+iteration
+---iteration---
+status
+evidence
+fullRerun
+reviewCohort
+rerunCommands
+blockers
+---cohort---
+["cleaner","architect","qa"]
+---surface---
+"api"

@@ -1,0 +1,83 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-lt1",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-lt1",
+      "createdAt": "2026-10-17T18:19:20.811Z",
+      "creator": "harness",
+      "pid": 89764,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-17T18:19:21.531Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lt1-fault",
+      "label": "lt1-fault",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-17T18:19:21.532Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-17T18:19:21.532Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "lt1-fault"
+    },
+    {
+      "kind": "fault",
+      "id": "fail-split-once",
+      "createdAt": "2026-10-17T18:19:31.065Z",
+      "creator": "harness",
+      "path": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\live-gjcdash-lt1\\lt1-fault\\flags\\fail-split-once"
+    },
+    {
+      "kind": "assertion",
+      "id": "lt1: ext dev · Todo 실패(pane split: herdr-split) · Workers 부분 완료(Todo 기준 pane 없음: no-anchor) -> ext dev · Todo 열림 · Workers 열림",
+      "createdAt": "2026-10-17T18:20:27.453Z",
+      "creator": "harness"
+    }
+  ],
+  "observed": [],
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-17T18:20:27.980Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "lt1-fault",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lt1-fault"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-17T18:20:28.000Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-lt1",
+      "at": "2026-10-17T18:20:28.958Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

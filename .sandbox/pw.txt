@@ -1,0 +1,22 @@
+73:     reject: (cause) => settle.reject(cause),
+74:   };
+75: }
+76: 
+77: function fixture(t) {
+78:   const state = mkdtempSync(join(tmpdir(), "gjc-pointer-workers-"));
+79:   t.after(() => rmSync(state, { recursive: true, force: true }));
+80:   const clock = fakeClock();
+81:   const writes = [];
+82:   const output = Object.assign(new EventEmitter(), { columns: 80, rows: 24, isTTY: true,
+83:     write: (text) => { output.writes.push(text); return true; }, writes: [] });
+84:   const input = new EventEmitter();
+85:   input.isTTY = true;
+86:   input.setRawMode = () => {};
+87:   input.resume = () => {};
+88:   const port = {
+89:     read(path) {
+90:       const text = readFileSync(path, "utf8");
+91:       try { return JSON.parse(text); }
+92:       catch (cause) { throw Object.assign(cause, { code: "INVALID_JSON" }); }
+93:     },
+94:     readRaw: (path) => readFileSync(path, "utf8"),

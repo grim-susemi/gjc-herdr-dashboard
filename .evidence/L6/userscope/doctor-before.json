@@ -1,0 +1,43 @@
+{
+  "ok": true,
+  "agentDir": "C:\\Users\\USER\\.gjc\\agent",
+  "shim": {
+    "path": "C:\\Users\\USER\\.gjc\\agent\\extensions\\gjc-herdr-dashboard.js",
+    "exists": true,
+    "managed": true,
+    "target": "file:///C:/Users/USER/.gjc/agent/herdr-dashboard/generation-000001/extension.mjs",
+    "targetPath": "C:\\Users\\USER\\.gjc\\agent\\herdr-dashboard\\generation-000001\\extension.mjs",
+    "targetGeneration": "generation-000001",
+    "targetUsable": true
+  },
+  "current": {
+    "path": "C:\\Users\\USER\\.gjc\\agent\\herdr-dashboard\\current.json",
+    "exists": true,
+    "valid": true,
+    "generation": "generation-000001",
+    "token": "gen-000001",
+    "language": "ko",
+    "error": null
+  },
+  "generations": [
+    {
+      "name": "generation-000001",
+      "token": "gen-000001",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000001",
+        "lang": "ko"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": true
+    }
+  ],
+  "state": {
+    "path": "C:\\Users\\USER\\.gjc\\agent\\herdr-dashboard\\state",
+    "exists": false
+  },
+  "mismatches": []
+}

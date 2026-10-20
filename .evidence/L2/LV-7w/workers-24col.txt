@@ -1,0 +1,40 @@
+Workers [3]  Running 1~
+>◐ Parse the c~ Running
+  read · Reading config
+  3 tools · 1200 tok ·~
+ ✗ Write the mi~ Failed
+  5 tools · 3400 tok ·~
+ ⊘ Check the l~ Aborted
+  1 tools · 90 tok · c~
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────
+Follow ON · Live

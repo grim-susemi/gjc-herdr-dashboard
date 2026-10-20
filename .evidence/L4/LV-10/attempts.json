@@ -1,0 +1,21 @@
+[
+  {
+    "attempt": 1,
+    "notifiesBefore": 0,
+    "pairNotifies": 1,
+    "pairLines": [
+      "ext dev · Todo 열림 · Workers 열림"
+    ],
+    "cumulative": 1
+  },
+  {
+    "attempt": 2,
+    "notifiesBefore": 1,
+    "pairNotifies": 2,
+    "pairLines": [
+      "ext dev · Todo 정상 · Workers 정상",
+      "ext dev · Todo 정상 · Workers 정상"
+    ],
+    "cumulative": 3
+  }
+]

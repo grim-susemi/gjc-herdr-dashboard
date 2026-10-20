@@ -1,0 +1,47 @@
+✔ LT-4 session-kind: a sub session is reported ineligible once, not silently ignored (6.4609ms)
+✔ LT-4 no-ui: a host without a UI is reported ineligible once (1.1703ms)
+✔ LT-4 tty: a non-TTY stdout is reported ineligible once (1.1238ms)
+✔ LT-4 outside-herdr: a session outside Herdr is reported ineligible once (1.064ms)
+✔ LT-4 disabled: the opt-out setting is reported ineligible once (1.1159ms)
+✔ LT-4 nested: another recorded GJC in this pane is reported ineligible once (1.1211ms)
+✔ LT-4 mirrored-install: a tree without the shipped assets is reported ineligible once (2.0083ms)
+✔ LT-4 state-dir: a tree that derives no state directory is reported ineligible once (2.7573ms)
+✔ LT-4 busy: a live lock holder yields one busy notify with its holder snapshot (12.8195ms)
+✔ LT-4 busy:other-owner: a live foreign owner yields exactly one busy notify (14.9124ms)
+✔ LT-4 herdr missing: an unresolvable Herdr vector fails once and creates no pane (8.9608ms)
+✔ LT-4 node missing: an unusable Node runtime fails once with zero panes (7.0411ms)
+✔ LT-4 list failure: a failing pane list is reported once as a coded failure (214.0577ms)
+✔ LT-4 partial:size: a parent too small for the role column reports partial once (8.5569ms)
+✔ LT-4 partial:timeout: a split that never answers reports partial once (144.1454ms)
+✔ LT-4 normal: one opened notify, one pane, and the single notify carries the gen token (233.6146ms)
+✔ LT-4 duplicate: a second install delegates and appends its warning to the single result line (672.1378ms)
+✔ LT-6 c3: a main that fails eligibility at session_start arms on the next eligible /dashboard (233.9931ms)
+✔ R3: the 5 s heartbeat tick runs an automatic pass while the todo record is pending, and not otherwise (557.9687ms)
+✔ G9: an exception from the retained ctx disables the poll for good (event-only) (366.554ms)
+✔ LT-6: a sub session shares the main registry, stays inert, and leaves main armed (196.0662ms)
+✔ LT-6: main shutdown closes zero panes, deletes no record and stamps stoppedAt (231.1155ms)
+✔ LT-6: reload (same session + module) replaces the entry and retires the old instance (426.6661ms)
+✔ LT-6: a different module URL in the same pane delegates and warns once, silently on start (229.6689ms)
+✔ AC1.4: three /dashboard calls leave exactly one GJC Todo pane (653.7178ms)
+✔ AC1.5: an outside-Herdr live call reports the exact ineligible reason token (1.4874ms)
+✔ AC1.10: no trigger ever sends prompt text, keys or a reporter command to a pane (770.9689ms)
+✔ AC1.11: a session-id change keeps the pane and moves the projection to the new scope (438.8047ms)
+✔ AC1.2: todo_write publishes a Todo projection in one call; a non-todo tool publishes none (33.701ms)
+✔ §7.1 item 5: no projection is published while the slot carries no live todo record (17.0684ms)
+✔ a degraded /dashboard call is answered and never throws: no host UI means no toast (0.8018ms)
+✔ an automatic trigger before arming is silent: no notify, no Herdr call, no file (176.1569ms)
+✔ one /dashboard call runs one explicit pass and no automatic pass for the same call (236.2633ms)
+✔ triggers: turn_end, agent_end, goal_updated, todo_write and each bus channel run one pass (168.2679ms)
+✔ binding-seam-fault: a throwing binding seam still owes one notify (2.0376ms)
+✔ G12: session_switch rebinds the scope at once, without waiting for another event (239.0243ms)
+✔ a session switch with no event after it is still picked up by the 1 s poll (380.1788ms)
+✔ L4: before /dashboard adopts a stopped previous owner, no automatic trigger writes a slot or data file (451.8718ms)
+✔ L4: markStopped never stamps a release on a record another instance owns (17.0347ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7207.7647

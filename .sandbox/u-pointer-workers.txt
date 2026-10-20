@@ -1,0 +1,31 @@
+✔ the body really scrolls, so the wheel clamps are observable (20.162ms)
+✔ wheel down scrolls +3 and wheel up -3, clamped to [0, maxScroll] (42.8889ms)
+✔ a wheel turns follow off and persists the scroll it landed on (29.0886ms)
+✔ a click on a card selects it and a second click folds it, like Space/Enter (24.3969ms)
+✔ a click on the footer or header row only turns follow off (34.8317ms)
+✔ a drag pans the body and a release ends it (25.7191ms)
+✔ a drag clamps at the bottom of the body (38.6389ms)
+✔ a motion report without a press is ignored, and a non-left button never scrolls (22.1797ms)
+✔ blur returns follow ON, closes the detail view and re-arms the reveal; focus in does nothing (28.9594ms)
+✔ blur without a follow change still redraws but writes no preference (18.2694ms)
+✔ the Herdr focus callback goes through the same blur path (14.9239ms)
+✔ a rejected focus subscription shows exactly one notice and the viewer keeps working (25.3959ms)
+✔ a failed() report alone shows the notice once, and the dispose lands on finish (20.4266ms)
+✔ a subscription that lands after finish is disposed immediately (15.7719ms)
+✔ a watcher that throws synchronously is reported, not propagated (15.2169ms)
+✔ a non-interactive viewer never subscribes to the Herdr focus stream (17.3977ms)
+✔ an SGR report split across two chunks is decoded exactly once (16.5518ms)
+✔ raw mouse bytes never reach the key handler (30.2138ms)
+✔ dispose detaches the input decoder, so post-dispose bytes are inert (15.6835ms)
+✔ a resize repaint is the geometry a click is judged against (26.4904ms)
+✔ a wheel after blur starts from the scroll position the frame shows, not the stale pref (29.1923ms)
+✔ stop pauses the stdin the viewer resumed, so the process can exit (19.4272ms)
+✔ a click after blur keeps the scroll position that was on screen (24.174ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 598.0628

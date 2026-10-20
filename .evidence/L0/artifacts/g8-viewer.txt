@@ -1,0 +1,6 @@
+=== g8-tree-dev
+VIEWER-ROOT file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/.sandbox/g8-tree-dev/ title locale-ko-ok state-dir-basename 
+exit=0
+=== case-probe-gen/.gjc/herdr-dashboard/generation-000001
+VIEWER-ROOT file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/.sandbox/case-probe-gen/.gjc/herdr-dashboard/generation-000001/ title locale-ko-ok state-dir-basename 
+exit=0

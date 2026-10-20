@@ -1,0 +1,83 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-lt3",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-lt3",
+      "createdAt": "2026-10-18T15:35:02.277Z",
+      "creator": "harness",
+      "pid": 45328,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-18T15:35:02.866Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lv3",
+      "label": "lv3",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-18T15:35:02.867Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-18T15:35:02.867Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "lv3"
+    },
+    {
+      "kind": "assertion",
+      "id": "lv3: ext dev · Todo 열림 · Workers 열림; ready at +30811 ms with the row and 실시간",
+      "createdAt": "2026-10-18T15:36:47.107Z",
+      "creator": "harness"
+    }
+  ],
+  "observed": [
+    {
+      "paneId": "w1:p2",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "label": "GJC Todo · 252ca028"
+    }
+  ],
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-18T15:36:47.659Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "lv3",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lv3"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-18T15:36:47.684Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-lt3",
+      "at": "2026-10-18T15:36:48.667Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

@@ -1,0 +1,62 @@
+{
+  "after": {
+    "todo": [
+      "w1:p2"
+    ],
+    "workers": [
+      "w1:p3"
+    ]
+  },
+  "panes": [
+    {
+      "agent": "gjc",
+      "agent_status": "idle",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4adopt",
+      "focused": true,
+      "pane_id": "w1:p1",
+      "revision": 5,
+      "scroll": {
+        "max_offset_from_bottom": 92,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t1",
+      "terminal_id": "term_65e36144d5f741",
+      "terminal_title": "GJC: case-l4adopt",
+      "terminal_title_stripped": "GJC: case-l4adopt",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4adopt",
+      "focused": false,
+      "label": "GJC Todo · a65445fa",
+      "pane_id": "w1:p2",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t1",
+      "terminal_id": "term_65e3617f3a0b22",
+      "workspace_id": "w1"
+    },
+    {
+      "agent_status": "unknown",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4adopt",
+      "focused": false,
+      "label": "GJC Workers · a65445fa",
+      "pane_id": "w1:p3",
+      "revision": 0,
+      "scroll": {
+        "max_offset_from_bottom": 0,
+        "offset_from_bottom": 0,
+        "viewport_rows": 40
+      },
+      "tab_id": "w1:t1",
+      "terminal_id": "term_65e3617ff63f33",
+      "workspace_id": "w1"
+    }
+  ]
+}

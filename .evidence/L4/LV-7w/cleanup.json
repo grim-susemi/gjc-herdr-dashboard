@@ -1,0 +1,54 @@
+{
+  "closed": [
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "at": "2026-10-18T15:39:14.497Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": null
+      }
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "at": "2026-10-18T15:39:14.777Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": null
+      }
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-18T15:39:15.154Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "lvwid",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lvwid"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-18T15:39:15.179Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-lvwid",
+      "at": "2026-10-18T15:39:16.040Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "skipped": [],
+  "verifiedAbsent": true
+}

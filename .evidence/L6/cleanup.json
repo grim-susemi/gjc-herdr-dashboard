@@ -1,0 +1,32 @@
+{
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-19T18:49:21.495Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l6-drill",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-19T18:49:21.519Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l6drill",
+      "at": "2026-10-19T18:49:22.397Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "skipped": [],
+  "verifiedAbsent": true
+}

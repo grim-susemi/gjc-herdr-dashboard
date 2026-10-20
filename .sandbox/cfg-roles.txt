@@ -1,0 +1,32 @@
+modelRoles: 
+  default: ollama-cloud/deepseek-v4.1-flash:high
+task: 
+  agentModelOverrides: 
+    executor: ollama-cloud/deepseek-v4.1-flash:high
+    architect: anthropic/claude-opus-5-5:max
+    planner: anthropic/claude-opus-5-5:xhigh
+    critic: openai-codex/gpt-6.1-sol:high
+defaultThinkingLevel: xhigh
+skills: 
+  enabled: true
+  customDirectories: 
+    - C:\Users\USER\.gjc\skills
+  enablePiUser: true
+  enablePiProject: true
+configSchemaVersion: 2
+ui: 
+  language: ko
+memory: 
+  backend: hindsight
+hindsight: 
+  apiUrl: http://localhost:8888
+  bankId: ""
+tasksPane: 
+  defaultVisible: true
+pet: 
+  mode: "off"
+statusLine: 
+  separator: block
+  preset: default-usage
+colorBlindMode: false
+mouse: 

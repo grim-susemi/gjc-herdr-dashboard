@@ -1,0 +1,7 @@
+13://   * the arming decision, reached only from `session_start` and `/dashboard` (R6);
+543:  // R6: only this function turns an instance into an armed owner, and only `session_start` and
+868:  pi?.on?.('session_start', async (_event, ctx) => {
+876:    await runAutoPass(ctx, 'session_start');
+879:  // G12: `/new`, `/resume` and fork arrive as `session_switch` in the same process (the factory is not
+882:  pi?.on?.('session_switch', async (_event, ctx) => {
+884:    await runAutoPass(ctx, 'session_switch');

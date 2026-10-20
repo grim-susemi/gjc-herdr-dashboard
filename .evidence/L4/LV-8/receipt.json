@@ -1,0 +1,112 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-lvp",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-lvp",
+      "createdAt": "2026-10-18T15:39:16.422Z",
+      "creator": "harness",
+      "pid": 72048,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w2",
+      "createdAt": "2026-10-18T15:39:17.002Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lvp",
+      "label": "lvp",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w2:t1",
+      "createdAt": "2026-10-18T15:39:17.003Z",
+      "creator": "harness",
+      "workspaceId": "w2"
+    },
+    {
+      "kind": "pane",
+      "id": "w2:p1",
+      "createdAt": "2026-10-18T15:39:17.003Z",
+      "creator": "harness",
+      "workspaceId": "w2",
+      "tabId": "w2:t1",
+      "role": "parent",
+      "label": "lvp"
+    },
+    {
+      "kind": "pane",
+      "id": "w2:p2",
+      "createdAt": "2026-10-18T15:40:28.284Z",
+      "creator": "harness",
+      "workspaceId": "w2",
+      "tabId": "w2:t1",
+      "role": "viewer",
+      "label": "GJC Todo · 7837681b"
+    },
+    {
+      "kind": "pane",
+      "id": "w2:p3",
+      "createdAt": "2026-10-18T15:40:28.306Z",
+      "creator": "harness",
+      "workspaceId": "w2",
+      "tabId": "w2:t1",
+      "role": "viewer",
+      "label": "GJC Workers · 7837681b"
+    }
+  ],
+  "observed": [],
+  "closed": [
+    {
+      "kind": "pane",
+      "id": "w2:p2",
+      "at": "2026-10-18T15:42:49.604Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w2",
+        "tabId": "w2:t1",
+        "label": "GJC Todo · 7837681b"
+      }
+    },
+    {
+      "kind": "pane",
+      "id": "w2:p3",
+      "at": "2026-10-18T15:42:49.943Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w2",
+        "tabId": "w2:t1",
+        "label": "GJC Workers · 7837681b"
+      }
+    },
+    {
+      "kind": "workspace",
+      "id": "w2",
+      "at": "2026-10-18T15:42:50.580Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "lvp",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lvp"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w2:t1",
+      "at": "2026-10-18T15:42:50.607Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w2",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-lvp",
+      "at": "2026-10-18T15:42:51.503Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

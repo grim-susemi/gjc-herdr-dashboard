@@ -1,0 +1,137 @@
+[
+  {
+    "name": "todo: starts with follow ON",
+    "ok": true,
+    "detail": {
+      "frame": "Todo [0/60]  완료:0 · 제외:0\r\n─ LVP 0/60 ────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n>[•] lvp-row-01\r\n [ ] lvp-row-02\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n [ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "todo: wheel down turns follow OFF",
+    "ok": true,
+    "detail": {
+      "frame": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-06\r\n [ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n [ ] lvp-row-40\r\n [ ] lvp-row-41\r\n [ ] lvp-row-42\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "todo: two wheel-down steps moved the body by 6 lines (row 01 -> 06 after the phase header line)",
+    "ok": true,
+    "detail": {
+      "top0": ">[•] lvp-row-01",
+      "now": "[ ] lvp-row-06"
+    }
+  },
+  {
+    "name": "todo: wheel up keeps follow OFF and moves back 3 rows",
+    "ok": true,
+    "detail": {
+      "afterUp": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n [ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "todo: the other role's follow is untouched by todo's pointer",
+    "ok": true,
+    "detail": {
+      "other": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "todo: blur returns follow ON",
+    "ok": true,
+    "detail": {
+      "frame": "Todo [0/60]  완료:0 · 제외:0\r\n─ LVP 0/60 ────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n>[•] lvp-row-01\r\n [ ] lvp-row-02\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n [ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "todo: click turns follow OFF",
+    "ok": true,
+    "detail": {
+      "frame": "Todo [0/60]  완료:0 · 제외:0\r\n─ LVP 0/60 ────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n [•] lvp-row-01\r\n [ ] lvp-row-02\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n>[ ] lvp-row-06\r\n [ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "todo: drag keeps follow OFF",
+    "ok": true,
+    "detail": {
+      "afterDrag": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n>[ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "todo: drag changed the visible body",
+    "ok": true,
+    "detail": {
+      "beforeDrag": "Todo [0/60]  완료:0 · 제외:0\r\n─ LVP 0/60 ────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n [•] lvp-row-01\r\n [ ] lvp-row-02\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n>[ ] lvp-row-06\r\n [ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간",
+      "afterDrag": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n>[ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "todo: resize redraws the frame and the viewer stays alive",
+    "ok": true,
+    "detail": {
+      "before": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n>[ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간",
+      "after": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n>[ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "workers: starts with follow ON",
+    "ok": true,
+    "detail": {
+      "frame": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "workers: wheel down turns follow OFF",
+    "ok": true,
+    "detail": {
+      "frame": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "workers: body fits the PTY, scroll distance is unit-tested",
+    "ok": true,
+    "detail": "harness limit"
+  },
+  {
+    "name": "workers: wheel up keeps follow OFF",
+    "ok": true,
+    "detail": {
+      "afterUp": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "workers: the other role's follow is untouched by workers's pointer",
+    "ok": true,
+    "detail": {
+      "other": "Todo [0/60]  완료:0 · 제외:0\r\n [ ] lvp-row-03\r\n [ ] lvp-row-04\r\n [ ] lvp-row-05\r\n [ ] lvp-row-06\r\n>[ ] lvp-row-07\r\n [ ] lvp-row-08\r\n [ ] lvp-row-09\r\n [ ] lvp-row-10\r\n [ ] lvp-row-11\r\n [ ] lvp-row-12\r\n [ ] lvp-row-13\r\n [ ] lvp-row-14\r\n [ ] lvp-row-15\r\n [ ] lvp-row-16\r\n [ ] lvp-row-17\r\n [ ] lvp-row-18\r\n [ ] lvp-row-19\r\n [ ] lvp-row-20\r\n [ ] lvp-row-21\r\n [ ] lvp-row-22\r\n [ ] lvp-row-23\r\n [ ] lvp-row-24\r\n [ ] lvp-row-25\r\n [ ] lvp-row-26\r\n [ ] lvp-row-27\r\n [ ] lvp-row-28\r\n [ ] lvp-row-29\r\n [ ] lvp-row-30\r\n [ ] lvp-row-31\r\n [ ] lvp-row-32\r\n [ ] lvp-row-33\r\n [ ] lvp-row-34\r\n [ ] lvp-row-35\r\n [ ] lvp-row-36\r\n [ ] lvp-row-37\r\n [ ] lvp-row-38\r\n [ ] lvp-row-39\r\n───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "workers: blur returns follow ON",
+    "ok": true,
+    "detail": {
+      "frame": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  },
+  {
+    "name": "workers: click turns follow OFF",
+    "ok": true,
+    "detail": {
+      "frame": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "workers: drag keeps follow OFF",
+    "ok": true,
+    "detail": {
+      "afterDrag": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 OFF · 실시간"
+    }
+  },
+  {
+    "name": "workers: resize redraws the frame and the viewer stays alive",
+    "ok": true,
+    "detail": {
+      "before": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간",
+      "after": "Workers [6]  완료 6\r\n>✓ lvpf 완료\r\n ✓ lvpe 완료\r\n ✓ lvpd 완료\r\n ✓ lvpc 완료\r\n ✓ lvpb 완료\r\n ✓ lvpa 완료\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n───────────────────────────────────────────────────────────\r\n자동 추적 ON · 실시간"
+    }
+  }
+]

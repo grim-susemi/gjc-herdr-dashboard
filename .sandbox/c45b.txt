@@ -1,0 +1,18 @@
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:1055:1
+✖ critic #5: a folded trigger never restores an older context over a newer one (816.1729ms)
+  AssertionError [ERR_ASSERTION]: the retained scope still follows the newest context
+  
+  's-1' !== 's-2'
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/instance.test.mjs:1068:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 's-1',
+    expected: 's-2',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,88 @@
+✔ the body really scrolls, so the wheel clamps are observable (14.6224ms)
+✔ wheel down scrolls +3 and wheel up -3, clamped to [0, maxScroll] (16.4684ms)
+✔ a wheel turns follow off and persists scroll without persisting follow (15.4012ms)
+✔ a click selects the task under the cursor and turns follow off (12.0448ms)
+✔ a click on the footer row only turns follow off (8.0485ms)
+✔ a drag pans the body and a release ends it (11.3686ms)
+✔ a drag clamps at the bottom of the body (9.3691ms)
+✔ a motion report without a press is ignored (8.0788ms)
+✔ blur returns follow ON, re-arms the reveal and ends the drag; focus in does nothing (20.5564ms)
+✔ blur without a follow change still redraws but writes no preference (8.2496ms)
+✔ the Herdr focus callback goes through the same blur path (8.9092ms)
+✔ a rejected focus subscription shows exactly one notice and the viewer keeps working (11.112ms)
+✔ a failed() report alone shows the notice once, and the dispose lands on stop (9.1467ms)
+✔ a subscription that lands after finish is disposed immediately (5.7819ms)
+✔ a non-interactive viewer never subscribes to the Herdr focus stream (5.5797ms)
+✔ an SGR report split across two chunks is decoded exactly once (7.7126ms)
+✔ resize repaints, and the click mapping uses the frame drawn after the resize (9.2902ms)
+✔ a keyboard action re-arms the reveal a pointer action disarmed (11.9964ms)
+✔ an SGR report is decoded in place of the key path, and a real key in the same chunk still lands (6.5972ms)
+✔ pointer and focus handling never writes slot.json or owner.json (18.7133ms)
+✔ dispose detaches the input decoder, so post-dispose bytes are inert (7.9014ms)
+✖ a wheel after blur starts from the scroll position the frame shows, not the stale pref (9.483ms)
+✖ a click after blur selects the row drawn on screen (9.8987ms)
+✖ stop pauses the stdin the viewer resumed, so the process can exit (12.613ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 21
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 291.6661
+
+✖ failing tests:
+
+test at test\unit\pointer-todo.test.mjs:445:1
+✖ a wheel after blur starts from the scroll position the frame shows, not the stale pref (9.483ms)
+  AssertionError [ERR_ASSERTION]: one wheel step moves 3 rows from what is on screen
+  
+  10 !== 3
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/pointer-todo.test.mjs:453:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 10,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\unit\pointer-todo.test.mjs:456:1
+✖ a click after blur selects the row drawn on screen (9.8987ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + '["P",0,"t10",0]'
+  - '["P",0,"t1",0]'
+               ^
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/pointer-todo.test.mjs:463:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '["P",0,"t10",0]',
+    expected: '["P",0,"t1",0]',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\unit\pointer-todo.test.mjs:466:1
+✖ stop pauses the stdin the viewer resumed, so the process can exit (12.613ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/pointer-todo.test.mjs:474:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

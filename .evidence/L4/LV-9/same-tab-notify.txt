@@ -1,0 +1,1 @@
+ext dev · Todo 부분 완료(배치 모양: shape) pane w1:p5 · Workers 부분 완료(공간 부족: size)

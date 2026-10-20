@@ -1,0 +1,22 @@
+{
+  "ac110": "idle -> working -> idle over 20948 ms",
+  "ac12": {
+    "todoWriteEventToDiskMs": 247,
+    "todoWriteEventToScreenMs": 1166,
+    "todoAppendReflectedMs": 2005
+  },
+  "lv6": {
+    "calls": 181,
+    "mutations": 0,
+    "newFiles": 0
+  },
+  "lv11": {
+    "scopeEpoch": [
+      1,
+      2
+    ]
+  },
+  "ac19Exit": {
+    "disconnectMs": 826
+  }
+}

@@ -1,0 +1,5 @@
+217:  // `installCtx` refuse to put an OLDER context back (critic #5: a folded trigger captured before a
+778:  function installCtx(ctx, seq) {
+807:    installCtx(ctx, seq);
+869:          // `installCtx` ignores the folded ctx if a newer one (an explicit call) arrived meanwhile.
+893:    installCtx(ctx, seq);

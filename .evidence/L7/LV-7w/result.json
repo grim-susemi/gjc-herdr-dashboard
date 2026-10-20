@@ -1,0 +1,20 @@
+{
+  "24": {
+    "titleLines": 3,
+    "widest": 23,
+    "cardLines": [
+      ">▌⠸ Parse the config f…",
+      " ▌× Write the… · failed",
+      " ▌⊘ Check th… · aborted"
+    ]
+  },
+  "40": {
+    "titleLines": 3,
+    "widest": 39,
+    "cardLines": [
+      ">▌⠏ Parse the conf… · ⧖ 497904h 43m 56s",
+      " ▌× Write the migrati… · failed · ⧖ 31s",
+      " ▌⊘ Check the lint ou… · aborted · ⧖ 2s"
+    ]
+  }
+}

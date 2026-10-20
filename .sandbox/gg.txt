@@ -1,0 +1,18 @@
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/extensibility/extensions/runner.ts:293:	#getGoalStateFn: ExtensionContext["getGoalState"] = () => undefined;
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/extensibility/extensions/runner.ts:442:		this.#getGoalStateFn = contextActions.getGoalState ?? (() => undefined);
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/extensibility/extensions/runner.ts:764:			getGoalState: () => this.#getGoalStateFn(),
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/extensibility/extensions/types.ts:496:	getGoalState(): unknown;
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/extensibility/extensions/types.ts:1671:	getGoalState?: () => unknown;
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/modes/controllers/extension-ui-controller.ts:560:			getGoalState: () => this.ctx.session.getGoalModeState(),
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/modes/controllers/extension-ui-controller.ts:790:			getGoalState: () => this.ctx.session.getGoalModeState(),
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/modes/controllers/extension-ui-controller.ts:936:						getGoalState: () => this.ctx.session.getGoalModeState(),
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/modes/runtime-init.ts:132:			getGoalState: () => session.getGoalModeState(),
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/query/handlers.ts:25:	getGoalState(): unknown | Promise<unknown>;
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/query/handlers.ts:133:	Q04: { resource: "goal", method: "getGoalState", mvcc: true },
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/sdk-surface-parity.test.ts:87:		getGoalState: () => undefined,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/session-runtime.test.ts:109:		getGoalState: () => options.goalState,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/session-runtime.ts:1726:	const getGoalState = (): unknown => {
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/session-runtime.ts:1728:			typeof (ctx as Partial<ExtensionContext>).getGoalState === "function" ? ctx.getGoalState() : undefined;
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/sdk/host/session-runtime.ts:1757:		getGoalState,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/session/agent-session.ts:12870:			getGoalState: () => this.getGoalModeState(),
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/executor.ts:2192:						getGoalState: () => session.getGoalModeState(),

@@ -1,0 +1,44 @@
+[
+  {
+    "elapsed": 0,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 5249,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 10335,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 15420,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 20523,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 25603,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": true
+  },
+  {
+    "elapsed": 30811,
+    "panes": 1,
+    "state": "ready",
+    "hasRow": true
+  }
+]

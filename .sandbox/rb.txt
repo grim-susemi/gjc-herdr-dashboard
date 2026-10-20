@@ -1,0 +1,3 @@
+765:  assert.deepEqual(world.fake.paneIds(), paneIdsAfterFirst, 'rebinding never touches the pane');
+770:  assert.equal((await world.slot()).scope.scopeEpoch, 2, 'the epoch counts the rebinding');
+772:  // file is left in place (per-scope data is not moved or deleted by a rebind).

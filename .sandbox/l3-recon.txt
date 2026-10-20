@@ -1,0 +1,59 @@
+== todo render
+26:// Frame = { text, lines, bodyLines, taskRanges, phaseRanges, scroll, bodyStart,
+27://           bodyRows, selectableKeys, selectionIndex, footer, footerFits,
+81:  const taskRanges = Object.create(null), phaseRanges = Object.create(null);
+116:      taskRanges[key] = { start: taskStart, end: bodyLines.length, phaseStart: start, status: task.status };
+120:    phaseRanges[phaseKeyOf(name, phaseOccurrence)] = { start, end: bodyLines.length };
+122:  return { bodyLines, taskRanges, phaseRanges, selectableKeys };
+187:  const { bodyLines, taskRanges, phaseRanges, selectableKeys } = drawn;
+210:    return { text: lines.join("\n"), lines, bodyLines, taskRanges, phaseRanges,
+211:      scroll: clamp(scroll, bodyLines.length), bodyStart: lines.length - 1, bodyRows: 0,
+218:  const bodyRows = Math.max(0, rows - 3 - (errorLine ? 1 : 0));
+219:  const selected = taskRanges[resolved];
+220:  if (revealSelection && selected && bodyRows > 0 &&
+221:    (selected.start < scroll || selected.start + Math.min(selected.end - selected.start, bodyRows) > scroll + bodyRows)) {
+222:    scroll = selected.start - selected.phaseStart < bodyRows ? selected.phaseStart : selected.start;
+224:  scroll = clamp(scroll, bodyLines.length - bodyRows);
+225:  const visible = bodyLines.slice(scroll, scroll + bodyRows);
+226:  while (visible.length < bodyRows) visible.push("");
+233:  return { text: lines.join("\n"), lines, bodyLines, taskRanges, phaseRanges,
+234:    scroll, bodyStart: lines.length - bodyRows - 2, bodyRows, selectableKeys,
+== workers viewer
+10:// `Space`/`Enter` fold, `c` completed filter, `d` detail, `f` follow, `j`/`k` scroll,
+21://   * `expanded` is a per-card id map (`{ [cardId]: boolean }`), not a single flag.
+22://   * `c` toggles `showCompleted` (completed cards are auto-folded to one line by
+23://     default) and is persisted; `d` toggles the detail view and is deliberately NOT
+110:// `detail` is intentionally absent: it is a transient view toggle (contract: `d` is
+113:export const EMPTY_PREFS = Object.freeze({ scroll: 0, expanded: Object.freeze({}), selection: null,
+114:  follow: true, showCompleted: false });
+116:const freshPrefs = () => ({ scroll: 0, expanded: {}, selection: null, follow: true,
+117:  showCompleted: false });
+164:// `expanded` is a per-card id map. Anything that is not a boolean entry is dropped
+191:  return { prefs: { scroll: integer(value.scroll), expanded: readExpanded(value.expanded),
+193:    showCompleted: value.showCompleted === true }, error: "" };
+198:    expanded: readExpanded(prefs.expanded), selection: prefs.selection,
+199:    showCompleted: prefs.showCompleted === true };
+239:    detail = false, closing = false, disposed = false, closeJob = null, timer, watcher;
+278:        expanded: prefs.expanded, showCompleted: prefs.showCompleted, detail },
+333:    input.off?.("data", onData);
+460:      const kept = Object.keys(prefs.expanded).filter((id) => alive.has(id));
+461:      if (kept.length !== Object.keys(prefs.expanded).length) {
+462:        prefs.expanded = Object.fromEntries(kept.map((id) => [id, prefs.expanded[id]]));
+481:  function key(sequence) {
+488:      prefs.showCompleted = !prefs.showCompleted;
+500:      prefs.expanded = { ...prefs.expanded, [id]: !prefs.expanded[id] };
+515:    } else if (sequence === "d") {
+516:      // `d` is a transient detail view: it changes the frame and nothing else, so the
+518:      detail = !detail;
+529:  const onData = (chunk) => { for (const character of String(chunk)) void key(character); };
+537:      input.on("data", onData);
+577:        detail, prefs, notices, slot };
+== workers render ranges
+49:// Frame = { text, lines, bodyLines, ranges, selectable, selection, scroll, maxScroll,
+198:  const bodyLines = [], ranges = Object.create(null);
+213:    if (id !== "") ranges[id] = { start, end: bodyLines.length, status };
+215:  return { bodyLines, ranges };
+273:    return { text: lines.join("\n"), lines, bodyLines: drawn.bodyLines, ranges: drawn.ranges,
+283:  const range = drawn.ranges[selection];
+293:  return { text: lines.join("\n"), lines, bodyLines: drawn.bodyLines, ranges: drawn.ranges,
+309:  const range = frame?.ranges?.[selection];

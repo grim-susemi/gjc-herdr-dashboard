@@ -1,0 +1,52 @@
+[
+  {
+    "agent": "gjc",
+    "agent_status": "idle",
+    "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\todo-7\\.sandbox\\case-lvw",
+    "focused": true,
+    "pane_id": "w1:p1",
+    "revision": 2,
+    "scroll": {
+      "max_offset_from_bottom": 38,
+      "offset_from_bottom": 0,
+      "viewport_rows": 40
+    },
+    "tab_id": "w1:t1",
+    "terminal_id": "term_65e3aed4a3b8c1",
+    "terminal_title": "GJC: case-lvw",
+    "terminal_title_stripped": "GJC: case-lvw",
+    "workspace_id": "w1"
+  },
+  {
+    "agent_status": "unknown",
+    "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\todo-7\\.sandbox\\case-lvw",
+    "focused": false,
+    "label": "GJC Todo · df27dae7",
+    "pane_id": "w1:p2",
+    "revision": 0,
+    "scroll": {
+      "max_offset_from_bottom": 0,
+      "offset_from_bottom": 0,
+      "viewport_rows": 40
+    },
+    "tab_id": "w1:t1",
+    "terminal_id": "term_65e3af25591d72",
+    "workspace_id": "w1"
+  },
+  {
+    "agent_status": "unknown",
+    "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\todo-7\\.sandbox\\case-lvw",
+    "focused": false,
+    "label": "GJC Workers · df27dae7",
+    "pane_id": "w1:p3",
+    "revision": 0,
+    "scroll": {
+      "max_offset_from_bottom": 0,
+      "offset_from_bottom": 0,
+      "viewport_rows": 40
+    },
+    "tab_id": "w1:t1",
+    "terminal_id": "term_65e3af263b49a3",
+    "workspace_id": "w1"
+  }
+]

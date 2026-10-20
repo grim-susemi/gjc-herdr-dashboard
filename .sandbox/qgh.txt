@@ -1,0 +1,18 @@
+Run native GJC Ultragoal workflow commands
+
+USAGE
+  $ gjc ultragoal quality-gate init [--surface <name> ...] --out <path>
+  $ gjc ultragoal quality-gate source-hash [--json]
+  $ gjc ultragoal quality-gate validate --quality-gate-json <json-or-path> [--goal-id <id>] [--json]
+
+FLAGS
+      --surface=<value>            Surface to scaffold (repeatable; default web)
+      --out=<value>                Output path for quality-gate init
+      --quality-gate-json=<value>  JSON string or path for quality-gate validate
+      --goal-id=<value>            Optional durable goal id for rule-identical validation
+      --json                       Machine-readable output
+
+EXAMPLES
+  $ gjc ultragoal quality-gate init --surface web --surface api --out ./quality-gate.json
+  $ gjc ultragoal quality-gate source-hash --json
+  $ gjc ultragoal quality-gate validate --quality-gate-json ./quality-gate.json --json

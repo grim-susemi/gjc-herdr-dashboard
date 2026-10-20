@@ -1,0 +1,10 @@
+COMMAND ["sdk"]
+CANONICAL COMMAND ["sdk"]
+REVISION a9f72ec6ce2ef0c74816cdc7bf65479915e67ef6353d0aec0bf722c797c27192
+SECTION recovery PAGE 1
+SECTIONS ["overview","usage","children","arguments","options","examples","recovery"]
+ENTRIES (JSON display literals; do not paste escaped strings as shell argv)
+{"id":"sdk/recovery/1","kind":"recovery","complete":true,"value":{"description":"Use command-local --help to correct syntax. After an uncertain mutation, preserve complete references and reconcile before retrying; no recovery is executed automatically.","disruption":"none","requiresConfirmation":false}}
+SECTION COMPLETE false
+DOCUMENT COMPLETE false
+CONTINUATION {"section":"recovery","page":2,"executable":"gjc","argv":["sdk","--help","--help-revision","a9f72ec6ce2ef0c74816cdc7bf65479915e67ef6353d0aec0bf722c797c27192","--help-section","recovery","--help-page","2"]}

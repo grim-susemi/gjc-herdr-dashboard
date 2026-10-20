@@ -1,0 +1,24 @@
+54:| A-4 | §8 전이표, §9 LT-2 r1–r7 | LT-2, AC4.1 |
+57:| A-7 | §15.5, SR3 | AC-G1, AC4.5, LV-9 |
+65:| A-15 | §6 R 행 활성 scope 정의 | AC4.6 |
+79:| C-7 | §12 L0.0, §15.4–15.5 | G0, LV-9, AC-G6 |
+234:  - 결과 코드: `opened`, `adopted`, `ready`, `pending`, `pending-slow`, `partial:<why>`, `busy`, `busy:other-owner`, `unresponsive`, `replaced:<why>`, `ineligible:<reason>`, `failed:<code>`, `
+261:  - prev-dead(pid 사망, heartbeat 30s 이상 정지, `stoppedAt` 있음): adopt
+370:| LT-2 | 죽은 기록 상속(E3) | r1 paneId 없음 → T4, 새 pane 1. r2 owner prev-dead + V ready → adopt, 새 pane 0. r3 unresponsive → T14, 조치 0. r4 dead + O+ → T16, 역할 pane �
+373:| LT-5 | layout-waiting 고착 | foreign pane, 손상된 slot, 모르는 schema, 크기 부족, foreign 형제 재구성 → opened나 partial, 대기 상태 0 | LV-9 |
+375:| LT-7 | 잠금(C-4) | (a) holder가 살아 있고 heartbeat 신선, 가짜 시계 31s → pass2는 busy, mutation 0, slot 쓰기 0. (b) 협조적 해제 뒤 pass3는 opened. (c) holder pid 사망
+406:| 15 | 재시작 뒤 명시 `/dashboard`로 adopt | L4 |
+414:2. 소유자가 고른 Herdr pane에서 cwd를 sibling으로 두고 GJC를 시작한다. 현재 `기타 작업` 세션과 `w1:pT5`는 쓰지 않는다. ultragoal adopt도 가능하다.
+456:| L4 프로세스 간 라이브 | adopt, 잠금, 손상, retention, 공존, reload | AC4.*, LV-5·9·10 | **Architect 체크포인트** |
+526:- **AC4.1**: gjc 종료 → 같은 pane에서 재시작 → `/dashboard` = `adopted`. paneId 불변, 새 pane 0, "연결 끊김" 해제.
+527:- **AC4.3**: LT-7 통과. 라이브 연속 2회 → 1회 실행, 나머지는 busy 또는 무조치. pane 수 정확.
+528:- **AC4.4**: slot 손상 → 격리, 예전 viewer 은퇴, 다음 `/dashboard` 정상.
+529:- **AC4.5(A-7)**: LV-9에서 foreign 3개의 id·label·shell_pid 불변. AC-G1.
+530:- **AC4.6(A-15)**: retention은 활성이 아닌 오래된 scope만 지운다.
+531:- **AC4.7**: `/reload` 뒤 G12 분기대로 교체되고 pane이 늘지 않는다. duplicate는 단위 테스트.
+575:| LV-5 | `l4-adopt.mjs` | 종료 → 같은 pane에서 재시작 → `/dashboard` | AC4.1 |
+579:| LV-9 | `l4-coexist.mjs` | §15.5 | AC4.5 |
+580:| LV-10 | `l4-lock.mjs` | `/dashboard` 2회를 간격 없이 | AC4.3 |
+626:| Architect | L1 exit(LT-6·LT-8), L4 exit | REQUEST CHANGES면 해당 계층 재작업. 구조적 실패면 P-A 재검토 |
+647:- **architect**: L1·L4 체크포인트.
+649:- **ultragoal**: sibling cwd 세션에서 L0–L6을 장기 목표로 관리할 때 사용한다(adopt).

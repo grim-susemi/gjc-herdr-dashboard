@@ -1,0 +1,7 @@
+ℹ duration_ms 10296.2022
+
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:922:1
+✖ auto-pass coalescing: a bus burst is folded and the session change after it still rebinds (279.947ms)
+  [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\USER\AppData\Local\Temp\gjc-instance-MeCcS6\slots\c871c365cecc379c72ad3caf\lock'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\Users\\USER\\AppData\\Local\\Temp\\gjc-instance-MeCcS6\\slots\\c871c365cecc379c72ad3caf\\lock' }

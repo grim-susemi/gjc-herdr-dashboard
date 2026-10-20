@@ -1,0 +1,33 @@
+✔ the body really scrolls, so the wheel clamps are observable (19.1957ms)
+✔ wheel down scrolls +3 and wheel up -3, clamped to [0, maxScroll] (20.6566ms)
+✔ a wheel turns follow off and persists scroll without persisting follow (18.4892ms)
+✔ a click selects the task under the cursor and turns follow off (17.5193ms)
+✔ a click on the footer row only turns follow off (8.4868ms)
+✔ a drag pans the body and a release ends it (10.4348ms)
+✔ a drag clamps at the bottom of the body (9.9118ms)
+✔ a motion report without a press is ignored (9.6502ms)
+✔ blur returns follow ON, re-arms the reveal and ends the drag; focus in does nothing (23.5491ms)
+✔ blur without a follow change still redraws but writes no preference (10.6902ms)
+✔ the Herdr focus callback goes through the same blur path (8.8312ms)
+✔ a rejected focus subscription shows exactly one notice and the viewer keeps working (13.3004ms)
+✔ a failed() report alone shows the notice once, and the dispose lands on stop (12.7555ms)
+✔ a subscription that lands after finish is disposed immediately (11.6845ms)
+✔ a non-interactive viewer never subscribes to the Herdr focus stream (7.1528ms)
+✔ an SGR report split across two chunks is decoded exactly once (10.1684ms)
+✔ resize repaints, and the click mapping uses the frame drawn after the resize (11.1305ms)
+✔ a keyboard action re-arms the reveal a pointer action disarmed (14.0827ms)
+✔ an SGR report is decoded in place of the key path, and a real key in the same chunk still lands (7.9174ms)
+✔ pointer and focus handling never writes slot.json or owner.json (21.0882ms)
+✔ dispose detaches the input decoder, so post-dispose bytes are inert (5.6448ms)
+✔ a wheel after blur starts from the scroll position the frame shows, not the stale pref (9.309ms)
+✔ a click after blur selects the row drawn on screen (11.2868ms)
+✔ stop pauses the stdin the viewer resumed, so the process can exit (13.4544ms)
+✔ a click after blur keeps the scroll position that was on screen (10.3667ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 354.7717

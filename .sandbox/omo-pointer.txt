@@ -1,0 +1,45 @@
+    }
+  }
+}, focus: focused => {
+  if (focused || closing) return;
+  dragY = undefined; follow = true; revealSelection = false; verbose = false;
+  draw();
+}, pointer: mouse => {
+  if (closing) return;
+  if (mouse.release) { dragY = undefined; return; }
+  if (mouse.button & 64) {
+    follow = false; revealSelection = false;
+    scroll = Math.max(0, scroll + (mouse.button & 1 ? 3 : -3));
+  } else if ((mouse.button & 3) === 0) {
+    follow = false; revealSelection = false;
+    if (mouse.button & 32) {
+      if (dragY !== undefined) scroll = Math.max(0, scroll + dragY - mouse.y);
+    } else {
+      const ranges = view === 'tasks' ? lastFrame?.taskRanges : lastFrame?.nodeRanges;
+      const row = mouse.y - 1 - (lastFrame?.bodyStart ?? 0) + scroll;
+      const inBody = mouse.y - 1 >= lastFrame?.bodyStart &&
+        mouse.y - 1 < lastFrame.bodyStart + lastFrame.bodyRows;
+      const hit = inBody ? Object.entries(ranges ?? {}).find(([, range]) => row >= range.start && row < range.end) ??
+        (view === 'dag' ? Object.entries(lastFrame?.graphRanges ?? {}).find(([, range]) =>
+          row >= range.start && row < range.end) : undefined) : undefined;
+      if (hit) {
+        const id = hit[0];
+        if (view === 'tasks') selectedTaskId = id;
+        else selectedNodes.set(selectedId, id);
+        const item = view === 'tasks' ? standaloneTasks(state).find(item => item.id === id) :
+          state.runs?.find(run => run.id === selectedId)?.nodes.find(item => item.id === id);
+        if (item) setExpanded(viewState, view === 'tasks' ? TASK_SCOPE : selectedId, id,
+          !isExpanded(viewState, view === 'tasks' ? TASK_SCOPE : selectedId, id, item.status ?? item.state));
+      }
+    }
+    dragY = mouse.y;
+  } else return;
+  draw();
+} });
+disposeFocus = await watchHerdrFocus(paneId ?? process.env.HERDR_PANE_ID, () => {
+  if (closing) return;
+  dragY = undefined; follow = true; revealSelection = false; verbose = false; draw();
+}, cause => { presenceNotice = `Focus: ${cause.message}`; draw(); })
+  .catch(cause => { presenceNotice = `Focus: ${cause.message}`; return () => {}; });
+process.on('SIGTERM', () => { void close(); }); process.on('SIGINT', () => { void close(); }); process.on('SIGHUP', () => { void close(); });
+if (fixedView && launchToken) {

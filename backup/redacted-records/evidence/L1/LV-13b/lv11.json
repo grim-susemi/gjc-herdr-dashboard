@@ -1,0 +1,16 @@
+{
+  "before": {
+    "sessionId": "01a14b0d-bac8-7241-97db-ebba6f6c918c",
+    "scopeKey": "redacted",
+    "scopeEpoch": 1,
+    "language": "ko"
+  },
+  "after": {
+    "sessionId": "01a14b0f-fd86-71a1-b0d8-f915da31be5f",
+    "scopeKey": "redacted",
+    "scopeEpoch": 2,
+    "language": "ko"
+  },
+  "paneBefore": "w1:p2",
+  "paneAfter": "w1:p2"
+}

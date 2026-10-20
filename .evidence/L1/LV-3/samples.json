@@ -1,0 +1,38 @@
+[
+  {
+    "elapsed": 0,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 5081,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 10287,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 15371,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 20573,
+    "panes": 1,
+    "state": "pending",
+    "hasRow": false
+  },
+  {
+    "elapsed": 25659,
+    "panes": 1,
+    "state": "ready",
+    "hasRow": true
+  }
+]

@@ -1,0 +1,25 @@
+✔ E1: explicit passes report exactly one allowed code each and automatic passes stay diagnostic (41.5806ms)
+✔ E2/LT-1: split failures are one coded result each and the same process opens on the next pass (14.1688ms)
+✔ E2/LT-1: a restarted process adopts an existing layout and reopens after a q close (20.7149ms)
+✔ E2/LT-1: an exception in a session path never blocks a later explicit pass (8.4606ms)
+✔ E3: seven consecutive transitions in one process end in the documented codes (43.1357ms)
+✔ E5/LT-3: FP1-FP5 each converge with one more pass, and no crashed pane is ever re-entered (84.4364ms)
+✔ LT-3: three explicit passes while pending keep one pane and every automatic driver is inert (27.0555ms)
+✔ A-32: automatic passes in a full lifecycle use only pane list / process-info / layout (27.0314ms)
+✔ A-30 totals: the T20 O+ path costs close 1 / create 1, the failure path adds one close, T3 costs 0 (66.2206ms)
+✔ A-30: a not-found close with a still-present pane, a failed confirm list and an outright error all keep the record (73.9389ms)
+✔ A-30: a close that never answers is partial:timeout, with the record, the q and the pane kept (267.196ms)
+✔ A-30: an automatic pass whose pane list fails changes nothing at all (17.0434ms)
+✔ A-31: pinned automatic passes at hbAge >= 15000 ms report unresponsive and never promote (25.1934ms)
+✔ A-31: a pending q record survives automatic passes with zero bytes changed and no promotion (18.4482ms)
+✔ LT-8: in a full lifecycle every run target belongs to the same pass split (49.6741ms)
+✔ LT-5: no sequence produces a waiting state and foreign siblings are never touched (20.7253ms)
+✔ the whole state directory stays inside slots/ for this lane: no data or prefs file is written (16.0978ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 843.1263

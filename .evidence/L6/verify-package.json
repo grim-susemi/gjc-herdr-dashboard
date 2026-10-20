@@ -1,0 +1,13 @@
+{
+  "pass": true,
+  "dir": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\install-smoke\\.gjc\\herdr-dashboard\\generation-000001",
+  "generation": "generation-000001",
+  "token": "gen-000001",
+  "language": "ko",
+  "files": 27,
+  "importOk": true,
+  "defaultExport": "function",
+  "localeHeader": "ext gen-000001",
+  "shim": null,
+  "errors": []
+}

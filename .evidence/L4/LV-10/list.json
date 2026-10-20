@@ -1,0 +1,52 @@
+[
+  {
+    "agent": "gjc",
+    "agent_status": "idle",
+    "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock",
+    "focused": true,
+    "pane_id": "w1:p1",
+    "revision": 2,
+    "scroll": {
+      "max_offset_from_bottom": 37,
+      "offset_from_bottom": 0,
+      "viewport_rows": 40
+    },
+    "tab_id": "w1:t1",
+    "terminal_id": "term_65e1f0ed646cd1",
+    "terminal_title": "GJC: case-l4-lock",
+    "terminal_title_stripped": "GJC: case-l4-lock",
+    "workspace_id": "w1"
+  },
+  {
+    "agent_status": "unknown",
+    "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock",
+    "focused": false,
+    "label": "GJC Todo · c5271f54",
+    "pane_id": "w1:p2",
+    "revision": 0,
+    "scroll": {
+      "max_offset_from_bottom": 0,
+      "offset_from_bottom": 0,
+      "viewport_rows": 40
+    },
+    "tab_id": "w1:t1",
+    "terminal_id": "term_65e1f0f9b6b792",
+    "workspace_id": "w1"
+  },
+  {
+    "agent_status": "unknown",
+    "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock",
+    "focused": false,
+    "label": "GJC Workers · c5271f54",
+    "pane_id": "w1:p3",
+    "revision": 0,
+    "scroll": {
+      "max_offset_from_bottom": 0,
+      "offset_from_bottom": 0,
+      "viewport_rows": 40
+    },
+    "tab_id": "w1:t1",
+    "terminal_id": "term_65e1f0fa52ed73",
+    "workspace_id": "w1"
+  }
+]

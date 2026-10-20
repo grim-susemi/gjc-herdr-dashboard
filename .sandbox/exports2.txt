@@ -1,0 +1,27 @@
+test/live/case.mjs:29:export const LAUNCH_CLEAR_ENV = ['GJC_HERDR_PANE_OWNER', 'GJC_SESSION_CWD', 'HERDR_CONFIG_PATH'];
+test/live/case.mjs:30:export const DEFAULT_ARGS = ['--no-session', '--no-title'];
+test/live/case.mjs:35:export function casePaths({ caseId, root = SANDBOX, state = null }) {
+test/live/case.mjs:41:export function evidenceDirFor(level, lv) {
+test/live/case.mjs:48:export function createCase({ caseId, root = SANDBOX, state = null, herdr, viewerFailpoint = null }) {
+test/live/case.mjs:62:export function launchCommand({ dir, herdr, args = DEFAULT_ARGS, clearEnv = LAUNCH_CLEAR_ENV,
+test/live/case.mjs:74:export async function sendPrompt(fixture, paneId, text, { chunk = 12, gapMs = 150, settleMs = 1_500 } = {}) {
+test/live/case.mjs:83:export async function launchGjc(fixture, paneId, options) {
+test/live/case.mjs:93:export const ANSI = /\u001B\[[0-9;?]*[ -/]*[@-~]/g;
+test/live/case.mjs:94:export const stripAnsi = (text) => String(text ?? '').replace(ANSI, '');
+test/live/case.mjs:96:export function notifyLines(frame) {
+test/live/case.mjs:102:export async function waitForNotify(fixture, paneId, pattern, {
+test/live/case.mjs:124:export async function sendSlash(fixture, paneId, name, pattern, {
+test/live/case.mjs:145:export async function expectNoNotify(fixture, paneId, pattern, {
+test/live/case.mjs:162:export const viewerPanes = (fixture, role = 'todo') => fixture.listPanes().filter((pane) => {
+test/live/case.mjs:168:export function assert(condition, message, details = null) {
+test/live/case.mjs:172:export function writeEvidence(dir, name, text) {
+test/live/case.mjs:177:export function writeEvidenceJson(dir, name, value) {
+test/live/case.mjs:184:export async function runScript(name, fn) {
+test/live/fixture.mjs:53:export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+test/live/fixture.mjs:54:export const SANDBOX = join(REPO, '.sandbox');
+test/live/fixture.mjs:55:export const EVIDENCE = join(REPO, '.evidence');
+test/live/fixture.mjs:61:export const BUSY_MARKER = 'Queue (busy)';
+test/live/fixture.mjs:62:export const PROMPT_MARKER = 'Type your message';
+test/live/fixture.mjs:63:export const BOOT_MARKER = 'warming workspace';
+test/live/fixture.mjs:65:export function realHerdrBinary(env = process.env) {
+test/live/fixture.mjs:84:export function createFixture(options = {}) {

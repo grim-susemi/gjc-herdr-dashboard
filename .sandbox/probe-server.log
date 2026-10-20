@@ -1,0 +1,5 @@
+herdr server running; you can use any herdr CLI command in another terminal.
+api socket: C:\Users\USER\AppData\Roaming\herdr\sessions\gjcdash-probe\herdr.sock
+client socket: C:\Users\USER\AppData\Roaming\herdr\sessions\gjcdash-probe\herdr-client.sock
+logs: C:\Users\USER\AppData\Roaming\herdr\sessions\gjcdash-probe\herdr-server.log
+did you mean to open the Herdr TUI? run `herdr`; you do not need `herdr server`.

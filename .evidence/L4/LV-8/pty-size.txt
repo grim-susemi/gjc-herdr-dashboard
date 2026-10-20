@@ -1,0 +1,2 @@
+pane rect (layout): {"height":14,"width":60,"x":60,"y":0}
+pane get viewport_rows: 40

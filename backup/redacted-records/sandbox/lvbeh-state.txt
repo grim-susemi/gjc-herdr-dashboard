@@ -1,0 +1,4 @@
+.sandbox\case-lvbeh\.gjc\herdr-dashboard\state\slots\a6998dcad53a880b3e9439e7\owner.json
+{"schema":"gjc-herdr-dashboard/owner/1","pid":11680,"instanceId":"2cfe0f93-63ee-4b2f-b98e-bab5e770d69a","sessionId":"01a14ae6-7e45-7631-a44f-c163bc9553ab","heartbeatAt":1792257993442}
+.sandbox\case-lvbeh\.gjc\herdr-dashboard\state\slots\a6998dcad53a880b3e9439e7\slot.json
+{"schema":"gjc-herdr-dashboard/slot/1","layoutKey":"a6998dcad53a880b3e9439e7","parent":{"socket":"C:\\Users\\USER\\AppData\\Roaming\\herdr\\sessions\\gjcdash-lvbeh\\herdr.sock","paneId":"w1:p1","tabId":"w1:t1"},"herdr":["C:\\Program Files\\nodejs\\node.exe","C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\test\\live\\herdr-wrapper.mjs"],"scope":{"sessionId":"01a14ae3-5f8b-705e-a4f9-45856b03d2a0","scopeKey":"redacted","scopeEpoch":1,"language":"ko"},"roles":{"todo":{"state":

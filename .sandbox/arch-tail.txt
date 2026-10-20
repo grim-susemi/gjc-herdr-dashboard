@@ -1,0 +1,22 @@
+toolResult: TEXT  56|| A-6 | §10, §13(`gjc-cli.mjs` 없음) | SR8, AC5.1–5.3 |
+*57|| A-7 | §15.5, SR3 | AC-G1, AC4.5, LV-9 |
+ 58|| A-8 | §12 L0.0, G0 | G0 receipt. 실패하면 중단 |
+ 59|| A-9 | §7.2 자격 3번 isTTY | LT-4 `tty` |
+ 60
+toolResult: TEXT ✔ malformed payloads are ignored and counted instead of guessed at (0.344ms)
+✔ the cap keeps 50 cards, dropping the oldest completed first and then the oldest (0.3343ms)
+✔ durationMs agrees with whate
+toolResult: TEXT ✔ malformed payloads are ignored and counted instead of guessed at (0.2381ms)
+✔ the cap keeps 50 cards, dropping the oldest completed first and then the oldest (0.3223ms)
+✔ durationMs agrees with what
+assistant: thinking | CALL search {"pattern":"stoppedAt|adopted|owner/1","paths":["test/unit/instance.test.mjs","test/unit/band-pass.test.mjs","test/unit/extension.test.mjs"] | CALL search {"pattern":"corrupt: true|owner: null","paths":["test/unit","src"]}
+toolResult: TEXT # test/unit/
+## instance.test.mjs
+ 324|  await writeJson(slotPaths(world.stateDir, world.layoutKey).owner,
+*325|    { schema: 'gjc-herdr-dashboard/owner/1', pid: 7777, instanceId: 'other-instance',
+ 3
+toolResult: TEXT # src/core/
+## reconciler.mjs
+ 132|      // busy:other-owner rather than adopting someone else's slot (R1 owner step 5).
+*133|      return { owner: null, corrupt: true, detail: error.code ?? error.mes
+2026-10-17T22:30:17.729Z mtime 2026-10-17T22:21:49.900Z

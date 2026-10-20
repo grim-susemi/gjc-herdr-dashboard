@@ -1,0 +1,65 @@
+34://   decideOwnerPhase({owner, instanceId, pid, registryOwnerInstanceId, pidAlive, now, corrupt})
+35-//   TABLE_IDS, ACTION_TYPES, PANE_MUTATION_ACTIONS, INPUT_DOMAIN, enumerateInputs(),
+36-//   decideRoleFromInput(input)
+37-//
+38-// Row order is the table's priority order (first match wins): slot rows, then record rows, then
+39-// pane/V rows, then age rows. `ownerPhase === 'prev-live'` short-circuits to T0 before every role
+40-// row: another live owner means zero mutation and `busy:other-owner` (R1 owner step 5).
+41-import { AGE_SLOW_MS, AGE_STALLED_MS } from './liveness.mjs';
+42-
+43-export const TABLE_IDS = ['T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T9', 'T10', 'T11', 'T12',
+44-  'T13', 'T14', 'T16', 'T17', 'T18', 'T19', 'T20', 'T21', 'T22'];
+45-
+46-export const ACTION_TYPES = ['create', 'discard-record', 'write-closed', 'promote-ready',
+47-  'write-data', 'close-pane', 'quarantine-slot', 'clear-intent', 'reconfirm-o-plus'];
+48-
+49-// Everything here changes Herdr state or the pane set. Automatic passes must never contain one.
+50-export const PANE_MUTATION_ACTIONS = new Set(['create', 'close-pane', 'rename-pane',
+51-  'run-viewer', 'focus-pane', 'send-text', 'send-keys']);
+52-
+53-export const INPUT_DOMAIN = {
+54-  slotStatus: ['ok', 'corrupt'],
+55-  intent: [false, true],
+56-  recordState: [null, 'closed', 'pending', 'ready'],
+57-  pane: ['absent', 'present'],
+58-  O: [false, true],
+59-  Oplus: [false, true],
+60-  V: ['none', 'closing-q', 'ready', 'unresponsive', 'dead'],
+61-  age: [0, 19999, 20000, 119999, 120000],
+62-  mode: ['explicit', 'auto'],
+63-  ownerPhase: ['me', 'prev-dead', 'reload', 'prev-live'],
+64-};
+65-
+66-export function enumerateInputs() {
+67-  const out = [];
+68-  for (const slotStatus of INPUT_DOMAIN.slotStatus)
+69-    for (const intent of INPUT_DOMAIN.intent)
+70-      for (const recordState of INPUT_DOMAIN.recordState)
+71-        for (const pane of INPUT_DOMAIN.pane)
+72-          for (const O of INPUT_DOMAIN.O)
+73-            for (const Oplus of INPUT_DOMAIN.Oplus)
+74-              for (const V of INPUT_DOMAIN.V)
+--
+235:export function decideOwnerPhase({ owner, instanceId, pid = process.pid, registryOwnerInstanceId,
+236-  pidAlive, now = Date.now(), corrupt = false } = {}) {
+237-  if (owner === null || owner === undefined) return { phase: 'me', detail: 'no-owner' };
+238-  if (corrupt || typeof owner !== 'object') return { phase: 'prev-live', detail: 'owner-unreadable' };
+239-  if (owner.instanceId === instanceId) return { phase: 'me', detail: 'same-instance' };
+240-  if (owner.pid === pid && registryOwnerInstanceId !== undefined &&
+241-      registryOwnerInstanceId !== owner.instanceId) {
+242-    return { phase: 'reload', detail: 'registry-successor', heartbeatAt: owner.heartbeatAt ?? null };
+243-  }
+244-  if (Number.isFinite(owner.stoppedAt)) {
+245-    return { phase: 'prev-dead', detail: 'stopped', stoppedAt: owner.stoppedAt };
+246-  }
+247-  const alive = typeof pidAlive === 'function' ? pidAlive(owner.pid) : null;
+248-  if (alive === false) return { phase: 'prev-dead', detail: 'esrch', pid: owner.pid };
+249-  // `true` (alive or EPERM) and `null` (unknowable) both block the takeover.
+250-  return { phase: 'prev-live', detail: alive === true ? 'alive' : 'liveness-unavailable',
+251-    pid: owner.pid, heartbeatAt: owner.heartbeatAt ?? null, heartbeatAgeMs: heartbeatAge(owner, now) };
+252-}
+253-
+254-function heartbeatAge(owner, now) {
+255-  if (!Number.isFinite(owner.heartbeatAt)) return null;
+256-  return Math.max(0, now - owner.heartbeatAt);
+257-}

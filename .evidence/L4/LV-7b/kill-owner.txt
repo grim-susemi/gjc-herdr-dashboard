@@ -1,0 +1,2 @@
+pid=37848
+SUCCESS: The process with PID 37848 (child process of PID 72732) has been terminated.

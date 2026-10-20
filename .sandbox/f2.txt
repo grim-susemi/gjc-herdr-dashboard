@@ -1,0 +1,59 @@
+✖ §7.1 item 1: the factory body reads no host value and creates no registry map (3.4686ms)
+✔ the factory registers the seven handlers, three bus channels and the one command (0.342ms)
+✔ the access traps are non-vacuous: a handler does read the host surface (1.7365ms)
+✔ two factories in one process stay independent and create no shared state (0.4059ms)
+✔ POSIX shell command preserves apostrophes and shell metacharacters (259.713ms)
+✔ win32 shell command uses the PowerShell call operator and doubles apostrophes (0.1732ms)
+✔ resolveHerdrVector prefers the JSON argv env, then HERDR_BIN_PATH, then PATH (18.4945ms)
+✔ createHerdr runs the vector without a shell and appends the caller arguments (0.3824ms)
+✔ createHerdr returns {} for an empty body and surfaces Herdr error codes (0.5593ms)
+✔ createHerdr resolves a real vector from the environment and spawns a real child (95.4875ms)
+✔ resolveHerdrVector finds an executable on PATH and rejects a non-executable override (5.324ms)
+✔ the default language is ko and unsupported values are reported, not thrown (3.2443ms)
+✔ locale files resolve against a ROOT URL, one directory above the module (2.304ms)
+✔ every language covers the same keys and the same interpolation parameters (3.8932ms)
+====
+✖ a click on the footer or header row only turns follow off (54.5399ms)
+✔ a drag pans the body and a release ends it (36.8246ms)
+✔ a drag clamps at the bottom of the body (54.9018ms)
+✔ a motion report without a press is ignored, and a non-left button never scrolls (54.4612ms)
+✔ blur returns follow ON, closes the detail view and re-arms the reveal; focus in does nothing (42.4931ms)
+✔ blur without a follow change still redraws but writes no preference (45.6842ms)
+✔ the Herdr focus callback goes through the same blur path (58.6464ms)
+✔ a rejected focus subscription shows exactly one notice and the viewer keeps working (47.239ms)
+✔ a failed() report alone shows the notice once, and the dispose lands on finish (37.5735ms)
+✔ a subscription that lands after finish is disposed immediately (18.2308ms)
+✔ a watcher that throws synchronously is reported, not propagated (31.0191ms)
+✔ a non-interactive viewer never subscribes to the Herdr focus stream (16.6145ms)
+✔ an SGR report split across two chunks is decoded exactly once (26.502ms)
+✔ raw mouse bytes never reach the key handler (50.1506ms)
+====
+✖ §7.1 item 1: the factory body reads no host value and creates no registry map (3.4686ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'armed',
+      'dispose',
+  +   'drain',
+      'state'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/extension.test.mjs:115:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+====
+✖ a click on the footer or header row only turns follow off (54.5399ms)
+  Error: ENOTEMPTY, Directory not empty: \\?\C:\Users\USER\AppData\Local\Temp\gjc-pointer-workers-J9niYV '\\?\C:\Users\USER\AppData\Local\Temp\gjc-pointer-workers-J9niYV'
+      at rmSync (node:fs:1236:18)
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/pointer-workers.test.mjs:79:17)
+      at TestHook.runInAsyncScope (node:async_hooks:214:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.runHook (node:internal/test_runner/test:1024:20)
+      at after (node:internal/test_runner/test:1064:20)
+      at Test.run (node:internal/test_runner/test:1132:13)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    errno: 41,
+    code: 'ENOTEMPTY',

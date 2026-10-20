@@ -1,0 +1,29 @@
+✔ critic #4: a folded poll pass keeps strict semantics, and a failing strict pass clears the fold (407.032ms)
+✖ critic #5: a folded trigger never restores an older context over a newer one (816.1729ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1270.8517
+
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:1055:1
+✖ critic #5: a folded trigger never restores an older context over a newer one (816.1729ms)
+  AssertionError [ERR_ASSERTION]: the retained scope still follows the newest context
+  
+  's-1' !== 's-2'
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/instance.test.mjs:1068:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 's-1',
+    expected: 's-2',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

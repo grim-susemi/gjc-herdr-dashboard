@@ -1,0 +1,15 @@
+747:   // `session_shutdown` must not write a fresh owner record over the release it just stamped.
+748:   function claimOwner(paths, binding, hooks = {}) {
+749:     return ownerIo(async () => {
+750:       // Test seam (#1): the caller can stop the pass exactly between its classification and its
+751:       // claim, which is the window in which a `session_shutdown` can land.
+752:       if (typeof hooks.beforeOwnerWrite === 'function') await hooks.beforeOwnerWrite();
+753:       if (stopped) return { ok: false, skipped: true, code: 'stopped' };
+754:       const owner = ownerRecord({ pid, instanceId, sessionId: binding.sessionId, now: now() });
+755:       await writeOwnerFile(paths.owner, owner);
+756:       lastBinding = normalizeBinding(binding);
+757:       return { ok: true, path: paths.owner, owner };
+758:     });
+759:   }
+760: 
+761:   const explicitPass = input => enqueue(() => runPass('explicit', input));

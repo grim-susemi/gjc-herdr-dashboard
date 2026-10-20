@@ -1,0 +1,46 @@
+{
+  "closed": [
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "at": "2026-10-19T19:07:49.278Z",
+      "verifiedAbsent": true,
+      "note": "already gone"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "at": "2026-10-19T19:07:49.299Z",
+      "verifiedAbsent": true,
+      "note": "already gone"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-19T19:07:49.937Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l4adopt",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4adopt"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-19T19:07:49.956Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l4adopt",
+      "at": "2026-10-19T19:07:50.815Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "skipped": [],
+  "verifiedAbsent": true
+}

@@ -1,0 +1,112 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-l4reload",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-l4reload",
+      "createdAt": "2026-10-17T18:30:12.965Z",
+      "creator": "harness",
+      "pid": 90608,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-17T18:30:13.653Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4reload",
+      "label": "l4reload",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-17T18:30:13.653Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-17T18:30:13.654Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "l4reload"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "createdAt": "2026-10-17T18:31:21.990Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "viewer",
+      "label": "GJC Todo · c169459b"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "createdAt": "2026-10-17T18:31:22.015Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "viewer",
+      "label": "GJC Workers · c169459b"
+    }
+  ],
+  "observed": [],
+  "closed": [
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "at": "2026-10-17T18:33:04.078Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": "GJC Todo · c169459b"
+      }
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "at": "2026-10-17T18:33:04.403Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": "GJC Workers · c169459b"
+      }
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-17T18:33:04.897Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l4reload",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4reload"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-17T18:33:04.931Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l4reload",
+      "at": "2026-10-17T18:33:05.779Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

@@ -1,0 +1,1 @@
+kill-recovery (AC1.7/AC1.9): FAIL live-not-idle: pane w1:p1 was not idle within 120000 ms

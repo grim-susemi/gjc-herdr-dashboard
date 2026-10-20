@@ -1,0 +1,16 @@
+Resize a pane split
+
+Usage: herdr pane resize [OPTIONS] --direction <DIRECTION>
+
+Options:
+      --direction <DIRECTION>
+          [possible values: left, right, up, down]
+
+      --amount <FLOAT>
+          
+
+      --pane <ID>
+          
+
+      --current
+

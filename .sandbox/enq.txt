@@ -1,0 +1,6 @@
+107:  const enqueue = job => {
+727:  const explicitPass = input => enqueue(() => runPass('explicit', input));
+728:  const autoPass = input => enqueue(() => runPass('auto', input));
+734:    return enqueue(async () => {
+749:    return enqueue(async () => {
+797:    return enqueue(async () => {

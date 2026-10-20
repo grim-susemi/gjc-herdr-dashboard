@@ -1,0 +1,32 @@
+{
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-18T15:31:25.493Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "lvkill",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lvkill"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-18T15:31:25.520Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-lvkill",
+      "at": "2026-10-18T15:31:26.391Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "skipped": [],
+  "verifiedAbsent": true
+}

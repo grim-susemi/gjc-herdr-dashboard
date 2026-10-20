@@ -1,0 +1,10 @@
+data/19f2acc35d93a46cc0823b64/todo.json 245
+slots/bbf6636f8c383ac73d1f9883/lock/g000000000020.lock 140
+slots/bbf6636f8c383ac73d1f9883/lock/g000000000020.released 0
+slots/bbf6636f8c383ac73d1f9883/lock/g000000000021.lock 140
+slots/bbf6636f8c383ac73d1f9883/lock/g000000000021.released 0
+slots/bbf6636f8c383ac73d1f9883/owner.json 183
+slots/bbf6636f8c383ac73d1f9883/roles/todo.ready.json 143
+slots/bbf6636f8c383ac73d1f9883/slot.json 607
+slot.todo {"state":"ready","token":"redacted","paneId":"w1:p3","tabId":"w1:t1","shellPid":68780,"label":"GJC Todo · bbf6636f","pendingSince":1792213849742}
+ready {"pid":34860,"token":"redacted","paneId":"w1:p3","gen":"dev","startedAt":1792213851243,"heartbeatAt":1792214131751}

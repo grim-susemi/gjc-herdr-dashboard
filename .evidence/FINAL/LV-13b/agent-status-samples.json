@@ -1,0 +1,60 @@
+{
+  "idleBefore": "idle",
+  "samples": [
+    {
+      "ms": 0,
+      "status": "idle",
+      "panes": 1
+    },
+    {
+      "ms": 2051,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 4109,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 6174,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 8223,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 10388,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 12536,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 14601,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 16663,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 18711,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 20761,
+      "status": "idle",
+      "panes": 1
+    }
+  ]
+}

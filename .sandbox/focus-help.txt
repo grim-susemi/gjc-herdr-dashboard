@@ -1,0 +1,13 @@
+Focus a neighboring pane
+
+Usage: herdr pane focus [OPTIONS] --direction <DIRECTION>
+
+Options:
+      --direction <DIRECTION>
+          [possible values: left, right, up, down]
+
+      --pane <ID>
+          
+
+      --current
+

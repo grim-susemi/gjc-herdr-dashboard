@@ -1,0 +1,11 @@
+Show pane process information
+
+Usage: herdr pane process-info [OPTIONS]
+
+Options:
+      --pane <ID>
+          
+
+      --current
+
+{"error":{"code":"pane_not_found","message":"pane not found"},"id":"cli:pane:current"}

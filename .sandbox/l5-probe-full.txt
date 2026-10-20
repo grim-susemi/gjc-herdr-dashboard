@@ -1,0 +1,17 @@
+0 06:42:26 L5-module-eval {"gate":"L5-module-eval","pid":97632,"t":1792305746955}
+1 06:42:27 L5-factory {"gate":"L5-factory","pid":97632,"t":1792305747052,"hasEvents":"function","hasRegister":"function"}
+2 06:42:27 L5-session_start {"gate":"L5-session_start","pid":97632,"t":1792305747476,"hasGetGoalState":"function","goalType":"undefined","goalKeys":"undefined","goalStateKeys":"undefined","goalObjKeys":"undefined","objectiveType":"undefined","tokens":"undefined","timeUsedSeconds":"undefined","idType":"undefined","sessionGoalGetter":"undefined"}
+3 06:42:43 L5-goal_updated tokens=0 sec=0 status=active
+4 06:42:44 L5-goal_updated tokens=16775 sec=1 status=active
+5 06:42:45 L5-goal_updated tokens=33863 sec=2 status=active
+6 06:42:47 L5-goal_updated tokens=51223 sec=4 status=active
+7 06:42:48 L5-goal_updated tokens=69017 sec=5 status=active
+8 06:42:50 L5-goal_updated tokens=87751 sec=7 status=active
+9 06:42:51 L5-goal_updated tokens=106650 sec=8 status=active
+10 06:42:53 L5-goal_updated tokens=126098 sec=9 status=active
+11 06:42:54 L5-goal_updated tokens=146378 sec=10 status=active
+12 06:42:56 L5-goal_updated tokens=168051 sec=12 status=active
+13 06:42:57 L5-goal_updated tokens=191019 sec=13 status=active
+14 06:42:57 L5-goal_updated tokens=214181 sec=14 status=active
+
+counts: {"L5-module-eval":1,"L5-factory":1,"L5-session_start":1,"L5-goal_updated":12}

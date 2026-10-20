@@ -1,0 +1,5 @@
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:1007:1
+✖ a session switch with no event after it is still picked up by the 1 s poll (467.2201ms)
+  [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\USER\AppData\Local\Temp\gjc-instance-oqsmeh'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\Users\\USER\\AppData\\Local\\Temp\\gjc-instance-oqsmeh' }

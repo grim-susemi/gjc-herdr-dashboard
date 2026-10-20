@@ -1,0 +1,40 @@
+Workers [0/3]  run 1 · failed 1 · abo…
+───────────────────────────────────────
+>▌⠏ Parse the conf… · ⧖ 497904h 43m 56s
+ ▌[executor]
+ ▌1K tok · 3 tools · ctx 4%
+ ▌× Write the migrati… · failed · ⧖ 31s
+ ▌[executor]
+ ▌3K tok · 5 tools · ctx 9%
+ ▌⊘ Check the lint ou… · aborted · ⧖ 2s
+ ▌[executor]
+ ▌90 tok · 1 tools
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────
+ Follow ON · LIVE

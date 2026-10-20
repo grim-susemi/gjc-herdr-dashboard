@@ -1,0 +1,11 @@
+l4-adopt exit=0 l4-adopt (LV-5 / AC4.1 / AC4.4 / AC4.6): PASS
+l4-coexist exit=0 l4-coexist (LV-9 / AC4.5): PASS
+l4-lock exit=0 l4-lock (LV-10): PASS
+kill-recovery exit=0 kill-recovery (AC1.7/AC1.9): PASS
+l1-behaviour exit=0 l1-behaviour (LV-13/LV-6/LV-11/AC1.2/AC1.9): PASS
+lt1-fault exit=0 lt1-fault (LV-2): PASS
+lt3-delay exit=0 lt3-delay (LV-3): PASS
+l2-workers exit=0 l2-workers (LV-7): PASS
+l2-width exit=0 l2-width (AC-F4): PASS
+l3-pointer exit=0 l3-pointer (LV-8): PASS
+AC-G1-identical

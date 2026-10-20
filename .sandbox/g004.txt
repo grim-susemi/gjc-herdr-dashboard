@@ -1,0 +1,11 @@
+Implement L4: adopt after GJC restart (`adopted`, paneId unchanged), slot corruption quarantine (T18), retention of old scopes only (AC4.6), foreign-pane coexistence with omo-like labels (fixture pane labels `DAG · x`, `OmO DAG`, `OmO Todo · x`; LV-9), lock exercises LV-10, `/reload` behaviour per G12. Exit: AC4.1-AC4.7, architect checkpoint review on L4, suite green, live evidence saved.
+
+{
+ "id": "G004",
+ "title": "L4 Restart adopt, coexistence, retention and failures",
+ "objective": "Implement L4: adopt after GJC restart (`adopted`, paneId unchanged), slot corruption quarantine (T18), retention of old scopes only (AC4.6), foreign-pane coexistence with omo-like labels (fixture pane labels `DAG · x`, `OmO DAG`, `OmO Todo · x`; LV-9), lock exercises LV-10, `/reload` behaviour per G12. Exit: AC4.1-AC4.7, architect checkpoint review on L4, suite green, live evidence saved.",
+ "status": "active",
+ "createdAt": "2026-10-17T00:36:20.530Z",
+ "updatedAt": "2026-10-17T16:25:56.505Z",
+ "startedAt": "2026-10-17T16:25:56.505Z"
+}

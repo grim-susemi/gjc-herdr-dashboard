@@ -1,0 +1,18 @@
+=== test/live/l1-behaviour.mjs
+68: if (samples.some((s) => s.status === 'working') && samples.at(-1).status === 'idle') break;
+72: assert(idleBefore === 'idle', 'the parent was idle before the prompt', { idleBefore });
+74: assert(samples.at(-1).status === 'idle', 'the parent returned to idle', { samples });
+110: for (let i = 0; i < 60 && status() !== "idle"; i += 1) await sleep(2_000);
+140: if (subSeen && status() === 'idle') break;
+169: for (let i = 0; i < 60 && status() !== 'idle'; i += 1) await sleep(2_000);
+175: for (let i = 0; i < 60 && status() !== 'idle'; i += 1) await sleep(2_000);
+201: for (let i = 0; i < 60 && status() !== 'idle'; i += 1) await sleep(2_000);
+=== test/live/l2-workers.mjs
+55: for (let i = 0; i < 90 && status() !== 'idle'; i += 1) await sleep(2_000);
+56: assert(status() === 'idle', `the parent returned to idle (${label})`, { status: status() });
+=== test/live/lt3-delay.mjs
+65: const parentIdle = async () => (fixture.listPanes().find((p) => p.pane_id === ws.rootPaneId)?.agent_status === 'idle');
+=== test/live/l3-pointer.mjs
+51: const idle = async (label) => {
+52: for (let i = 0; i < 90 && status() !== 'idle'; i += 1) await sleep(2_000);
+53: assert(status() === 'idle', `the parent returned to idle (${label})`, { status: status() });

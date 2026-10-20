@@ -1,0 +1,46 @@
+  // Band: Todo spans the top, workers (left) and DAG (right) share the row below.
+  // Live roles are only re-verified. A missing role is split from a live
+  // neighbour: workers below Todo, or left of a live DAG by split and swap; DAG
+  // right of workers. Closure stays per role, so a closed DAG never stops workers.
+  async openBand(todo, existing, tabId, forceRole) {
+    const todoHeight = String(BAND_LAYOUT.todoHeight), workersWidth = String(BAND_LAYOUT.workersWidth);
+    const live = {};
+    for (const role of ['workers', 'dag']) if (existing[role]) {
+      live[role] = await this.ensureRole(role, existing[role].paneId, 'right', workersWidth, tabId, () => forceRole(role));
+      if (!live[role]) { this.status = 'layout-waiting'; return live; }
+    }
+    const records = { workers: await readJson(this.paneFile('workers')), dag: await readJson(this.paneFile('dag')) };
+    const needed = role => !live[role] && (forceRole(role) || !records[role]?.manualClose);
+    if (needed('workers') || needed('dag')) {
+      // Measure the owned region before the first mutation of this pass.
+      const owned = [todo?.paneId, records.workers?.paneId, records.dag?.paneId].filter(Boolean);
+      const rects = ((await this.herdr('layout', '--pane', this.parentPane))?.layout?.panes ?? [])
+        .filter(pane => owned.includes(pane.pane_id)).map(pane => pane.rect);
+      if (rects.length) {
+        const x = Math.min(...rects.map(rect => rect.x)), y = Math.min(...rects.map(rect => rect.y));
+        const width = Math.max(...rects.map(rect => rect.x + rect.width)) - x;
+        const height = Math.max(...rects.map(rect => rect.y + rect.height)) - y;
+        if (!bandSizes({ width, height }).fits) { this.status = 'layout-waiting'; return { ...live, waiting: bandWaiting }; }
+      }
+    }
+    let { workers, dag } = live;
+    if (!workers && dag) workers = await this.ensureRole('workers', dag.paneId, 'right', workersWidth, tabId,
+      () => forceRole('workers'), dag.paneId);
+    else if (!workers && todo) workers = await this.ensureRole('workers', todo.paneId, 'down', todoHeight, tabId,
+      () => forceRole('workers'));
+    if (!dag && workers) dag = await this.ensureRole('dag', workers.paneId, 'right', workersWidth, tabId, () => forceRole('dag'));
+    this.status = workers ? 'current' : 'layout-waiting';
+    return { dag, workers };
+  }
+  async ensureRole(role, anchor, direction, ratio, tabId, force, beforePane) {
+    if (force()) await this.roleTail;
+    let record = await readJson(this.paneFile(role));
+    // Actor tombstones retain their evidence files. Revalidate the held owner's
+    // absence proof before replacing a locator from an obsolete generation.
+    if (this.managedAvailable && record && !record.manualClose &&
+      this.recordMatches({ ...record, viewerPath: this.viewer }, role) && typeof record.nodePath === 'string' &&
+      this.coordinator?.actor?.snapshot.closures.some(entry => entry.role === role && entry.paneId === record.paneId &&
+        entry.sessionId === record.sessionId && entry.reason === 'pane_not_found')) {
+      if (typeof this.node === 'function') this.node = await this.node();
+      if (pathKey(record.viewerPath) !== pathKey(this.viewer) || pathKey(record.nodePath) !== pathKey(this.node)) {
+        await this.coordinator.obsoleteLocator(record);

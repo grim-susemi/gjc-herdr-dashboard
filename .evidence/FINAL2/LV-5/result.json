@@ -1,0 +1,30 @@
+{
+  "ac41": {
+    "adopted": "ext dev · Todo 인계 · Workers 인계",
+    "paneIds": {
+      "todo": [
+        "w1:p2"
+      ],
+      "workers": [
+        "w1:p3"
+      ]
+    }
+  },
+  "ac46": {
+    "dataScopes": [
+      "5dca7fc12542ab69c35c161e",
+      "bbbbbbbbbbbbbbbbbbbbbbbb",
+      "fac600f0a200f0133651ac9b"
+    ],
+    "prefsScopes": [
+      "bbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
+  },
+  "ac44": {
+    "quarantined": [
+      "slot.json.corrupt-1792436854026"
+    ],
+    "recovery": "ext dev · Todo 열림 · Workers 열림",
+    "next": "ext dev · Todo 정상 · Workers 정상"
+  }
+}

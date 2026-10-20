@@ -1,0 +1,32 @@
+{
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-20T00:48:09.946Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l5goal",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\todo-7\\.sandbox\\case-l5goal"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-20T00:48:10.028Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l5goal",
+      "at": "2026-10-20T00:48:10.897Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "skipped": [],
+  "verifiedAbsent": true
+}

@@ -1,0 +1,46 @@
+415: async function armed(world, deps = {}) {
+416:   const pi = world.pi();
+417:   const handle = createInstance(pi, world.deps(deps));
+418:   const { ctx } = world.ctx();
+419:   await pi.handlers.get('session_start')({}, ctx);
+420:   return { pi, handle, ctx };
+421: }
+422: 
+423: // --------------------------------------------------------------------------------- AC2.7 -----
+424: test('AC2.7: a throwing bus handler becomes the workers sourceError and never escapes into the host', async t => {
+425:   const world = await instanceWorld(t, {
+426:     workersTrackerFactory: () => {
+427:       const tracker = createWorkersTracker({ now: () => world.clock.now() });
+428:       return { ...tracker, onProgress: () => { throw new Error('injected bus fault'); } };
+429:     },
+430:   });
+431:   const { pi, handle, ctx } = await armed(world);
+432:   // Open the band so the workers record and its data file exist (the publish is gated on it).
+433:   await pi.commands.get('dashboard').handler({}, ctx);
+434:   assert.equal(world.notifications.length, 1);
+435:   const before = handle.state().workers.sourceError;
+436:   assert.equal(before, null, JSON.stringify(handle.state().workers));
+437: 
+438:   // The injected fault must not throw out of the host's event dispatch (LT-1/AC2.7) and must show
+439:   // up as the footer's source error, which is what the viewer renders as `원천 오류`.
+440:   assert.doesNotThrow(() => pi.channels.get('task:subagent:progress')({ progress: { id: 'x' } }));
+441:   await world.fire(0);
+442:   assert.equal(handle.state().workers.sourceError, 'injected bus fault');
+443:   assert.deepEqual(handle.state().errors, [], 'a bus fault is a source error, not an instance error');
+444:   // The other roles and `/dashboard` keep working (AC2.7): one more explicit pass, one more notify.
+445:   world.notifications.length = 0;
+446:   const again = await pi.commands.get('dashboard').handler({}, ctx);
+447:   assert.equal(again.ok, true, JSON.stringify(again));
+448:   assert.equal(world.notifications.length, 1);
+449:   assert.equal(world.fake.calls.filter(call => call.argv[1] === 'split').length, 2,
+450:     'the second pass adds no pane');
+451: 
+452:   // The healthy path is not vacuous: a real lifecycle payload lands as a card, and the projection
+453:   // that reaches the disk carries it.
+454:   world.writes.length = 0;
+455:   pi.channels.get('task:subagent:lifecycle')({ id: 'sub-1', agent: 'executor', status: 'started',
+456:     description: 'band-pass lane' });
+457:   pi.channels.get('task:subagent:event')({ ignored: true });
+458:   await world.fire(0);
+459:   assert.equal(handle.state().workers.cards, 1);
+460:   const published = await readJsonFile(world.workersFile());

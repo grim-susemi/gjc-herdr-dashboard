@@ -1,0 +1,6 @@
+90:    stateDir, herdr, vector = null, now = () => Date.now(), pidAlive = probePid, instanceId,
+100:  const registryValue = () => (typeof registryOwnerInstanceId === 'function'
+107:  const enqueue = job => {
+727:  const explicitPass = input => enqueue(() => runPass('explicit', input));
+728:  const autoPass = input => enqueue(() => runPass('auto', input));
+773:    return enqueue(async () => {

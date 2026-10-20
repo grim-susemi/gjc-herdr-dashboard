@@ -1,0 +1,7 @@
+5: ## L0
+54: ## L1 (Todo pane, instance lifecycle and lock)
+106: ## L2 (Workers pane and the two-role band)
+124: ## L3 (pointer and focus)
+139: ## G003 gaps carried forward
+145: ## L4 (restart adopt, coexistence, retention, corruption, lock)
+total 162

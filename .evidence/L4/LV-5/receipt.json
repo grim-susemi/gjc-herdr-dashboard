@@ -1,0 +1,110 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-l4adopt",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-l4adopt",
+      "createdAt": "2026-10-18T15:23:58.935Z",
+      "creator": "harness",
+      "pid": 2604,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-18T15:23:59.690Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4adopt",
+      "label": "l4adopt",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-18T15:23:59.690Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-18T15:23:59.691Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "l4adopt"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "createdAt": "2026-10-18T15:25:05.621Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "viewer",
+      "label": "GJC Todo · a65445fa"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "createdAt": "2026-10-18T15:25:05.663Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "viewer",
+      "label": "GJC Workers · a65445fa"
+    },
+    {
+      "kind": "assertion",
+      "id": "l4-adopt: {\"ac41\":{\"adopted\":\"ext dev · Todo 인계 · Workers 인계\",\"paneIds\":{\"todo\":[\"w1:p2\"],\"workers\":[\"w1:p3\"]}},\"ac46\":{\"dataScopes\":[\"0dc070ea2d963c012d75b380\",\"3abcb4ca4ce9d6037dfe8422\",\"bbbbbbbbbbbbbbbbbbbbbbbb\"],\"prefsScopes\":[\"bbbbbbbbbbbbbbbbbbbbbbbb\"]},\"ac44\":{\"quarantined\":[\"slot.json.corrupt-1792337178561\"],\"recovery\":\"ext dev · Todo 열림 · Workers 열림\",\"next\":\"ext dev · Todo 정상 · Workers 정상\"}}",
+      "createdAt": "2026-10-18T15:26:34.219Z",
+      "creator": "harness"
+    }
+  ],
+  "observed": [],
+  "closed": [
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "at": "2026-10-18T15:26:34.244Z",
+      "verifiedAbsent": true,
+      "note": "already gone"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "at": "2026-10-18T15:26:34.268Z",
+      "verifiedAbsent": true,
+      "note": "already gone"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-18T15:26:34.836Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l4adopt",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4adopt"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-18T15:26:34.864Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l4adopt",
+      "at": "2026-10-18T15:26:35.731Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

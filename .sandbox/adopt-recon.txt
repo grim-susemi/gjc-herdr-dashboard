@@ -1,0 +1,63 @@
+src/host/gjc-adapter.mjs:69:  "opened", "adopted", "ready", "pending", "pending-slow", "partial", "busy",
+src/host/gjc-adapter.mjs:267:const CODE_KEYS = new Set(["opened", "adopted", "ready", "pending", "pending-slow",
+src/core/transitions.mjs:197:    const notify = ownerPhase === 'me' ? 'ready' : 'adopted';
+==
+19://   layoutKeyOf({socket, parentPaneId})          -> 24 hex chars of sha256(JSON([socket, parent]))
+20-//   scopeKeyOf({socket, parentPaneId, sessionId})-> 24 hex chars of sha256(JSON([socket, parent,
+21-//                                                 session]))
+22-//   key8Of(layoutKey)                            -> first 8 chars, the label token
+23-//   labelOf(role, key8)                          -> `GJC Todo · <key8>` / Workers / Progress
+24-//   slotPaths(stateDir, layoutKey)               -> {dir, slot, owner, intent, lockDir, rolesDir,
+25-//                                                   ready(role)}
+26-//   dataPaths(stateDir, scopeKey)                -> {dir, todo, workers, goal, progress}
+27-//   prefsPaths(stateDir, scopeKey)               -> {dir, file(role)}
+28-//   readSlot(path)                              -> {status:'ok', slot} | {status:'absent'} |
+29-//                                                   {status:'corrupt', reason}
+30-//   writeSlot(path, slot)                       -> void
+31-//   quarantineSlot(path, {now})                 -> {path, reason} (renames to slot.json.corrupt-<ts>)
+--
+56:export function layoutKeyOf({ socket, parentPaneId }) {
+57-  return hash([socket, parentPaneId]);
+58-}
+59-
+60-export function scopeKeyOf({ socket, parentPaneId, sessionId }) {
+61-  return hash([socket, parentPaneId, sessionId]);
+62-}
+63-
+64-export function key8Of(layoutKey) {
+65-  return String(layoutKey).slice(0, 8);
+66-}
+67-
+68-export function labelOf(role, key8) {
+==
+export function launchCommand({ dir, herdr, args = DEFAULT_ARGS, clearEnv = LAUNCH_CLEAR_ENV,
+  extra = [] } = {}) {
+  const parts = [`Set-Location -LiteralPath ${psQuote(resolve(dir))}`];
+  for (const key of clearEnv) parts.push(`Remove-Item -ErrorAction SilentlyContinue Env:${key}`);
+  if (herdr) parts.push(`$env:GJC_HERDR_DASHBOARD_HERDR = ${psQuote(JSON.stringify(herdr))}`);
+  for (const [key, value] of extra) parts.push(`$env:${key} = ${psQuote(value)}`);
+  parts.push(['gjc', ...args].join(' '));
+  return parts.join('; ');
+}
+
+// A long single `send-text` is dropped by the gjc input box (measured: 90 characters in one call
+// produced no turn), while 12-character chunks arrive intact. Enter follows after a short settle.
+export async function sendPrompt(fixture, paneId, text, { chunk = 12, gapMs = 150, settleMs = 1_500 } = {}) {
+  for (let at = 0; at < text.length; at += chunk) {
+    fixture.sendText(paneId, text.slice(at, at + chunk));
+    await new Promise((done) => { setTimeout(done, gapMs); });
+  }
+  await new Promise((done) => { setTimeout(done, settleMs); });
+  fixture.sendKeys(paneId, 'enter');
+}
+
+export async function launchGjc(fixture, paneId, options) {
+  const command = launchCommand(options);
+  fixture.sendText(paneId, command);
+  fixture.sendKeys(paneId, 'enter');
+  return command;
+}
+
+// The host renders one notify per `/dashboard` call as an ANSI-styled line inside the pane frame:
+// ` ext dev · Todo 열림` (L1 LV-1 viewer-frame.txt / LV-4-outside-herdr.txt). The colour codes sit
+// inside the line (measured: they break a naive `^\s*ext \S+ · ` match), so they are stripped first.

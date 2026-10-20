@@ -1,0 +1,25 @@
+Run native GJC Ultragoal workflow commands
+
+USAGE
+  $ gjc ultragoal <command> [FLAGS]
+
+COMMANDS
+  status
+  create-goals
+  complete-goals
+  checkpoint
+  review
+  steer
+  record-review-blockers
+  classify-blocker
+  record-critic-verdict
+  record-critic-gate-override
+  quality-gate init
+  quality-gate source-hash
+  quality-gate lane-selection
+  quality-gate validate
+  succession offer
+  succession adopt
+  succession status
+
+Run `gjc ultragoal checkpoint --help`, `gjc ultragoal review --help`, `gjc ultragoal classify-blocker --help`, `gjc ultragoal record-critic-verdict --help`, or `gjc ultragoal record-critic-gate-override --help`, or `gjc ultragoal quality-gate --help`, or `gjc ultragoal succession --help` for command-specific requirements.

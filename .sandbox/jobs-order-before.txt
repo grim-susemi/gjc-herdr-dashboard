@@ -1,0 +1,28 @@
+✖ AC2.6: a background job present at the first /dashboard is on the workers projection at once (54.9826ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 104.2689
+
+✖ failing tests:
+
+test at test\unit\band-pass.test.mjs:525:1
+✖ AC2.6: a background job present at the first /dashboard is on the workers projection at once (54.9826ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"gjc-herdr-dashboard/workers/1","updatedAt":1700000000000,"empty":true,"sourceError":null,"cards":[],"ignored":0,"generatedAt":1700000000000}
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/band-pass.test.mjs:532:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

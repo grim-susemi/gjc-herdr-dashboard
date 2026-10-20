@@ -1,0 +1,15 @@
+async function sendTwice(fixture, paneId, name) {
+  await fixture.slash(paneId, name);
+  await fixture.slash(paneId, name);
+  // The TUI can swallow keystrokes typed while a turn is starting. A second send that produced no
+  // notify is retried with the same no-wait shape (a fresh back-to-back send), never with a long gap:
+  // what matters is that two DELIVERED calls produced two notifies, one split sequence and one pane
+  // per role.
+  for (let retry = 0; retry < 3; retry += 1) {
+    await new Promise((done) => { setTimeout(done, 12_000); });
+    const lines = notifyTexts(fixture, paneId).filter((line) => /Todo|Workers/.test(line));
+    if (lines.length >= 2) break;
+    await fixture.slash(paneId, name);
+  }
+  return [notifyTexts(fixture, paneId), notifyTexts(fixture, paneId)];
+}

@@ -1,0 +1,20 @@
+### 15.5 omo 공존 fixture (A-7, C-7)
+- executor는 실제 omo를 실행하지 않는다.
+- 소유 탭에서 하네스가 일반 셸 pane 3개를 만들고 label을 `DAG · x`, `OmO DAG`, `OmO Todo · x`로 지정해 foreign pane을 흉내 낸다.
+- 우리 `/dashboard`를 실행한 뒤 확인한다.
+  - 세 pane의 id·label·shell_pid 불변
+  - 우리 pane만 생성됨
+  - `partial`·opened 문구
+  - AC-G1 해시 불변
+- omo 쪽 반응(`foreignWaiting`)은 README에 문서로만 적는다. 실제 omo와의 교차 실행은 소유자가 요청할 때만, 소유자의 감독 아래 별도 창에서 한다.
+
+## 16. 롤백 드릴 (C-8, L6)
+- 드릴 루트는 `.sandbox/case-drill/.gjc`(`--agent-dir`)다. G13이 통과해야 한다. 판정은 새 GJC 시험 세션의 프레임과 notify `gen-NNNNNN` 토큰으로 한다.
+
+| 드릴 | 절차 | 기대 |
+|---|---|---|
+| D1 | 임시 agent-dir에 G1 설치 → 새 세션 `/dashboard` → G2 설치 → 새 세션 | G1 토큰 opened → G2 토큰 opened. `--doctor`의 shim 대상과 current.json이 일치 |
+| D2 | `install --select <G1>` → 새 세션 | G1 토큰. 상태 파일 재사용(같은 schema major) |
+==
+==
+==

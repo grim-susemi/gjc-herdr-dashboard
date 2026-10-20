@@ -1,0 +1,18 @@
+{"gate":"U13-workspace-create","ok":true,"at":"2026-10-17T00:41:24.991Z","keys":["root_pane","tab","type","workspace"]}
+{"gate":"G6-list","ok":true,"at":"2026-10-17T00:41:25.007Z","paneKeys":["agent_status","cwd","focused","pane_id","revision","scroll","tab_id","terminal_id","workspace_id"],"count":2}
+{"gate":"G6-split","ok":true,"at":"2026-10-17T00:41:25.032Z","keys":["agent_status","cwd","focused","pane_id","revision","scroll","tab_id","terminal_id","workspace_id"]}
+{"gate":"G6-rename","ok":true,"at":"2026-10-17T00:41:25.047Z"}
+{"gate":"G6-layout","ok":true,"at":"2026-10-17T00:41:25.063Z","keys":["layout","type"]}
+{"gate":"G6-process-info","ok":true,"at":"2026-10-17T00:41:25.089Z","keys":["process_info","type"]}
+{"gate":"G6-run","ok":true,"at":"2026-10-17T00:41:25.107Z"}
+{"gate":"G6-wait-output","ok":true,"at":"2026-10-17T00:41:26.331Z"}
+{"gate":"G6-read-env","ok":false,"at":"2026-10-17T00:41:26.347Z","readKeys":"undefined","sawPaneIdEnv":false,"matchedAny":true}
+{"gate":"U9-split-close-20","ok":true,"at":"2026-10-17T00:41:27.372Z","ids":["w1:pS","w1:pT","w1:pV","w1:pW","w1:pX","w1:pY","w1:pZ","w1:p0","w1:p11","w1:p12","w1:p13","w1:p14","w1:p15","w1:p16","w1:p17","w1:p18","w1:p19","w1:p1A","w1:p1B","w1:p1C"]}
+{"gate":"U10-exit-removes-pane","ok":true,"at":"2026-10-17T00:41:31.423Z","id10":"w1:p1D","remaining":["w1:p1","w1:pR","w2:p1"]}
+{"gate":"U12-split-flags","ok":true,"at":"2026-10-17T00:41:31.439Z","flags":["--pane","--current","--direction","--ratio","--cwd","--env","--right-click","--focus","--no-focus"]}
+{"gate":"G6-read-env","ok":true,"at":"2026-10-17T00:41:55.020Z","note":"correction: earlier FAIL was probe regex (pane ids contain letters). Manual pane run+read in w2:p2 showed HERDR_PANE_ID=w2:p2 and env keys HERDR_BIN_PATH,CONFIG_PATH,ENV,HOME,PANE_ID,SESSION,SOCKET_PATH,TAB_ID,WORKSPACE_ID. pane read returns plain text, not JSON."}
+{"gate":"G6-focus-invariant-split-no-focus","ok":true,"at":"2026-10-17T00:45:46.850Z","before":["w1:p1"],"after":["w1:p1"],"created":"w1:p1G"}
+{"gate":"G6-focus-invariant-split-no-focus","ok":true,"at":"2026-10-17T00:45:54.872Z","before":["w1:p1"],"after":["w1:p1"],"created":"w1:p1H"}
+{"gate":"U7-events-subscribe-pane_focused","ok":false,"at":"2026-10-17T00:45:58.078Z","subscribeAck":{"keys":["id","result"],"hasError":false},"events":[{"focusError":"Command failed: C:\\Users\\USER\\AppData\\Local\\Programs\\Herdr\\bin\\herdr.exe --session gjcdash-probe pane focus --pane w1:p1"},{"focusError":"Command failed: C:\\Users\\USER\\AppData\\Local\\Programs\\Herdr\\bin\\herdr.exe --session gjcdash-probe pane focus --pane w1:p1"}]}
+{"gate":"G6-focus-invariant-split-no-focus","ok":true,"at":"2026-10-17T00:46:03.289Z","before":["w1:p1"],"after":["w1:p1"],"created":"w1:p1J"}
+{"gate":"U7-events-subscribe-pane_focused","ok":true,"at":"2026-10-17T00:46:06.507Z","subscribeAck":{"keys":["id","result"],"hasError":false},"events":[{"keys":["data","event"],"event":"pane_focused","dataKeys":["pane_id","type","workspace_id"],"type":"pane_focused","pane_id":"w1:p1J"},{"keys":["data","event"],"event":"tab_focused","dataKeys":["tab_id","type","workspace_id"],"type":"tab_focused"},{"keys":["data","event"],"event":"workspace_focused","dataKeys":["type","workspace_id"],"type":"workspace_focused"},{"keys":["data","event"],"event":"pane_focused","dataKeys":["pane_id","type","workspace_id"],"type":"pane_focused","pane_id":"w1:p1"},{"keys":["data","event"],"event":"tab_focused","dataKeys":["tab_id","type","workspace_id"],"type":"tab_focused"},{"keys":["data","event"],"event":"workspace_focused","dataKeys":["type","workspace_id"],"type":"workspace_focused"}]}

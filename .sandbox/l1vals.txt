@@ -1,0 +1,9 @@
+L1 LV-7b timing: { "killedAt": 1792261148908, "killToLabelMs": 10078, "ownerHeartbeatAt": 1792261147828, "lastHeartbeatToLabelMs": 11158 }
+L1 ac1-9-exit: disconnect_label_ms_after_enter=826
+L1 todo-write: first_seen_at=1792260654341 projection_updatedAt=1792260654094 generatedAt=1792260654295 event_to_disk_ms=247 event_to_viewer_screen_ms=1166 (sampled every 250 ms plus a pane read; the viewer repaints every 1 s) prompt_to_row_ms=4475 (includes the model turn)
+L1 lv11 scopes: 99481bb1a70f14ee4f552940 -> 18bfe5a5d20cc3ac921fa4c3 epoch 1->2
+L1 LV-10 splits: 2; notify-second: (no second notify)
+L1 LV-10 receipt created: [object Object],[object Object],[object Object],[object Object],[object Object]
+L4 LV-10 splits: 2; delivered [ "ext dev · Todo 열림 · Workers 열림", "ext dev · Todo 정상 · Workers 정상" ]
+L4 ac1-9-timing: { "killedAt": 1792292874100, "killToLabelMs": 8905, "ownerHeartbeatAt": 1792292871835, "lastHeartbeatToLabelMs": 11170 }
+L4 todo-write: first_seen_at=1792294260365 projection_updatedAt=1792294260056 generatedAt=1792294260258 event_to_disk_ms=309 event_to_viewer_screen_ms=1153 (sampled every 250 ms plus a pane read; the viewer repaints every 1 s) prompt_to_row_ms=3929 (includes the model turn)

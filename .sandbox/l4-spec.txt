@@ -1,0 +1,46 @@
+| L2 Workers + 2역할 band | workers 원천, model·render·view-state·viewer, §7.8 | AC2.*, AC-F1–F4, LV-7 | — |
+| L3 마우스·포커스 | terminal-input, pointer, 구독 | AC3.*, LV-8(12건) | — |
+| L4 프로세스 간 라이브 | adopt, 잠금, 손상, retention, 공존, reload | AC4.*, LV-5·9·10 | **Architect 체크포인트** |
+| L5 세 번째 역할 | F1 → P1 또는 생략 + L5b | AC5.*. P1이면 AC-F5와 LV-8 +6건 | — |
+| L6 패키지·설치·드릴 | build, install, verify-package, §16 | AC6.* | **사용자 범위 설치 전 소유자 승인** |
+| (L7) 자동 재열기 | 소유자 요청 시 | 별도 계획 | — |
+
+- **AC2.6**: background가 보인다. 깊이 1 한계를 README에 적는다.
+- **AC2.7(A-14)**: bus handler에 예외를 주입하면 "원천 오류"가 뜨고, 다른 역할과 `/dashboard`는 정상이다.
+- **AC2.8(A-16)**: foreign 형제가 있으면 `partial:shape`이고 foreign pane은 불변이다.
+- **AC3.1**: LV-8에서 click·drag·wheel이 그 역할의 follow만 멈춘다. wheel ±3, click은 접기·선택.
+- **AC3.2**: 포커스가 다른 pane·탭·워크스페이스로 가면 follow가 복귀한다.
+- **AC3.3**: 구독이 실패해도 viewer는 동작하고 footer에 1회 표시한다.
+- **AC4.1**: gjc 종료 → 같은 pane에서 재시작 → `/dashboard` = `adopted`. paneId 불변, 새 pane 0, "연결 끊김" 해제.
+- **AC4.3**: LT-7 통과. 라이브 연속 2회 → 1회 실행, 나머지는 busy 또는 무조치. pane 수 정확.
+- **AC4.4**: slot 손상 → 격리, 예전 viewer 은퇴, 다음 `/dashboard` 정상.
+- **AC4.5(A-7)**: LV-9에서 foreign 3개의 id·label·shell_pid 불변. AC-G1.
+- **AC4.6(A-15)**: retention은 활성이 아닌 오래된 scope만 지운다.
+- **AC4.7**: `/reload` 뒤 G12 분기대로 교체되고 pane이 늘지 않는다. duplicate는 단위 테스트.
+- **AC5.1**: F1 결과와 결정을 기록한다. P1이면 필드마다 fixture가 있고 AC-F5를 통과한다.
+- **AC5.2**: 생략 시 2역할이 최종이고 README에 근거가 있다. 목표 1줄은 goal이 있을 때만 보이고 `goal_updated` 후 2s 안에 바뀐다. 34열 footer가 잘리지 않는다.
+- **AC5.3**: SR4·SR8(gjc spawn·`.gjc` 읽기 없음).
+- **AC6.1**: §16 D1–D4를 모두 통과한다.
+  - SR7: `src/core/launch.mjs` 밖의 herdr `run`.
+  - SR8: `gjc`·`gjc.exe` spawn/execFile.
+
+### 15.3 라이브 재현 절차 (C-5: 항목당 스크립트 1개)
+**공통**
+- 하네스는 Node `execFile`로 herdr를 부른다. 슬래시 명령은 `pane send-text <pane> /dashboard` + `pane send-keys <pane> enter`로 보낸다. Git Bash 인자로는 넘기지 않는다(불가피하면 `MSYS_NO_PATHCONV=1`). PowerShell 인라인 `$_`는 쓰지 않는다.
+- 판정은 `pane read --source visible --format ansi`와 `pane layout`으로 한다.
+- 증거는 `.evidence/<L>/<LV>/`에 `.ansi`, `layout-*.json`, `receipt.json`, `focus-before/after.json`으로 남긴다.
+
+| LV | 스크립트 | 입력 | 기대 |
+|---|---|---|---|
+| LV-1 | `test/live/l1-open-reopen.mjs` | `/dashboard`, `/todo` 추가·시작·완료, `f`, `q`, `/dashboard`, `/dashboard`×3 | AC1.1–1.4, 재열기 footer follow ON |
+| LV-2 | `lt1-fault.mjs` | 플래그 `fail-split-once` + `/dashboard`×2 | `failed:herdr-split` → opened |
+| LV-3 | `lt3-delay.mjs` | 플래그 `delay-run-25s`(새로 split한 pane의 run만) + `/dashboard` 1회 | 대기 표시 → 45s 안에 데이터 프레임. 두 번째 `/dashboard` 없음, pane 수 불변 |
+| LV-4 | `lt4-outside.mjs` | `HERDR_ENV`를 제거하고 시작한 gjc | `outside-herdr` 프레임 |
+| LV-5 | `l4-adopt.mjs` | 종료 → 같은 pane에서 재시작 → `/dashboard` | AC4.1 |
+| LV-6 | `l1-sub-inert.mjs` | 서브에이전트 1회 | 래퍼 로그에 sub 호출 0, state diff는 owner 파일뿐 |
+| LV-7 | `l2-workers.mjs` | 병렬 2 + background 1 | AC2.1–2.6, AC-F4 |
+| LV-8 | `l3-pointer.mjs` | 역할마다 click fold, drag, wheel up, wheel down, blur, resize. SGR 시퀀스를 소유 viewer pane에만 보낸다 | AC3.1–3.2. 2역할 12건, P1이면 18건 |
+| LV-9 | `l4-coexist.mjs` | §15.5 | AC4.5 |
+| LV-10 | `l4-lock.mjs` | `/dashboard` 2회를 간격 없이 | AC4.3 |
+| LV-11 | `l1-rebind.mjs` | `/new` → `/todo` 추가 → `/resume` | AC1.11 |
+| LV-12 | `l6-drills.mjs` | §16 | AC6.1 |

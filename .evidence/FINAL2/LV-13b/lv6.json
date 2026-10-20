@@ -1,0 +1,20 @@
+{
+  "callsBefore": 105,
+  "callsAfter": 191,
+  "newFiles": [],
+  "subSeen": true,
+  "ownerBefore": {
+    "schema": "gjc-herdr-dashboard/owner/1",
+    "pid": 73232,
+    "instanceId": "9a619a0a-b7fa-4e3d-adaa-3f0d29a6ba6c",
+    "sessionId": "01a15589-188c-72a2-bade-793abc2a6809",
+    "heartbeatAt": 1792436528466
+  },
+  "ownerAfter": {
+    "schema": "gjc-herdr-dashboard/owner/1",
+    "pid": 73232,
+    "instanceId": "9a619a0a-b7fa-4e3d-adaa-3f0d29a6ba6c",
+    "sessionId": "01a15589-188c-72a2-bade-793abc2a6809",
+    "heartbeatAt": 1792436558603
+  }
+}

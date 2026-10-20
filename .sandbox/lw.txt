@@ -1,0 +1,19 @@
+✔ sessionArgs: a measured socket identifies the session without a prefix (1.1619ms)
+✔ paneIdOf: reads the pane id out of the measured split reply (0.2445ms)
+✔ main: forwards argv unchanged, passes the reply through byte for byte, and logs the call (3.1818ms)
+✔ main: a session prefix is added only when the environment cannot identify the session (3.1937ms)
+✔ fail-list: every pane list fails while the flag exists, and the flag is not consumed (2.9336ms)
+✔ fail-split-once: the first split fails with structured JSON, then the flag is gone (4.0232ms)
+✔ planCall: no verb other than the two flagged ones is ever intercepted (1.8057ms)
+✔ R3: the wrapper no longer offers a delay-run flag (the late viewer is the product failpoint) (0.3912ms)
+✔ no binary: the wrapper reports herdr_missing instead of guessing a path (1.5238ms)
+✔ CLI: an injected failure is visible to a real caller as exit 1 plus a JSON error body (55.4467ms)
+✔ CLI: a flag-free call whose real binary cannot run fails without inventing a reply (61.1011ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 151.5888

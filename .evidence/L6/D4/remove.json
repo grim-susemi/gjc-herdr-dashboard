@@ -1,0 +1,14 @@
+{
+  "removed": true,
+  "agentDir": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc",
+  "shim": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc\\extensions\\gjc-herdr-dashboard.js",
+  "generationsKept": [
+    "generation-000001",
+    "generation-000002",
+    "generation-000003",
+    "generation-000004",
+    "generation-000005",
+    "generation-000006"
+  ],
+  "state": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc\\herdr-dashboard\\state"
+}

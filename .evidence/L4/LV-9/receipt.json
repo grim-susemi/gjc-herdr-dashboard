@@ -1,0 +1,133 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-l4cob",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-l4cob",
+      "createdAt": "2026-10-18T15:27:51.979Z",
+      "creator": "harness",
+      "pid": 64592,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-18T15:27:52.710Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-same-tab",
+      "label": "l4coexist-same-tab",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-18T15:27:52.710Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-18T15:27:52.711Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "l4coexist-same-tab"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "createdAt": "2026-10-18T15:28:02.560Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "foreign",
+      "label": "DAG · x"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "createdAt": "2026-10-18T15:28:02.764Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "foreign",
+      "label": "OmO DAG"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p4",
+      "createdAt": "2026-10-18T15:28:03.196Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "foreign",
+      "label": "OmO Todo · x"
+    }
+  ],
+  "observed": [],
+  "closed": [
+    {
+      "kind": "pane",
+      "id": "w1:p2",
+      "at": "2026-10-18T15:29:03.013Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": "DAG · x"
+      }
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p3",
+      "at": "2026-10-18T15:29:03.432Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": "OmO DAG"
+      }
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p4",
+      "at": "2026-10-18T15:29:03.737Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "tabId": "w1:t1",
+        "label": "OmO Todo · x"
+      }
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-18T15:29:04.405Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l4coexist-same-tab",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4coexist-same-tab"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-18T15:29:04.546Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l4cob",
+      "at": "2026-10-18T15:29:05.390Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

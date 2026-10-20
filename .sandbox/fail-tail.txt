@@ -1,0 +1,47 @@
+✖ failing tests:
+
+test at test\unit\extension.test.mjs:86:1
+✖ §7.1 item 1: the factory body reads no host value and creates no registry map (3.4686ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'armed',
+      'dispose',
+  +   'drain',
+      'state'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/extension.test.mjs:115:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'armed', 'dispose', 'drain', 'state' ],
+    expected: [ 'armed', 'dispose', 'state' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\unit\pointer-workers.test.mjs:213:1
+✖ a click on the footer or header row only turns follow off (54.5399ms)
+  Error: ENOTEMPTY, Directory not empty: \\?\C:\Users\USER\AppData\Local\Temp\gjc-pointer-workers-J9niYV '\\?\C:\Users\USER\AppData\Local\Temp\gjc-pointer-workers-J9niYV'
+      at rmSync (node:fs:1236:18)
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/pointer-workers.test.mjs:79:17)
+      at TestHook.runInAsyncScope (node:async_hooks:214:14)
+      at TestHook.run (node:internal/test_runner/test:1106:25)
+      at TestHook.run (node:internal/test_runner/test:1427:18)
+      at TestHook.run (node:internal/util:585:20)
+      at Test.runHook (node:internal/test_runner/test:1024:20)
+      at after (node:internal/test_runner/test:1064:20)
+      at Test.run (node:internal/test_runner/test:1132:13)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    errno: 41,
+    code: 'ENOTEMPTY',
+    path: '\\\\?\\C:\\Users\\USER\\AppData\\Local\\Temp\\gjc-pointer-workers-J9niYV',
+    syscall: 'rm'
+  }

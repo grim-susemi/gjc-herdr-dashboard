@@ -1,0 +1,31 @@
+{"at":"2026-10-18T15:29:18.894Z","atMs":1792337358894,"argv":["pane","layout","--pane","w1:p1"],"ok":true,"code":null,"ms":29,"ppid":83924}
+{"at":"2026-10-18T15:29:19.013Z","atMs":1792337359013,"argv":["pane","list"],"ok":true,"code":null,"ms":31,"ppid":83924}
+{"at":"2026-10-18T15:29:19.108Z","atMs":1792337359108,"argv":["pane","split","w1:p1","--direction","right","--no-focus"],"ok":true,"code":null,"ms":42,"ppid":83924,"paneId":"w1:p2"}
+{"at":"2026-10-18T15:29:19.205Z","atMs":1792337359205,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":38,"ppid":83924}
+{"at":"2026-10-18T15:29:19.290Z","atMs":1792337359290,"argv":["pane","rename","w1:p2","GJC Todo · c5271f54"],"ok":true,"code":null,"ms":32,"ppid":83924}
+{"at":"2026-10-18T15:29:19.383Z","atMs":1792337359383,"argv":["pane","run","w1:p2","& 'C:\\Program Files\\nodejs\\node.exe' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\src\\viewers\\todo\\viewer.mjs' '--state' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock\\.gjc\\herdr-dashboard\\state' '--layout' 'c5271f547b4d05c814d97437' '--role' 'todo' '--token' 'ede38f8b-0be5-411c-a7f9-0c9e6b4724bd' '--pane' 'w1:p2' '--lang' 'ko'; exit"],"ok":true,"code":null,"ms":34,"ppid":83924}
+{"at":"2026-10-18T15:29:19.465Z","atMs":1792337359465,"argv":["pane","list"],"ok":true,"code":null,"ms":30,"ppid":83924}
+{"at":"2026-10-18T15:29:19.549Z","atMs":1792337359549,"argv":["pane","layout","--pane","w1:p1"],"ok":true,"code":null,"ms":34,"ppid":83924}
+{"at":"2026-10-18T15:29:19.660Z","atMs":1792337359660,"argv":["pane","list"],"ok":true,"code":null,"ms":26,"ppid":83924}
+{"at":"2026-10-18T15:29:19.747Z","atMs":1792337359747,"argv":["pane","split","w1:p2","--direction","down","--ratio","0.35","--no-focus"],"ok":true,"code":null,"ms":43,"ppid":83924,"paneId":"w1:p3"}
+{"at":"2026-10-18T15:29:19.829Z","atMs":1792337359829,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":31,"ppid":83924}
+{"at":"2026-10-18T15:29:19.907Z","atMs":1792337359907,"argv":["pane","rename","w1:p3","GJC Workers · c5271f54"],"ok":true,"code":null,"ms":29,"ppid":83924}
+{"at":"2026-10-18T15:29:19.988Z","atMs":1792337359988,"argv":["pane","run","w1:p3","& 'C:\\Program Files\\nodejs\\node.exe' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\src\\viewers\\workers\\viewer.mjs' '--state' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock\\.gjc\\herdr-dashboard\\state' '--layout' 'c5271f547b4d05c814d97437' '--role' 'workers' '--token' 'd794435e-9170-4f3d-8cf0-025c614f0089' '--pane' 'w1:p3' '--lang' 'ko'; exit"],"ok":true,"code":null,"ms":30,"ppid":83924}
+{"at":"2026-10-18T15:29:20.069Z","atMs":1792337360069,"argv":["pane","list"],"ok":true,"code":null,"ms":31,"ppid":83924}
+{"at":"2026-10-18T15:29:20.142Z","atMs":1792337360142,"argv":["pane","layout","--pane","w1:p1"],"ok":true,"code":null,"ms":27,"ppid":83924}
+{"at":"2026-10-18T15:29:20.982Z","atMs":1792337360982,"argv":["pane","list"],"ok":true,"code":null,"ms":32,"ppid":83924}
+{"at":"2026-10-18T15:29:21.069Z","atMs":1792337361069,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":41,"ppid":83924}
+{"at":"2026-10-18T15:29:21.152Z","atMs":1792337361152,"argv":["pane","list"],"ok":true,"code":null,"ms":33,"ppid":83924}
+{"at":"2026-10-18T15:29:21.228Z","atMs":1792337361228,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":30,"ppid":83924}
+{"at":"2026-10-18T15:29:25.976Z","atMs":1792337365976,"argv":["pane","list"],"ok":true,"code":null,"ms":29,"ppid":83924}
+{"at":"2026-10-18T15:29:26.053Z","atMs":1792337366053,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":30,"ppid":83924}
+{"at":"2026-10-18T15:29:26.133Z","atMs":1792337366133,"argv":["pane","list"],"ok":true,"code":null,"ms":33,"ppid":83924}
+{"at":"2026-10-18T15:29:26.218Z","atMs":1792337366218,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":36,"ppid":83924}
+{"at":"2026-10-18T15:29:32.518Z","atMs":1792337372518,"argv":["pane","list"],"ok":true,"code":null,"ms":30,"ppid":83924}
+{"at":"2026-10-18T15:29:32.595Z","atMs":1792337372595,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":29,"ppid":83924}
+{"at":"2026-10-18T15:29:32.673Z","atMs":1792337372673,"argv":["pane","list"],"ok":true,"code":null,"ms":31,"ppid":83924}
+{"at":"2026-10-18T15:29:32.760Z","atMs":1792337372760,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":37,"ppid":83924}
+{"at":"2026-10-18T15:29:33.982Z","atMs":1792337373982,"argv":["pane","list"],"ok":true,"code":null,"ms":130,"ppid":83924}
+{"at":"2026-10-18T15:29:34.066Z","atMs":1792337374066,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":32,"ppid":83924}
+{"at":"2026-10-18T15:29:34.139Z","atMs":1792337374139,"argv":["pane","list"],"ok":true,"code":null,"ms":29,"ppid":83924}
+{"at":"2026-10-18T15:29:34.215Z","atMs":1792337374215,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":30,"ppid":83924}

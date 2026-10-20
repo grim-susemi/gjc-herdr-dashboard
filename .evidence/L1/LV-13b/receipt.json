@@ -1,0 +1,89 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-lvbeh",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-lvbeh",
+      "createdAt": "2026-10-17T18:09:08.933Z",
+      "creator": "harness",
+      "pid": 10720,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-17T18:09:10.377Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lvbeh",
+      "label": "lvbeh",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-17T18:09:10.378Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-17T18:09:10.378Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "lvbeh"
+    },
+    {
+      "kind": "assertion",
+      "id": "/new attempt 1: scope changed",
+      "createdAt": "2026-10-17T18:11:42.583Z",
+      "creator": "harness"
+    },
+    {
+      "kind": "assertion",
+      "id": "l1-behaviour: {\"ac110\":\"idle -> working -> idle over 20948 ms\",\"ac12\":{\"todoWriteEventToDiskMs\":247,\"todoWriteEventToScreenMs\":1166,\"todoAppendReflectedMs\":2005},\"lv6\":{\"calls\":181,\"mutations\":0,\"newFiles\":0},\"lv11\":{\"scopeEpoch\":[1,2]},\"ac19Exit\":{\"disconnectMs\":826}}",
+      "createdAt": "2026-10-17T18:11:47.442Z",
+      "creator": "harness"
+    }
+  ],
+  "observed": [
+    {
+      "paneId": "w1:p2",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "label": "GJC Todo · a6998dca"
+    }
+  ],
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-17T18:11:47.856Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "lvbeh",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lvbeh"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-17T18:11:47.881Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-lvbeh",
+      "at": "2026-10-17T18:11:48.770Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

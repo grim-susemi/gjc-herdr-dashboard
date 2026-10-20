@@ -1,0 +1,15 @@
+38://           registryOwnerInstanceId, herdrTimeoutMs, explicitBudgetMs, autoBudgetMs, platform }
+54://     ownerPhase, ownerDetail, rebound, quarantined, interrupted, fence, failure, detail, trigger }
+55://   `ownerPhase`/`ownerDetail` are the R1 owner step's verdict and reason; `busy` results always
+93:    sleep = null, env = process.env, registryOwnerInstanceId = null, herdrTimeoutMs = 5000,
+100:  const registryValue = () => (typeof registryOwnerInstanceId === 'function'
+101:    ? registryOwnerInstanceId() : registryOwnerInstanceId);
+127:  async function readOwnerState(paths) {
+201:      elapsedMs: 0, lock: null, ownerPhase: null, ownerDetail: null, rebound: false, quarantined: false,
+426:        now: now(), corrupt: ownerState.corrupt, registryOwnerInstanceId: registryValue() });
+427:      result.ownerPhase = phaseInfo.phase;
+499:        const decision = decideRole({ record, observation, mode, ownerPhase: phaseInfo.phase,
+733:  function ownerPhase(binding) {
+738:        corrupt: state.corrupt, registryOwnerInstanceId: registryValue() });
+754:        corrupt: state.corrupt, registryOwnerInstanceId: registryValue() });
+824:  return { explicitPass, autoPass, writeOwner, markStopped, rebind, ownerPhase };

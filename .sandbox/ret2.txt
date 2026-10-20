@@ -1,0 +1,27 @@
+1114:   // ------------------------------------------------------------------ test handle --------------
+1115:   // Exactly the agreed shape (the registry entry carries the two extra methods a handover needs).
+1116:   return {
+1117:     armed: () => armed,
+1118:     dispose,
+1119:     state: () => ({
+1120:       armed, disposed, instanceId, moduleUrl: deps.moduleUrl ?? null,
+1121:       rootUrl: rootUrl?.href ?? null, rootPath, stateDir, gen: gen ?? 'dev', language,
+1122:       rawLanguage, invalidLanguage, pollMode, binding: binding ? { ...binding } : null, layoutKey,
+1123:       scopeKey,
+1124:       owner: isSelfOwner(), delegate: delegateTo !== null,
+1125:       delegateInstanceId: delegateTo?.instanceId ?? null, duplicateNotified,
+1126:       vector: vector ? [...vector] : null, vectorError, lastOwnerPath, heartbeatAt, lastLeaf,
+====
+1117:     armed: () => armed,
+1118:     dispose,
+1119:     state: () => ({
+1120:       armed, disposed, instanceId, moduleUrl: deps.moduleUrl ?? null,
+1121:       rootUrl: rootUrl?.href ?? null, rootPath, stateDir, gen: gen ?? 'dev', language,
+1122:       rawLanguage, invalidLanguage, pollMode, binding: binding ? { ...binding } : null, layoutKey,
+1123:       scopeKey,
+1124:       owner: isSelfOwner(), delegate: delegateTo !== null,
+1125:       delegateInstanceId: delegateTo?.instanceId ?? null, duplicateNotified,
+1126:       vector: vector ? [...vector] : null, vectorError, lastOwnerPath, heartbeatAt, lastLeaf,
+1127:       lastResultCode, lastNotify, superseded,
+1128:       // §7.6 for a drill: the workers tracker's own counts, not a copy of the projection file. One
+1129:       // `snapshot()` call feeds all three fields so they describe the same instant.

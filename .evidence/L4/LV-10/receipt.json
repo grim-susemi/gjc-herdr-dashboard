@@ -1,0 +1,76 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-l4lock",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-l4lock",
+      "createdAt": "2026-10-18T15:29:05.591Z",
+      "creator": "harness",
+      "pid": 72512,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-18T15:29:06.188Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock",
+      "label": "l4-lock",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-18T15:29:06.188Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-18T15:29:06.189Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "l4-lock"
+    },
+    {
+      "kind": "assertion",
+      "id": "l4-lock: 3 notify line(s), 2 split(s), 1 viewer pane(s)",
+      "createdAt": "2026-10-18T15:29:46.603Z",
+      "creator": "harness"
+    }
+  ],
+  "observed": [],
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-18T15:29:47.183Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l4-lock",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-l4-lock"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-18T15:29:47.337Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l4lock",
+      "at": "2026-10-18T15:29:48.194Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

@@ -1,0 +1,40 @@
+Workers [3]  Running 1 · Failed 1 · Ab~
+>◐ Parse the config files Running
+  read · Reading config
+  3 tools · 1200 tok · ctx 4% · ? · 49~
+ ✗ Write the migration Failed
+  5 tools · 3400 tok · ctx 9% · ? · 31s
+ ⊘ Check the lint output Aborted
+  1 tools · 90 tok · ctx ?% · ? · 2s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────
+Follow ON · Live

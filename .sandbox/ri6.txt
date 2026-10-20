@@ -1,0 +1,19 @@
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:999:1
+✖ L4: a retired instance cannot reclaim the successor's owner record (254.1851ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /busy \(other owner\)/. Input:
+  
+  'ext dev · Todo opened · Workers opened'
+  
+      at assertOneNotify (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/instance.test.mjs:186:10)
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/instance.test.mjs:1017:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ext dev · Todo opened · Workers opened',
+    expected: /busy \(other owner\)/,
+    operator: 'match',
+    diff: 'simple'
+  }

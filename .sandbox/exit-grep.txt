@@ -1,0 +1,11 @@
+test/live/l1-behaviour.mjs:8://   AC1.9 (exit)    `/exit` -> the viewer shows `연결 끊김` within 5 s, pane stays
+test/live/l1-behaviour.mjs:199:    // ---- AC1.9 exit: /exit -> 연결 끊김 within 5 s ----------------------------------------------
+test/live/l1-behaviour.mjs:200:    fixture.sendText(parent, '/exi');
+test/live/l1-behaviour.mjs:204:    const exitAt = Date.now();
+test/live/l1-behaviour.mjs:213:      if (/연결 끊김/.test(frame)) disconnectMs = Date.now() - exitAt;
+test/live/l1-behaviour.mjs:215:    writeEvidence(evidence, 'viewer-after-exit.txt', frame);
+test/live/l1-behaviour.mjs:216:    writeEvidence(evidence, 'ac1-9-exit.txt', `disconnect_label_ms_after_enter=${disconnectMs}`);
+test/live/l1-behaviour.mjs:217:    assert(disconnectMs !== null, 'the viewer showed 연결 끊김 after /exit', { frame });
+test/live/l1-behaviour.mjs:218:    assert(disconnectMs <= 5_000, `AC1.9: 연결 끊김 within 5 s of a normal exit (took ${disconnectMs} ms)`, { frame });
+test/live/l1-behaviour.mjs:219:    assert(viewerPanes(fixture).length === 1, 'the viewer pane stays after /exit');
+test/live/fixture.mjs:150:      throw coded('herdr-exit', `herdr ${args.join(' ')} exited ${raw.status}: ${raw.stdout.slice(0, 200)}${raw.stderr.slice(0, 200)}`);

@@ -1,0 +1,22 @@
+1028:   pi?.on?.('session_shutdown', async () => {
+1029:     if (!armed) return;
+1030:     // R1 order: disposeLocal() (timers and watchers only) -> the `stoppedAt` record -> `disposed`.
+1031:     // Panes are never closed and records are never deleted here (§7.1 item 4: pane close 0).
+1032:     disposeLocal();
+1033:     try { await reconciler?.markStopped(); }
+1034:     catch (error) {
+1035:       // outcome: without a `stoppedAt` marker the next pass recovers through ESRCH, which is the
+1036:       // documented M4 boundary; the failure is kept in state().
+1037:       record(error, 'shutdown');
+1038:     }
+1039:     // #7: a projection write scheduled just before shutdown must not outlive the process (or the
+1040:     // test teardown that removes the state directory).
+1041:     await drain();
+1042:     if (entry) entry.disposed = true;
+1043:     disposed = true;
+1044:     // outcome: a second `session_shutdown` (or a later `dispose()`) finds `armed === false` and
+1045:     // stops at the guard line; the marker is written once with the first stamp.
+1046:   });
+1047: 
+1048:   pi?.on?.('turn_end', async (_event, ctx) => {
+1049:     if (!armed) return;

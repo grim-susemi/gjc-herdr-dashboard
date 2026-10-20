@@ -1,0 +1,5 @@
+✖ failing tests:
+
+test at test\unit\band-pass.test.mjs:425:1
+✖ AC2.7: a throwing bus handler becomes the workers sourceError and never escapes into the host (344.2113ms)
+  [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\USER\AppData\Local\Temp\gjc-band-inst-osjtqO\slots\daafd5742ba68c2b3c8f0ba6\lock'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\Users\\USER\\Ap

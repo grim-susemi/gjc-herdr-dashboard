@@ -1,0 +1,13 @@
+Send key presses to a pane
+
+Usage: herdr pane send-keys <PANE_ID> <KEY>...
+
+Arguments:
+  <PANE_ID>
+          
+
+  <KEY>...
+          
+
+Use esc as the canonical Escape key name; escape is also accepted.
+

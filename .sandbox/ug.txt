@@ -1,0 +1,160 @@
+{
+  "exists": true,
+  "status": "active",
+  "paths": {
+    "dir": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.gjc\\_session-01a14748-39ea-77a3-8c51-52648589ff11\\ultragoal",
+    "briefPath": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.gjc\\_session-01a14748-39ea-77a3-8c51-52648589ff11\\ultragoal\\brief.md",
+    "goalsPath": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.gjc\\_session-01a14748-39ea-77a3-8c51-52648589ff11\\ultragoal\\goals.json",
+    "ledgerPath": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.gjc\\_session-01a14748-39ea-77a3-8c51-52648589ff11\\ultragoal\\ledger.jsonl"
+  },
+  "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+  "currentGoal": {
+    "id": "G004",
+    "title": "L4 Restart adopt, coexistence, retention and failures",
+    "objective": "Implement L4: adopt after GJC restart (`adopted`, paneId unchanged), slot corruption quarantine (T18), retention of old scopes only (AC4.6), foreign-pane coexistence with omo-like labels (fixture pane labels `DAG · x`, `OmO DAG`, `OmO Todo · x`; LV-9), lock exercises LV-10, `/reload` behaviour per G12. Exit: AC4.1-AC4.7, architect checkpoint review on L4, suite green, live evidence saved.",
+    "status": "active",
+    "createdAt": "2026-10-17T00:36:20.530Z",
+    "updatedAt": "2026-10-17T16:25:56.505Z",
+    "startedAt": "2026-10-17T16:25:56.505Z"
+  },
+  "counts": {
+    "pending": 2,
+    "active": 1,
+    "complete": 3,
+    "failed": 0,
+    "blocked": 0,
+    "review_blocked": 0,
+    "superseded": 0
+  },
+  "goals": [
+    {
+      "id": "G001",
+      "title": "L0 Bootstrap proof and host probes",
+      "objective": "Execute plan L0.0 and L0 in the sibling repo. L0.0: confirm this session's repositoryBinding worktreeRoot is `C:/Users/USER/orca/projects/gjc-herdr-dashboard` (G0 no-op proof, receipt saved); stop and report if not. Add repo scaffolding (package.json, README stub, `scripts/test.mjs` with env isolation, `.sandbox/`/`.evidence/` usage). L0: B1/B2 baseline of the omo archive at pinned SHA (record total/pass/fail and the 12 pre-existing failures by name, `B1-isolated` if different), PROVENANCE skeleton, and every probe G1-G13, U7, U9-U12 from the plan's gate table with the table's expected values and failure paths, evidence under `.evidence/L0/` (types/keys only, no secrets). Static rules SR1-SR9 test file created. End with a written L0 result summary and a Go/No-Go recommendation; do not proceed past a stop-condition gate (G0, G1 load, G2, G3, G6 split/run, G7, G8, U11+U12).",
+      "status": "complete",
+      "createdAt": "2026-10-17T00:36:20.530Z",
+      "updatedAt": "2026-10-17T02:34:11.108Z",
+      "startedAt": "2026-10-17T00:36:31.430Z",
+      "completedAt": "2026-10-17T02:34:11.108Z",
+      "evidence": "L0 complete at 3a86fce: gates measured or honestly recorded (G9/G12 partial, G13 FAIL corrected, accepted by owner Go 2026-10-17 10:35 KST); critic OKAY, architect APPROVE; node scripts/test.mjs 21/21.",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "c86123af-095f-4943-9742-e783b8537ebe",
+        "verifiedAt": "2026-10-17T02:34:11.108Z",
+        "goalId": "G001",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "6dc13b3111637229093d9ffdda405124f3ae2d75cc5b026512dc5fa4ddf55c28",
+        "planGeneration": "831321c1545729b552ece47238818a6d38f7c8bb799cd5a88b49d2a0c476749d",
+        "basis": {
+          "planHashBeforeCheckpoint": "89b268e364449c8fa63acbaace0e7fd54db925d0a047a337fdbd5ccbd4d39fd4",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "a34668ad-e513-47d5-8a09-4ce9634e8b41",
+          "goalUpdatedAtBeforeCheckpoint": "2026-10-17T02:34:11.108Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G001"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "127088a3c2db1f7ac515fe5f657f86a1f968e4400522aa75237926530511c93f"
+        },
+        "checkpointLedgerEventId": "c7079a3b-65b6-442e-ab11-45a9bd0c4eb8"
+      }
+    },
+    {
+      "id": "G002",
+      "title": "L1 Todo pane, instance lifecycle and lock",
+      "objective": "Implement plan L1 per base plan section 7 with amendment R1 (generation `wx` lock, no heartbeat takeover, manual-recovery boundary M1-M5 in README), R2 table incl. the A-29 delta (automatic T20 = zero action; closed written only by T3, explicit T20 O+, explicit T20 not-O+), R3 (viewer ready delay failpoint, SR9), R4 (ROOT_URL asset layout, G8 two trees, mirror detect), R6 (arming entry points). Copy+adapt the Todo viewer/render/input/i18n from omo with PROVENANCE mapping; keep every maintained-feature test adapted and passing. Deliver unit tests LT-1..LT-8 (incl. LT-7 a-h, LT-2 r1-r7 and S1-S6 with the A-30/A-31/A-32 obligations from the final plan section 4) and live scripts LV-1,2,3,4,6,10,11,13 in the owned fixture. Exit: AC-G1..G6, AC-F1..F4, AC1.1-AC1.13, `node scripts/test.mjs` 100% pass, architect checkpoint review on L1 (LT-6, LT-7, LT-8).",
+      "status": "complete",
+      "createdAt": "2026-10-17T00:36:20.530Z",
+      "updatedAt": "2026-10-17T13:23:33.923Z",
+      "startedAt": "2026-10-17T02:34:11.156Z",
+      "completedAt": "2026-10-17T13:23:33.923Z",
+      "evidence": "L1 complete at 8c8d454: 357/357 unit tests; five live scripts PASS in harness-owned Herdr sessions (LV-2/3/10/13/6/11, AC1.2 215/515 ms, AC1.7 external close, AC1.9 exit 0.9 s / kill 6.5 s); AC-G1 protected omo files identical; architect 18-L1ReReview APPROVE; critic 21-FinalCriticL1C OKAY",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "77698733-c1ea-41e3-a08c-b260f7310154",
+        "verifiedAt": "2026-10-17T13:23:33.923Z",
+        "goalId": "G002",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "571d935146841b23178fc9f1841f967f4b5520d20ee5fe622a35b40e529fe1b0",
+        "planGeneration": "6a152c9be7ec1838db9e3c79ffb86661619ae9f411773a04768fdcf70852ab03",
+        "basis": {
+          "planHashBeforeCheckpoint": "8db08d6faf0bc19fbab370c0aca3b770d90240a4a21cf9e808e1dbb1780a1860",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "8277165b-4b87-4e55-9690-8d34499ca144",
+          "goalUpdatedAtBeforeCheckpoint": "2026-10-17T13:23:33.923Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G002"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "7b2d00b39898e0eb2688be43ca02336ca5fe13af4869c0048ba4bfdc91378593"
+        },
+        "checkpointLedgerEventId": "afe3718a-a30b-42f9-b3da-70ef52f298f2"
+      }
+    },
+    {
+      "id": "G003",
+      "title": "L2-L3 Workers pane, band layout, pointer and follow",
+      "objective": "Implement L2 (native subagent telemetry workers pane under Todo with band placement, fold/select/peek keys, failed vs aborted, background jobs, cost per K1 rule, assignment sentinel never persisted, error surfacing AC2.7, foreign-sibling handling AC2.8) and L3 (mouse click/drag/wheel per viewer role, blur auto-follow via socket events.subscribe or DEC1004 fallback, subscription-failure footer). Unit plus live LV-7 and LV-8 (12 cases for two roles). Exit: AC2.1-AC2.8, AC3.1-AC3.3, AC-F1..F4 for both roles, full test suite green.",
+      "status": "complete",
+      "createdAt": "2026-10-17T00:36:20.530Z",
+      "updatedAt": "2026-10-17T16:25:56.443Z",
+      "startedAt": "2026-10-17T13:23:33.969Z",
+      "completedAt": "2026-10-17T16:25:56.443Z",
+      "evidence": "L2 Workers pane + band and L3 pointer/focus done: 530/530 unit; live l2-workers (LV-7), l2-width (AC-F4), l3-pointer (LV-8, 19 obs), L1 live scripts PASS; AC-G1 identical; critic 31 OKAY at de070af",
+      "completionVerification": {
+        "schemaVersion": 1,
+        "receiptId": "3332040a-11e1-46fc-825b-4a332215da30",
+        "verifiedAt": "2026-10-17T16:25:56.443Z",
+        "goalId": "G003",
+        "receiptKind": "per-goal",
+        "goalStatusBeforeCheckpoint": "active",
+        "gjcGoalMode": "aggregate",
+        "gjcObjective": "Complete the durable ultragoal plan in .gjc/ultragoal/goals.json, including later accepted/appended stories, under the original brief constraints; use .gjc/ultragoal/ledger.jsonl as the audit trail.",
+        "qualityGateHash": "7b425d4fa54edddeb4512643dd8dd66b8a7e2569ad89153ca3edb7164df5ca62",
+        "planGeneration": "42a05a12218a9be6f22880402848dab18f6391354a63ca60e9ffbfe87a0419a5",
+        "basis": {
+          "planHashBeforeCheckpoint": "a8c283d55bfabbbd719d839c5f0092c82bd7c92d2ac90c65775687fe4b94ad6e",
+          "latestRelevantLedgerEventIdBeforeCheckpoint": "963bb492-801b-434d-8f99-ca26c82a15e7",
+          "goalUpdatedAtBeforeCheckpoint": "2026-10-17T16:25:56.443Z",
+          "relevantGoalIdsBeforeCheckpoint": [
+            "G003"
+          ],
+          "requiredGoalSetHashBeforeCheckpoint": "8a1796892b070ae0080a57ad4e26ad4c8bf29cf1df67d2b61bb7af1d534078c7"
+        },
+        "checkpointLedgerEventId": "c5945403-de22-490d-815b-fbdaa44541b2"
+      }
+    },
+    {
+      "id": "G004",
+      "title": "L4 Restart adopt, coexistence, retention and failures",
+      "objective": "Implement L4: adopt after GJC restart (`adopted`, paneId unchanged), slot corruption quarantine (T18), retention of old scopes only (AC4.6), foreign-pane coexistence with omo-like labels (fixture pane labels `DAG · x`, `OmO DAG`, `OmO Todo · x`; LV-9), lock exercises LV-10, `/reload` behaviour per G12. Exit: AC4.1-AC4.7, architect checkpoint review on L4, suite green, live evidence saved.",
+      "status": "active",
+      "createdAt": "2026-10-17T00:36:20.530Z",
+      "updatedAt": "2026-10-17T16:25:56.505Z",
+      "startedAt": "2026-10-17T16:25:56.505Z"
+    },
+    {
+      "id": "G005",
+      "title": "L5 Progress pane decision (F1) and goal header",
+      "objective": "Run gate F1 on the real 0.18.11 host to see whether a verified native Progress snapshot exists. If pass: implement P1 (3-role band, snapshot fields only, title without \"DAG\") and re-apply AC3.x/AC-F1..F4 (AC-F5, 18 LV-8 cases). If fail (expected): omit, keep 2-role band, document rationale in README, implement L5b one-line goal header from `getGoalState`/`goal_updated` shown only when a goal exists. Exit: AC5.1-AC5.3, SR4/SR8 pass.",
+      "status": "pending",
+      "createdAt": "2026-10-17T00:36:20.530Z",
+      "updatedAt": "2026-10-17T00:36:20.530Z"
+    },
+    {
+      "id": "G006",
+      "title": "L6 Generation install, rollback drills, sandbox verification",
+      "objective": "Implement installer/generation packaging (`scripts/build.mjs`, `install.mjs`, `verify-package.mjs`, `dev-shim.mjs`), absolute file URL shim, `--doctor`, `--select`, `--remove`, `--lang`, foreign-shim refusal, dry-run. Run drills D1-D4 (amended: ext gen vs viewer gen, safe owned-viewer restart in sandbox, generation-specific frame, same-schema data/prefs reuse) in the sandbox agent-dir only. AC6.1 and AC6.4. Do NOT install into the user's real `~/.gjc` — final user-scope install (AC6.2/AC6.3) is a separate owner-approved step; prepare the command and report. Finish with VERIFICATION.md linking all evidence, README (limitations: duplicate Todo widget, depth-1 workers, manual lock recovery), and a final summary of what was and was not verified.",
+      "status": "pending",
+      "createdAt": "2026-10-17T00:36:20.530Z",
+      "updatedAt": "2026-10-17T00:36:20.530Z"
+    }
+  ],
+  "nudgeBudget": 10,
+  "nudgeCount": 0,
+  "nudgeRemaining": 10,
+  "nudgeGoalId": "G004",
+  "nudgeTargetKind": "story"
+}

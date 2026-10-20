@@ -1,0 +1,29 @@
+{
+ "gate": "L5-module-eval",
+ "pid": 97632,
+ "t": 1792305746955
+}
+---
+{
+ "gate": "L5-factory",
+ "pid": 97632,
+ "t": 1792305747052,
+ "hasEvents": "function",
+ "hasRegister": "function"
+}
+---
+{
+ "gate": "L5-session_start",
+ "pid": 97632,
+ "t": 1792305747476,
+ "hasGetGoalState": "function",
+ "goalType": "undefined",
+ "goalKeys": "undefined",
+ "goalStateKeys": "undefined",
+ "goalObjKeys": "undefined",
+ "objectiveType": "undefined",
+ "tokens": "undefined",
+ "timeUsedSeconds": "undefined",
+ "idType": "undefined",
+ "sessionGoalGetter": "undefined"
+}

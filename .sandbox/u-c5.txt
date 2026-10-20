@@ -1,0 +1,68 @@
+✔ LT-4 session-kind: a sub session is reported ineligible once, not silently ignored (9.2327ms)
+✔ LT-4 no-ui: a host without a UI is reported ineligible once (1.4038ms)
+✔ LT-4 tty: a non-TTY stdout is reported ineligible once (1.1954ms)
+✔ LT-4 outside-herdr: a session outside Herdr is reported ineligible once (1.3587ms)
+✔ LT-4 disabled: the opt-out setting is reported ineligible once (1.322ms)
+✔ LT-4 nested: another recorded GJC in this pane is reported ineligible once (1.2526ms)
+✔ LT-4 mirrored-install: a tree without the shipped assets is reported ineligible once (1.9584ms)
+✔ LT-4 state-dir: a tree that derives no state directory is reported ineligible once (2.9624ms)
+✔ LT-4 busy: a live lock holder yields one busy notify with its holder snapshot (17.1687ms)
+✖ LT-4 busy:other-owner: a live foreign owner yields exactly one busy notify (22.5797ms)
+✔ LT-4 herdr missing: an unresolvable Herdr vector fails once and creates no pane (17.4729ms)
+✔ LT-4 node missing: an unusable Node runtime fails once with zero panes (15.3042ms)
+✔ LT-4 list failure: a failing pane list is reported once as a coded failure (236.1263ms)
+✔ LT-4 partial:size: a parent too small for the role column reports partial once (13.704ms)
+✔ LT-4 partial:timeout: a split that never answers reports partial once (134.9292ms)
+✔ LT-4 normal: one opened notify, one pane, and the single notify carries the gen token (234.9232ms)
+✔ LT-4 duplicate: a second install delegates and appends its warning to the single result line (671.7569ms)
+✔ LT-6 c3: a main that fails eligibility at session_start arms on the next eligible /dashboard (230.8018ms)
+✔ R3: the 5 s heartbeat tick runs an automatic pass while the todo record is pending, and not otherwise (610.0202ms)
+✔ G9: an exception from the retained ctx disables the poll for good (event-only) (363.0811ms)
+✔ LT-6: a sub session shares the main registry, stays inert, and leaves main armed (195.0107ms)
+✔ LT-6: main shutdown closes zero panes, deletes no record and stamps stoppedAt (234.905ms)
+✔ LT-6: reload (same session + module) replaces the entry and retires the old instance (417.0155ms)
+✔ LT-6: a different module URL in the same pane delegates and warns once, silently on start (233.5891ms)
+✔ AC1.4: three /dashboard calls leave exactly one GJC Todo pane (658.9578ms)
+✔ AC1.5: an outside-Herdr live call reports the exact ineligible reason token (1.0575ms)
+✔ AC1.10: no trigger ever sends prompt text, keys or a reporter command to a pane (788.9795ms)
+✔ AC1.11: a session-id change keeps the pane and moves the projection to the new scope (440.1719ms)
+✔ AC1.2: todo_write publishes a Todo projection in one call; a non-todo tool publishes none (24.303ms)
+✔ §7.1 item 5: no projection is published while the slot carries no live todo record (17.0731ms)
+✔ a degraded /dashboard call is answered and never throws: no host UI means no toast (1.0155ms)
+✔ an automatic trigger before arming is silent: no notify, no Herdr call, no file (183.4156ms)
+✔ one /dashboard call runs one explicit pass and no automatic pass for the same call (236.3322ms)
+✔ triggers: turn_end, agent_end, goal_updated, todo_write and each bus channel run one pass (201.0508ms)
+✔ auto-pass coalescing: a bus burst is folded and the session change after it still rebinds (361.1577ms)
+✔ binding-seam-fault: a throwing binding seam still owes one notify (2.5806ms)
+✔ G12: session_switch rebinds the scope at once, without waiting for another event (238.6317ms)
+✔ a session switch with no event after it is still picked up by the 1 s poll (372.0646ms)
+✔ L4: before /dashboard adopts a stopped previous owner, no automatic trigger writes a slot or data file (464.2329ms)
+✔ L4: markStopped never stamps a release on a record another instance owns (20.6629ms)
+✔ L4: a rebind that did not happen is retried by the next trigger (751.8542ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 40
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8489.4259
+
+✖ failing tests:
+
+test at test\unit\instance.test.mjs:315:1
+✖ LT-4 busy:other-owner: a live foreign owner yields exactly one busy notify (22.5797ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /pid unknown · g000000000002 · /. Input:
+  
+  'ext dev · Todo busy (other owner) · Workers busy (other owner) · pid unknown · g000000000003 · C:\\Users\\USER\\AppData\\Local\\Temp\\gjc-instance-d4ZDNb\\slots\\c871c365cecc379c72ad3caf\\lock'
+  
+      at TestContext.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/test/unit/instance.test.mjs:332:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'ext dev · Todo busy (other owner) · Workers busy (other owner) · pid unknown · g000000000003 · C:\\Users\\USER\\AppData\\Local\\Temp\\gjc-instance-d4ZDNb\\slots\\c871c365cecc379c72ad3caf\\lock',
+    expected: /pid unknown · g000000000002 · /,
+    operator: 'match',
+    diff: 'simple'
+  }

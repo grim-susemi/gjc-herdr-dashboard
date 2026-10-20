@@ -1,0 +1,15 @@
+{
+  "live": "two `/dashboard` sends back to back in ONE parent gjc instance",
+  "observed": {
+    "viewerPanes": 1,
+    "splits": 2,
+    "notices": [
+      "ext dev · Todo 열림 · Workers 열림"
+    ]
+  },
+  "notCoveredLive": "cross-process lock contention (two gjc processes, two lock generations)",
+  "unitCoverage": [
+    "test/unit/reconciler.test.mjs LT-7a-d (acquireLock/releaseLock/generationIsCurrent)"
+  ],
+  "reason": "one parent instance serialises its own explicit passes, so a second PROCESS cannot be produced without a second gjc session; the plan keeps that case in unit tests"
+}

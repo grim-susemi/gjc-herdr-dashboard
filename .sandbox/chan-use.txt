@@ -1,0 +1,11 @@
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/executor.ts:92:	TASK_SUBAGENT_LIFECYCLE_CHANNEL,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/executor.ts:93:	TASK_SUBAGENT_PROGRESS_CHANNEL,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/executor.ts:1238:			options.eventBus.emit(TASK_SUBAGENT_PROGRESS_CHANNEL, {
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/executor.ts:2068:				options.eventBus.emit(TASK_SUBAGENT_LIFECYCLE_CHANNEL, {
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/executor.ts:2668:		options.eventBus.emit(TASK_SUBAGENT_LIFECYCLE_CHANNEL, {
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/index.ts:315:	TASK_SUBAGENT_LIFECYCLE_CHANNEL,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/index.ts:316:	TASK_SUBAGENT_PROGRESS_CHANNEL,
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:46:export const TASK_SUBAGENT_PROGRESS_CHANNEL = "task:subagent:progress";
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:49:export const TASK_SUBAGENT_LIFECYCLE_CHANNEL = "task:subagent:lifecycle";
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:51:/** Payload emitted on TASK_SUBAGENT_PROGRESS_CHANNEL */
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:62:/** Payload emitted on TASK_SUBAGENT_LIFECYCLE_CHANNEL */

@@ -1,0 +1,55 @@
+{
+  "idleBefore": "idle",
+  "samples": [
+    {
+      "ms": 0,
+      "status": "idle",
+      "panes": 1
+    },
+    {
+      "ms": 2295,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 4471,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 6612,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 8667,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 10733,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 12798,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 14846,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 16900,
+      "status": "working",
+      "panes": 1
+    },
+    {
+      "ms": 18971,
+      "status": "idle",
+      "panes": 1
+    }
+  ]
+}

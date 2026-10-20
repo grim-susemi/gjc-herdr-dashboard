@@ -1,0 +1,15 @@
+{
+  "schema": "gjc-herdr-dashboard/l5-goal-live/1",
+  "case": "l5goal",
+  "session": "gjcdash-l5goal",
+  "goalPrompt": "reply with the single word ok and stop",
+  "todoPaneId": "w1:p2",
+  "parentPaneId": "w1:p1",
+  "beforeHadGoalLine": false,
+  "afterHadGoalLine": true,
+  "statusAt": 1792434674670,
+  "lineAt": 1792434675110,
+  "latencyMs": 440,
+  "goalLine": "◎ reply with the single word ok and stop · 진행 · 0 토큰 · 0초",
+  "measuredAt": "2026-10-19T18:31:15.162Z"
+}

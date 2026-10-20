@@ -1,0 +1,36 @@
+60: 
+61:     const opened = await sendSlash(fixture, parent, 'dashboard', /열림|opened/, { label: 'open' });
+62:     writeEvidence(evidence, 'notify-open.txt', opened.line);
+63:     await sleep(8_000);
+64:     const todo = viewerPanes(fixture, 'todo')[0];
+65:     const workers = viewerPanes(fixture, 'workers')[0];
+66:     assert(Boolean(todo && workers), 'both role panes exist', { todo, workers });
+67:     fixture.adoptPane(todo.pane_id, { role: 'viewer', label: todo.label });
+68:     fixture.adoptPane(workers.pane_id, { role: 'viewer', label: workers.label });
+69: 
+70:     // Enough Todo rows and Workers cards that both bodies are taller than their panes.
+71:     const rows = Array.from({ length: 60 }, (_, i) => `lvp-row-${String(i + 1).padStart(2, '0')}`);
+72:     await sendPrompt(fixture, parent,
+73:       `Call todo_write once: phase LVP with these pending tasks, one each: ${rows.join(', ')}. Then reply done.`);
+74:     const todoHas = (needle) => {
+75:       try {
+76:         const dataDir = join(paths.stateDir, 'data');
+77:         return readdirSync(dataDir).some((scope) => {
+78:           try { return readFileSync(join(dataDir, scope, 'todo.json'), 'utf8').includes(needle); }
+79:           catch { return false; } // outcome: not written yet
+80:         });
+81:       } catch { return false; } // outcome: the data dir appears with the first pass
+82:     };
+83:     const deadline = Date.now() + 240_000;
+84:     while (Date.now() < deadline && !todoHas('lvp-row-60')) await sleep(2_000);
+85:     assert(todoHas('lvp-row-60') === true, 'the todo_write reached the Todo projection', {});
+86:     await idle('after todo_write');
+87: 
+88:     // Record the PTY-vs-pane-rect finding for the evidence folder.
+89:     {
+90:       const g = fixture.herdr(['pane', 'get', todo.pane_id]);
+91:       const body = g?.pane ?? g;
+92:       writeEvidence(evidence, 'pty-size.txt', `pane rect (layout): ${JSON.stringify(fixture.layout(parent).panes.find((q) => q.pane_id === todo.pane_id)?.rect)}\npane get viewport_rows: ${body?.scroll?.viewport_rows}\n`);
+93:     }
+94: 
+95:     // Workers cards: 8 background-less parallel tasks would be slow; instead drive 3 quick tasks

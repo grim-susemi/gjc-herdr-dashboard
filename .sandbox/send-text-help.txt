@@ -1,0 +1,13 @@
+Send literal text to a pane
+
+Usage: herdr pane send-text <PANE_ID> <TEXT>
+
+Arguments:
+  <PANE_ID>
+          
+
+  <TEXT>
+          
+
+next: herdr pane run <PANE_ID> <COMMAND> sends text and Enter in one call
+

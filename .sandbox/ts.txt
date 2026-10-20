@@ -1,0 +1,20 @@
+✔ the projection carries the contract schema and status vocabulary (1.1157ms)
+✔ getTodoState is the primary source and its shape is converted verbatim (0.5978ms)
+✔ the projection never carries notes, ids, assignment text or transcript bodies (0.43ms)
+✔ an empty source is reported as empty, never as a missing source (0.2445ms)
+✔ a cancelled status renders as abandoned, matching the renderer's mark table (0.1489ms)
+✔ the branch replay takes the newest eligible payload, scanning backwards (0.2911ms)
+✔ the replay is the fallback when the host accessor is absent or throws (0.4995ms)
+✔ a malformed payload is reported and never throws (0.3704ms)
+✔ the legacy todos shape and a raw phases payload are both accepted (0.1506ms)
+✔ a payload that does not normalize is reported rather than silently skipped (0.1902ms)
+✔ an unreadable branch is a source error, but an absent branch is not (0.1044ms)
+✔ the projection is stamped from the injected clock and defaults to now (0.0891ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 56.532

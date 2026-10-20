@@ -1,0 +1,83 @@
+{
+  "schema": "gjc-herdr-dashboard/live-receipt/1",
+  "session": "gjcdash-l5goal",
+  "created": [
+    {
+      "kind": "session",
+      "id": "gjcdash-l5goal",
+      "createdAt": "2026-10-19T18:30:02.776Z",
+      "creator": "harness",
+      "pid": 57748,
+      "role": "herdr session (server)"
+    },
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "createdAt": "2026-10-19T18:30:03.371Z",
+      "creator": "harness",
+      "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l5-goal\\.sandbox\\case-l5goal",
+      "label": "l5goal",
+      "focus": "no-focus"
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "createdAt": "2026-10-19T18:30:03.372Z",
+      "creator": "harness",
+      "workspaceId": "w1"
+    },
+    {
+      "kind": "pane",
+      "id": "w1:p1",
+      "createdAt": "2026-10-19T18:30:03.372Z",
+      "creator": "harness",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "role": "parent",
+      "label": "l5goal"
+    },
+    {
+      "kind": "assertion",
+      "id": "l5-goal: {\"schema\":\"gjc-herdr-dashboard/l5-goal-live/1\",\"case\":\"l5goal\",\"session\":\"gjcdash-l5goal\",\"goalPrompt\":\"reply with the single word ok and stop\",\"todoPaneId\":\"w1:p2\",\"parentPaneId\":\"w1:p1\",\"beforeHadGoalLine\":false,\"afterHadGoalLine\":true,\"statusAt\":1792434674670,\"lineAt\":1792434675110,\"latencyMs\":440,\"goalLine\":\"◎ reply with the single word ok and stop · 진행 · 0 토큰 · 0초\",\"measuredAt\":\"2026-10-19T18:31:15.162Z\"}",
+      "createdAt": "2026-10-19T18:31:15.163Z",
+      "creator": "harness"
+    }
+  ],
+  "observed": [
+    {
+      "paneId": "w1:p2",
+      "workspaceId": "w1",
+      "tabId": "w1:t1",
+      "label": "GJC Todo · fe64725c"
+    }
+  ],
+  "closed": [
+    {
+      "kind": "workspace",
+      "id": "w1",
+      "at": "2026-10-19T18:31:20.420Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "label": "l5goal",
+        "cwd": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l5-goal\\.sandbox\\case-l5goal"
+      }
+    },
+    {
+      "kind": "tab",
+      "id": "w1:t1",
+      "at": "2026-10-19T18:31:20.441Z",
+      "verifiedAbsent": true,
+      "recheck": {
+        "workspaceId": "w1",
+        "label": null
+      }
+    },
+    {
+      "kind": "session",
+      "id": "gjcdash-l5goal",
+      "at": "2026-10-19T18:31:21.296Z",
+      "verifiedAbsent": true
+    }
+  ],
+  "verifiedAbsent": true
+}

@@ -1,0 +1,41 @@
+{"at":"2026-10-17T18:21:20.471Z","atMs":1792261280471,"argv":["pane","list"],"ok":true,"code":null,"ms":32,"ppid":83832}
+{"at":"2026-10-17T18:21:20.549Z","atMs":1792261280549,"argv":["pane","layout","--pane","w1:p1"],"ok":true,"code":null,"ms":28,"ppid":83832}
+{"at":"2026-10-17T18:21:20.663Z","atMs":1792261280663,"argv":["pane","list"],"ok":true,"code":null,"ms":28,"ppid":83832}
+{"at":"2026-10-17T18:21:20.751Z","atMs":1792261280751,"argv":["pane","split","w1:p1","--direction","right","--no-focus"],"ok":true,"code":null,"ms":42,"ppid":83832,"paneId":"w1:p2"}
+{"at":"2026-10-17T18:21:20.820Z","atMs":1792261280820,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":23,"ppid":83832}
+{"at":"2026-10-17T18:21:20.895Z","atMs":1792261280895,"argv":["pane","rename","w1:p2","GJC Todo · 252ca028"],"ok":true,"code":null,"ms":30,"ppid":83832}
+{"at":"2026-10-17T18:21:20.971Z","atMs":1792261280971,"argv":["pane","run","w1:p2","& 'C:\\Program Files\\nodejs\\node.exe' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\src\\viewers\\todo\\viewer.mjs' '--state' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lv3\\.gjc\\herdr-dashboard\\state' '--layout' '252ca0282bd5fbef3b1057e7' '--role' 'todo' '--token' '943946e9-f869-46b3-bfa2-78aade0ea64e' '--pane' 'w1:p2' '--lang' 'ko' '--failpoint' 'ready-delay-25s'; exit"],"ok":true,"code":null,"ms":30,"ppid":83832}
+{"at":"2026-10-17T18:21:21.146Z","atMs":1792261281146,"argv":["pane","list"],"ok":true,"code":null,"ms":24,"ppid":83832}
+{"at":"2026-10-17T18:21:21.232Z","atMs":1792261281232,"argv":["pane","layout","--pane","w1:p1"],"ok":true,"code":null,"ms":42,"ppid":83832}
+{"at":"2026-10-17T18:21:21.321Z","atMs":1792261281321,"argv":["pane","list"],"ok":true,"code":null,"ms":31,"ppid":83832}
+{"at":"2026-10-17T18:21:21.462Z","atMs":1792261281462,"argv":["pane","list"],"ok":true,"code":null,"ms":35,"ppid":83832}
+{"at":"2026-10-17T18:21:21.564Z","atMs":1792261281564,"argv":["pane","split","w1:p2","--direction","down","--ratio","0.35","--no-focus"],"ok":true,"code":null,"ms":47,"ppid":83832,"paneId":"w1:p3"}
+{"at":"2026-10-17T18:21:21.647Z","atMs":1792261281647,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":30,"ppid":83832}
+{"at":"2026-10-17T18:21:21.744Z","atMs":1792261281744,"argv":["pane","rename","w1:p3","GJC Workers · 252ca028"],"ok":true,"code":null,"ms":32,"ppid":83832}
+{"at":"2026-10-17T18:21:21.837Z","atMs":1792261281837,"argv":["pane","run","w1:p3","& 'C:\\Program Files\\nodejs\\node.exe' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\src\\viewers\\workers\\viewer.mjs' '--state' 'C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard\\.sandbox\\case-lv3\\.gjc\\herdr-dashboard\\state' '--layout' '252ca0282bd5fbef3b1057e7' '--role' 'workers' '--token' '2480cf5e-95c9-407f-9dae-fd49eadc6a96' '--pane' 'w1:p3' '--lang' 'ko' '--failpoint' 'ready-delay-25s'; exit"],"ok":true,"code":null,"ms":36,"ppid":83832}
+{"at":"2026-10-17T18:21:21.929Z","atMs":1792261281929,"argv":["pane","list"],"ok":true,"code":null,"ms":44,"ppid":83832}
+{"at":"2026-10-17T18:21:22.026Z","atMs":1792261282026,"argv":["pane","layout","--pane","w1:p1"],"ok":true,"code":null,"ms":43,"ppid":83832}
+{"at":"2026-10-17T18:21:22.759Z","atMs":1792261282759,"argv":["pane","list"],"ok":true,"code":null,"ms":32,"ppid":83832}
+{"at":"2026-10-17T18:21:22.838Z","atMs":1792261282838,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":32,"ppid":83832}
+{"at":"2026-10-17T18:21:22.915Z","atMs":1792261282915,"argv":["pane","list"],"ok":true,"code":null,"ms":29,"ppid":83832}
+{"at":"2026-10-17T18:21:23.008Z","atMs":1792261283008,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":45,"ppid":83832}
+{"at":"2026-10-17T18:21:27.843Z","atMs":1792261287843,"argv":["pane","list"],"ok":true,"code":null,"ms":102,"ppid":83832}
+{"at":"2026-10-17T18:21:27.917Z","atMs":1792261287917,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":28,"ppid":83832}
+{"at":"2026-10-17T18:21:27.987Z","atMs":1792261287987,"argv":["pane","list"],"ok":true,"code":null,"ms":28,"ppid":83832}
+{"at":"2026-10-17T18:21:28.057Z","atMs":1792261288057,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":27,"ppid":83832}
+{"at":"2026-10-17T18:21:32.759Z","atMs":1792261292759,"argv":["pane","list"],"ok":true,"code":null,"ms":30,"ppid":83832}
+{"at":"2026-10-17T18:21:32.865Z","atMs":1792261292865,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":33,"ppid":83832}
+{"at":"2026-10-17T18:21:32.937Z","atMs":1792261292937,"argv":["pane","list"],"ok":true,"code":null,"ms":25,"ppid":83832}
+{"at":"2026-10-17T18:21:33.022Z","atMs":1792261293022,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":42,"ppid":83832}
+{"at":"2026-10-17T18:21:37.763Z","atMs":1792261297763,"argv":["pane","list"],"ok":true,"code":null,"ms":29,"ppid":83832}
+{"at":"2026-10-17T18:21:37.851Z","atMs":1792261297851,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":43,"ppid":83832}
+{"at":"2026-10-17T18:21:37.927Z","atMs":1792261297927,"argv":["pane","list"],"ok":true,"code":null,"ms":33,"ppid":83832}
+{"at":"2026-10-17T18:21:38.126Z","atMs":1792261298126,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":145,"ppid":83832}
+{"at":"2026-10-17T18:21:42.858Z","atMs":1792261302858,"argv":["pane","list"],"ok":true,"code":null,"ms":27,"ppid":83832}
+{"at":"2026-10-17T18:21:42.938Z","atMs":1792261302938,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":38,"ppid":83832}
+{"at":"2026-10-17T18:21:43.005Z","atMs":1792261303005,"argv":["pane","list"],"ok":true,"code":null,"ms":25,"ppid":83832}
+{"at":"2026-10-17T18:21:43.072Z","atMs":1792261303072,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":27,"ppid":83832}
+{"at":"2026-10-17T18:21:47.754Z","atMs":1792261307754,"argv":["pane","list"],"ok":true,"code":null,"ms":26,"ppid":83832}
+{"at":"2026-10-17T18:21:47.834Z","atMs":1792261307834,"argv":["pane","process-info","--pane","w1:p2"],"ok":true,"code":null,"ms":37,"ppid":83832}
+{"at":"2026-10-17T18:21:47.908Z","atMs":1792261307908,"argv":["pane","list"],"ok":true,"code":null,"ms":29,"ppid":83832}
+{"at":"2026-10-17T18:21:47.989Z","atMs":1792261307989,"argv":["pane","process-info","--pane","w1:p3"],"ok":true,"code":null,"ms":33,"ppid":83832}

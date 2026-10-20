@@ -1,0 +1,18 @@
+22://   * the workers bus subscription (L2 §7.6): `createWorkersTracker` is built at ARM time, the three
+108:// The subagent telemetry channels G5 measured (`VERIFICATION.md`). Plan §7.4 lists "bus" as an
+109:// automatic-pass trigger: a bus event feeds the workers tracker AND re-runs the automatic pass
+209:  let busUnsubscribe = null;
+404:  // A scheduled workers publish: the bus handlers may only enqueue (AC2.7), so this is the one place
+411:        // outcome: a workers publish that could not run is kept in state(); the bus burst it came
+430:          workersTracker?.fail(error, 'bus');
+434:        runAutoPass(latestCtx, 'bus');
+443:    busUnsubscribe = offs;
+447:    for (const off of busUnsubscribe ?? []) {
+452:        record(error, 'bus-unsubscribe');
+455:    busUnsubscribe = null;
+681:  // tracker already holds the state the bus fed it, so this function only decides whether the slot
+771:    // job the bus can never see still appears (AC2.6).
+789:  // record cleanup/promotion. Triggered by bus events, so by default it must not throw; the poll
+824:  // §7.6: `ctx.getJobs()` is the background supplement to the bus. The host surface is optional
+916:    // A finished `task` job is exactly the background card the bus cannot see (§7.6), so the jobs
+932:  // The bus carries no ctx, so it drives the retained one (G9). One subscription per measured

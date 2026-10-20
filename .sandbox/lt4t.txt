@@ -1,0 +1,26 @@
+test('LT-4 busy:other-owner: a live foreign owner yields exactly one busy notify', async t => {
+  const world = await makeWorld(t);
+  const pi = piOf();
+  const handle = createInstance(pi, world.deps({ pidAlive: () => true }));
+  const { ctx } = world.ctx();
+  // Arming claims the owner record itself (§7.1 item 3), so a foreign live owner has to take the
+  // file over afterwards — which is exactly the cross-process case the row exists for.
+  await pi.handlers.get('session_start')({}, ctx);
+  assert.equal((await world.owner()).instanceId, handle.state().instanceId);
+  await writeJson(slotPaths(world.stateDir, world.layoutKey).owner,
+    { schema: 'gjc-herdr-dashboard/owner/1', pid: 7777, instanceId: 'other-instance',
+      sessionId: 's-other', heartbeatAt: START });
+  world.fake.calls.length = 0;
+  const result = await pi.commands.get('dashboard').handler({}, ctx);
+  const line = assertOneNotify(world, /busy \(other owner\)/);
+  // The holder snapshot is the pass's own lock view (generation + directory): the foreign pid is
+  // never guessed when the pass did not measure it. The generation is this pass's own, so it is
+  // asserted as a generation number with the right shape rather than a fixed value (the arming pass
+  // holds one generation of its own).
+  assert.match(line, /pid unknown · g\d{12} · /);
+  assert.ok(line.includes(join(world.stateDir, 'slots', world.layoutKey, 'lock')), line);
+  assert.equal(result.code, 'busy:other-owner');
+  assert.deepEqual(world.tracer.mutations(), [], 'a foreign owner means zero pane mutation');
+  assert.deepEqual(world.fake.calls.map(call => call.argv.slice(0, 2).join(' ')), [],
+    'a foreign owner is decided before the first Herdr call');
+  assert.equal(handle.state().counters.explicit, 1);

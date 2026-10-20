@@ -1,0 +1,14 @@
+// The viewer pane is the one the product labelled `GJC Todo · <key8>`; its frame is what the LV reads.
+async function waitForViewer(fixture, { timeoutMs = 45_000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pane = viewerPanes(fixture)
+      .find(entry => DATA_FRAME.test(stripAnsi(fixture.readPane(entry.pane_id))));
+    if (pane) return { ...pane, paneId: pane.pane_id };
+    await new Promise((done) => { setTimeout(done, 1_000); });
+  }
+  const panes = viewerPanes(fixture);
+  const frame = panes[0] ? stripAnsi(fixture.readPane(panes[0].pane_id)) : '(no viewer pane)';
+  throw Object.assign(new Error(`the viewer did not paint a data frame within ${timeoutMs} ms`),
+    { code: 'live-timeout', details: { frame } });
+}

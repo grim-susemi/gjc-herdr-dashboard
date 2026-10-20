@@ -1,0 +1,31 @@
+✔ the pointer modes bracket the frame and match the DECSET bytes omo used (0.6354ms)
+✔ pointer press, drag and wheel become reports and never keys (2.6708ms)
+✔ a fragmented report is buffered until its final M or m arrives (0.4128ms)
+✔ focus in/out reports drive blur and are not keys; ordinary keys still arrive (1.2566ms)
+✔ a bare escape prefix is held, and an arrow split across chunks still arrives (0.6972ms)
+✔ disposal detaches the listener so no later chunk reaches a handler (0.2644ms)
+✔ watchHerdrFocus refuses to subscribe without a matching Herdr pane (0.2826ms)
+✔ an unreachable Herdr socket reports the failure instead of hanging the viewer (1.2164ms)
+✔ a Herdr subscription that closes after it started reports one failure (105.8471ms)
+✖ an error followed by the socket close reports exactly one failure (1.6782ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 438.1398
+
+✖ failing tests:
+
+test at test\unit\terminal-input.test.mjs:140:1
+✖ an error followed by the socket close reports exactly one failure (1.6782ms)
+  SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+      at JSON.parse (<anonymous>)
+      at Socket.<anonymous> (file:///C:/Users/USER/orca/projects/gjc-herdr-dashboard/src/terminal-input.mjs:60:30)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:559:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:510:3)
+      at Readable.push (node:internal/streams/readable:390:5)
+      at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)

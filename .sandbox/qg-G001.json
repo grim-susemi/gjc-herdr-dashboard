@@ -1,0 +1,128 @@
+{
+  "architectReview": {
+    "architectureStatus": "CLEAR",
+    "productStatus": "CLEAR",
+    "codeStatus": "CLEAR",
+    "recommendation": "APPROVE",
+    "evidence": "architect reviewed architecture, product behavior, and code changes",
+    "commands": [
+      "architect-review"
+    ],
+    "blockers": []
+  },
+  "executorQa": {
+    "status": "passed",
+    "e2eStatus": "passed",
+    "redTeamStatus": "passed",
+    "evidence": "executor built and ran e2e plus red-team QA suite",
+    "e2eCommands": [
+      "bun test:e2e"
+    ],
+    "redTeamCommands": [
+      "bun test:red-team"
+    ],
+    "artifactRefs": [
+      {
+        "id": "adversarial-report",
+        "kind": "failure-mode-test",
+        "path": "artifacts/adversarial-report.txt",
+        "description": "Adversarial boundary and failure-mode test output",
+        "inlineEvidence": "Adversarial boundary cases exercised invalid input, missing state, and repeated submission without violating the contract."
+      },
+      {
+        "id": "browser-run-1",
+        "kind": "browser-automation",
+        "path": "artifacts/browser-run-1.json",
+        "description": "Browser automation transcript for the approved user-facing flow",
+        "inlineEvidence": "Browser automation executed the approved flow, asserted the expected visible result, and captured the final DOM state."
+      },
+      {
+        "id": "gui-screenshot-1",
+        "kind": "screenshot",
+        "path": "artifacts/gui-screenshot-1.png",
+        "description": "Screenshot evidence for the GUI/web surface verdict",
+        "inlineEvidence": "Screenshot review confirmed the approved screen state, including the success message and absence of regression indicators."
+      }
+    ],
+    "contractCoverage": [
+      {
+        "id": "contract-1",
+        "contractRef": "approved-plan:goal",
+        "obligation": "The completed story satisfies the approved contract on surface web",
+        "status": "covered",
+        "surfaceEvidenceRefs": [
+          "surface-1"
+        ],
+        "adversarialCaseRefs": [
+          "case-invalid-input"
+        ]
+      }
+    ],
+    "surfaceEvidence": [
+      {
+        "id": "surface-1",
+        "surface": "gui/web",
+        "contractRef": "approved-plan:goal",
+        "invocation": "Exercise surface web against the approved contract",
+        "verdict": "passed",
+        "artifactRefs": [
+          "browser-run-1",
+          "gui-screenshot-1"
+        ]
+      }
+    ],
+    "adversarialCases": [
+      {
+        "id": "case-invalid-input",
+        "contractRef": "approved-plan:goal",
+        "scenario": "Submit invalid or boundary input through the user-facing surface",
+        "expectedBehavior": "The implementation rejects or handles the case according to the approved contract",
+        "verdict": "passed",
+        "artifactRefs": [
+          "adversarial-report"
+        ]
+      }
+    ],
+    "blockers": []
+  },
+  "criticReview": {
+    "verdict": "OKAY",
+    "evidence": "critic approved final aggregate",
+    "blockers": []
+  },
+  "iteration": {
+    "status": "passed",
+    "evidence": "no verification findings remain after steering iterations",
+    "fullRerun": true,
+    "reviewCohort": {
+      "reviewGeneration": 1,
+      "sourceHash": "sha256:replace-with-frozen-source-hash",
+      "joined": true,
+      "lanes": {
+        "cleaner": {
+          "status": "passed",
+          "sourceHash": "sha256:replace-with-frozen-source-hash",
+          "evidence": "cleaner clean",
+          "blockers": []
+        },
+        "architect": {
+          "status": "CLEAR",
+          "sourceHash": "sha256:replace-with-frozen-source-hash",
+          "evidence": "architect clear",
+          "blockers": []
+        },
+        "qa": {
+          "status": "passed",
+          "sourceHash": "sha256:replace-with-frozen-source-hash",
+          "evidence": "qa passed",
+          "blockers": []
+        }
+      }
+    },
+    "rerunCommands": [
+      "bun test:e2e",
+      "bun test:red-team"
+    ],
+    "blockers": []
+  }
+}

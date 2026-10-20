@@ -1,0 +1,17 @@
+{
+  "removed": true,
+  "newNotifies": [],
+  "generationsKept": [
+    "generation-000001",
+    "generation-000002",
+    "generation-000003",
+    "generation-000004",
+    "generation-000005",
+    "generation-000006"
+  ],
+  "stateKept": [
+    "data",
+    "slots"
+  ],
+  "doctorOk": false
+}

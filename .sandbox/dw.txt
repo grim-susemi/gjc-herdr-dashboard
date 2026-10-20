@@ -1,0 +1,8 @@
+8: //   * `delayMs` (200 ms default) merges a burst of publishes for one target into a single write,
+17: // `now` is injected so tests can drive a fake clock; it is only used as the `generatedAt` stamp.
+21: //   createDataWriter({ stateDir, now, delayMs = 200, shouldWrite, io }) -> Writer
+34: export function createDataWriter({ stateDir, now = () => Date.now(), delayMs = 200,
+52:       entry.timer = setTimeout(() => {
+58:           ? { ...projection, generatedAt: now() } : projection;
+68:       }, delayMs);
+70:     scheduled.set(path, entry);

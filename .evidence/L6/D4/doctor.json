@@ -1,0 +1,118 @@
+{
+  "ok": false,
+  "agentDir": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc",
+  "shim": {
+    "path": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc\\extensions\\gjc-herdr-dashboard.js",
+    "exists": false,
+    "managed": false,
+    "target": null,
+    "targetPath": null,
+    "targetGeneration": null,
+    "targetUsable": false
+  },
+  "current": {
+    "path": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc\\herdr-dashboard\\current.json",
+    "exists": true,
+    "valid": true,
+    "generation": "generation-000001",
+    "token": "gen-000001",
+    "language": "ko",
+    "error": null
+  },
+  "generations": [
+    {
+      "name": "generation-000001",
+      "token": "gen-000001",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000001",
+        "lang": "ko"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": false
+    },
+    {
+      "name": "generation-000002",
+      "token": "gen-000002",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000002",
+        "lang": "en"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": false
+    },
+    {
+      "name": "generation-000003",
+      "token": "gen-000003",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000003",
+        "lang": "ko"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": false
+    },
+    {
+      "name": "generation-000004",
+      "token": "gen-000004",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000004",
+        "lang": "ko"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": false
+    },
+    {
+      "name": "generation-000005",
+      "token": "gen-000005",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000005",
+        "lang": "ko"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": false
+    },
+    {
+      "name": "generation-000006",
+      "token": "gen-000006",
+      "managed": true,
+      "extension": true,
+      "config": {
+        "schema": "gjc-herdr-dashboard/config/1",
+        "generation": "gen-000006",
+        "lang": "ko"
+      },
+      "configError": null,
+      "usable": true,
+      "selected": false
+    }
+  ],
+  "state": {
+    "path": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc\\herdr-dashboard\\state",
+    "exists": true
+  },
+  "mismatches": [
+    {
+      "code": "shim-missing",
+      "detail": "C:\\Users\\USER\\orca\\projects\\gjc-herdr-dashboard-wt\\l6-install\\.sandbox\\case-drill\\.gjc\\extensions\\gjc-herdr-dashboard.js"
+    }
+  ]
+}

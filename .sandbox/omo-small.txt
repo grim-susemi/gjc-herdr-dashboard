@@ -1,0 +1,221 @@
+=== dag/src/herdr.mjs
+import { execFile } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
+import { promisify } from 'node:util';
+
+const execute = promisify(execFile);
+export const quote = value => `'${String(value).replaceAll("'", "'\\''")}'`;
+
+export function shellCommand(args, platform = process.platform) {
+  // Windows Herdr panes run PowerShell, where quoted executables need &.
+  if (platform === 'win32') return `& ${args.map(value => `'${String(value).replaceAll("'", "''")}'`).join(' ')}`;
+  return args.map(quote).join(' ');
+}
+
+function executableFile(path) {
+  try { return statSync(path).isFile(); }
+  catch { return false; }
+}
+
+export function resolveHerdrBin(env = process.env, platform = process.platform) {
+  const explicit = env.HERDR_BIN_PATH?.trim();
+  if (explicit && executableFile(explicit)) return explicit;
+  const name = platform === 'win32' ? 'herdr.exe' : 'herdr';
+  for (const dir of (env.PATH ?? '').split(delimiter)) {
+    if (!dir) continue;
+    const candidate = join(dir, name);
+    if (executableFile(candidate)) return candidate;
+  }
+  return null;
+}
+
+export function herdrSession(env = process.env) {
+  if (env.HERDR_ENV !== '1' || !env.HERDR_PANE_ID || !env.HERDR_SOCKET_PATH) return false;
+  if (!existsSync(env.HERDR_SOCKET_PATH)) return false;
+  const explicit = env.HERDR_BIN_PATH?.trim();
+  // A leftover HERDR_BIN_PATH such as `/path/herdr (deleted)` is not a live pane.
+  if (explicit && !executableFile(explicit)) return false;
+  return Boolean(resolveHerdrBin(env));
+}
+
+export function createHerdr(env = process.env) {
+  return async (...args) => {
+    const bin = resolveHerdrBin(env);
+    if (!bin) throw new Error('Herdr is not available in this session');
+    let stdout;
+    try {
+      ({ stdout } = await execute(bin, ['pane', ...args], { env, timeout: 10000, maxBuffer: 2 * 1024 * 1024 }));
+    } catch (error) {
+      // Herdr exits non-zero with a structured error body; keep its code (e.g.
+      // pane_not_found) so absence is recognised, as the Todo wrapper does.
+      let reply;
+      try { reply = JSON.parse(error.stdout || error.stderr); } catch { throw error; }
+      if (!reply?.error) throw error;
+      throw Object.assign(new Error(reply.error.message ?? JSON.stringify(reply.error), { cause: error }), { code: reply.error.code });
+    }
+    // pane run acknowledges success with an empty body in Herdr protocol 20.
+    if (!stdout.trim()) return {};
+    const reply = JSON.parse(stdout);
+    if (reply.error) throw Object.assign(new Error(reply.error.message ?? JSON.stringify(reply.error)), { code: reply.error.code });
+    return reply.result;
+  };
+}
+=== dag/src/storage.mjs
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+
+export async function readJson(path) {
+  try { return JSON.parse(await readFile(path, 'utf8')); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+}
+
+export async function writeJson(path, value) {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, JSON.stringify(value), { mode: 0o600 });
+    for (let attempt = 0; ; attempt++) {
+      try { await rename(temporary, path); break; }
+      catch (error) {
+        // Windows can deny replacement while a watcher/reader holds the target.
+        // Keep the old snapshot intact and bound retries; permanent errors escape.
+        if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || attempt === 5) throw error;
+        await delay(10 * 2 ** attempt);
+      }
+    }
+  } catch (error) {
+    try { await rm(temporary, { force: true }); }
+    catch (cleanupError) { error.cause = cleanupError; }
+    throw error;
+  }
+}
+=== dag/src/runtime.mjs
+import { execFile } from 'node:child_process';
+import { basename, isAbsolute } from 'node:path';
+import { promisify } from 'node:util';
+import { t } from './i18n.mjs';
+
+const execute = promisify(execFile);
+const probe = 'JSON.stringify({runtime:"omo-herdr-dag-node",version:process.versions.node,bun:!!process.versions.bun,path:process.execPath})';
+
+export async function resolveViewerNode({ env = process.env, execPath = process.execPath, run = execute, language = 'en' } = {}) {
+  const override = env.OMO_HERDR_DAG_NODE?.trim();
+  // Compiled OmO/Bun executables cannot be used as general JavaScript interpreters.
+  const candidates = override ? [override] : [
+    ...(/^node(?:js)?(?:\.exe)?$/i.test(basename(execPath)) ? [execPath] : []),
+    'node',
+  ];
+  for (const candidate of new Set(candidates)) {
+    try {
+      const { stdout } = await run(candidate, ['--eval', `console.log(${probe})`], {
+        env, timeout: 5000, maxBuffer: 16384,
+      });
+      const result = JSON.parse(stdout.trim());
+      if (result.runtime === 'omo-herdr-dag-node' && !result.bun &&
+          /^\d+\.\d+\.\d+/.test(result.version) && Number(result.version.split('.')[0]) >= 24 &&
+          typeof result.path === 'string' && isAbsolute(result.path)) return result.path;
+    } catch { /* Try PATH when the host's Node is unavailable or unsupported. */ }
+  }
+  throw new Error(t(language, 'nodeUnavailable'));
+}
+=== dag/src/retention.mjs
+import { readdir, rm, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+
+// Session snapshots accumulate one file family per OmO session in the state
+// directory. Startup retention prunes entries whose last modification is older
+// than the configured number of days, always sparing the current session.
+export function retentionDaysFromEnv(env = process.env) {
+  const raw = env.OMO_HERDR_DAG_RETENTION_DAYS?.trim();
+  if (raw === undefined || raw === '') return 14;
+  const days = Number(raw);
+  // Zero or invalid values disable pruning instead of deleting everything.
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  return days;
+}
+
+export async function pruneExpiredSnapshots(directory, { keepFiles = [], now = Date.now(), days, notify = () => {} } = {}) {
+  if (!(days > 0)) return;
+  let files;
+  try { files = await readdir(directory); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; return; }
+  const deadline = now - days * 86400000;
+  for (const file of files) {
+    // Only managed snapshot families: state, pane records, view preferences, temp leftovers.
+    if (!file.endsWith('.json') && !file.endsWith('.tmp')) continue;
+    // A long-lived session's own pane record must survive pruning, or its pane
+    // would be torn down and reopened on the next background event.
+    if (keepFiles.includes(file)) continue;
+    const path = join(directory, file);
+    try {
+      const info = await stat(path);
+      if (info.mtimeMs > deadline) continue;
+      await rm(path, { force: true });
+    } catch (error) {
+      // Another session's startup may prune the same file first; that race is benign.
+      if (error.code !== 'ENOENT') notify(`${error.message}`);
+    }
+  }
+}
+=== todo/src/i18n.mjs
+export const messages = {
+  en: {
+    closedPhases: 'Closed phases ({count})', controlsNarrow: 'j/k a/z c q',
+    todo: 'Todo', current: 'LIVE', empty: 'EMPTY (native)', waiting: 'WAITING',
+    error: 'ERROR', 'last-known': 'CACHED NOT LIVE', disconnected: 'OFFLINE NOT LIVE',
+    closed: 'closed', completed: 'done', dropped: 'drop', ask: 'Ask', now: 'Now',
+    idle: 'No current target', noAsk: 'No captured ask', emptyPhase: '(empty phase)',
+    emptyBody: 'The native checklist is empty.', waitingBody: 'Waiting for native Todo.',
+    errorBody: 'Native Todo is unavailable.', readError: 'Read error: {error}',
+    controls: 'j/k work a/z ask c closed q exit', position: 'Work {start}-{end}/{total}',
+    followOn: 'Follow ON', followOff: 'Follow OFF',
+    followShortOn: 'Follow ON', followShortOff: 'Follow OFF',
+    invalidBinding: 'CLI and Todo role state do not match.',
+    cacheError: 'Invalid derived Todo cache.',
+    prefsError: 'View preferences: {error}', registrationError: 'Viewer ownership was not verified.',
+    stateMissing: 'Role state is missing.',
+  },
+  ko: {
+    closedPhases: '닫힌 단계 ({count})', controlsNarrow: 'j/k a/z c q',
+    todo: 'Todo', current: '연결됨', empty: '원본 비어 있음', waiting: '연결 대기',
+    error: '읽기 오류', 'last-known': '기록 / 오프라인', disconnected: '연결 종료 / 기록',
+    closed: '닫힘', completed: '완료', dropped: '제외', ask: '요청', now: '현재',
+    idle: '현재 대상 없음', noAsk: '저장된 요청 없음', emptyPhase: '(빈 단계)',
+    emptyBody: '원본 체크리스트가 비어 있습니다.', waitingBody: '원본 Todo 연결을 기다립니다.',
+    errorBody: '원본 Todo를 읽을 수 없습니다.', readError: '읽기 오류: {error}',
+    controls: 'j/k 작업 a/z 요청 c 닫힌단계 q닫기', position: '작업 {start}-{end}/{total}',
+    followOn: '자동 추적 ON', followOff: '자동 추적 OFF',
+    followShortOn: '추적 ON', followShortOff: '추적 OFF',
+    invalidBinding: 'CLI와 Todo 역할 정보가 다릅니다.',
+    cacheError: 'Todo 파생 캐시가 잘못되었습니다.',
+    prefsError: '화면 설정: {error}', registrationError: '뷰어 소유권을 확인하지 못했습니다.',
+    stateMissing: '역할 정보를 찾을 수 없습니다.',
+  },
+  'zh-cn': {
+    closedPhases: '已关闭阶段 ({count})', controlsNarrow: 'j/k a/z c q',
+    todo: 'Todo', current: '在线', empty: '原生列表为空', waiting: '等待连接',
+    error: '读取错误', 'last-known': '记录 / 离线', disconnected: '连接结束 / 记录',
+    closed: '关闭', completed: '完成', dropped: '移除', ask: '请求', now: '当前',
+    idle: '无当前目标', noAsk: '无已保存请求', emptyPhase: '(空阶段)',
+    emptyBody: '原生清单为空。', waitingBody: '等待原生 Todo 连接。',
+    errorBody: '无法读取原生 Todo。', readError: '读取错误: {error}',
+    controls: 'j/k 工作 a/z 请求 c 已关闭 q 关闭', position: '工作 {start}-{end}/{total}',
+    followOn: '自动跟随 ON', followOff: '自动跟随 OFF',
+    followShortOn: '跟随 ON', followShortOff: '跟随 OFF',
+    invalidBinding: 'CLI 与 Todo 角色信息不匹配。',
+    cacheError: 'Todo 派生缓存无效。',
+    prefsError: '视图设置: {error}', registrationError: '无法验证查看器所有权。',
+    stateMissing: '找不到角色状态。',
+  },
+};
+
+export const languageOf = value => ['en', 'ko', 'zh-cn'].includes(value) ? value : 'en';
+export function t(language, key, values = {}) {
+  const template = messages[languageOf(language)][key];
+  if (template === undefined) throw new Error(`Unknown translation key: ${key}`);
+  return template.replace(/\{(\w+)\}/g, (match, name) =>
+    Object.hasOwn(values, name) ? String(values[name]) : match);
+}

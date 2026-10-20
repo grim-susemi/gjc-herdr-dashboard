@@ -1,0 +1,6 @@
+## L4 (restart adopt, coexistence, retention, corruption, lock)
+
+Unit: `node scripts/test.mjs` 539 tests, 0 fail (report `.evidence/L4/test-report.txt`, SR1-SR9 pass). Live evidence of every script was re-written under `.evidence/L4/<LV>/` (`GJC_LIVE_EVIDENCE_LEVEL=L4`, see `test/live/case.mjs`), so an L4 re-run no longer overwrites the files the L1-L3 rows cite. Before that switch the first L4 re-run did overwrite `.evidence/L1/*` for the scripts it re-ran; the L1 rows above quote the numbers those files now hold and the earlier numbers where they differed.
+
+What changed in L4 (all with regression tests that fail on the previous source):
+1. `reconciler.writeOwner` and `markStopped` touch on

@@ -1,0 +1,46 @@
+{
+  "schema": "gjc-herdr-dashboard/workers/1",
+  "updatedAt": 1792337918596,
+  "empty": false,
+  "sourceError": null,
+  "cards": [
+    {
+      "id": "1-lvwb",
+      "agent": "executor",
+      "title": "lvwb",
+      "status": "completed",
+      "background": false,
+      "currentTool": null,
+      "lastIntent": null,
+      "lastOutput": null,
+      "toolCount": 2,
+      "tokens": 27540,
+      "contextPercent": 1.3184547424316406,
+      "cost": null,
+      "durationMs": 16321,
+      "retry": null,
+      "startedAt": 1792337898926,
+      "endedAt": 1792337915247
+    },
+    {
+      "id": "0-lvwa",
+      "agent": "executor",
+      "title": "lvwa",
+      "status": "completed",
+      "background": false,
+      "currentTool": null,
+      "lastIntent": null,
+      "lastOutput": null,
+      "toolCount": 2,
+      "tokens": 27422,
+      "contextPercent": 1.3127326965332031,
+      "cost": null,
+      "durationMs": 16269,
+      "retry": null,
+      "startedAt": 1792337898924,
+      "endedAt": 1792337915193
+    }
+  ],
+  "ignored": 0,
+  "generatedAt": 1792337918797
+}

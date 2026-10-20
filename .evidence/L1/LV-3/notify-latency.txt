@@ -1,0 +1,1 @@
+3531 ms from the accepted keystroke batch #2 (gate: 15 s; R3 text says pending, the first call answers opened (T1))

@@ -1,0 +1,4 @@
+13://   LAUNCH_CLEAR_ENV
+29:export const LAUNCH_CLEAR_ENV = ['GJC_HERDR_PANE_OWNER', 'GJC_SESSION_CWD', 'HERDR_CONFIG_PATH'];
+30:export const DEFAULT_ARGS = ['--no-session', '--no-title'];
+64:export function launchCommand({ dir, herdr, args = DEFAULT_ARGS, clearEnv = LAUNCH_CLEAR_ENV,

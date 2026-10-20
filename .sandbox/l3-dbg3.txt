@@ -1,0 +1,15 @@
+l3-pointer (LV-8): FAIL live-assertion: the parent returned to idle (after todo_write)
+--- last frame ---
+                                    
+   Todos                                                                                                                
+   └ I. LVP                                                                                                             
+   └ ☐ lvp-row-01                                                                                                       
+     ☐ lvp-row-02                                                                                                       
+     ☐ lvp-row-03                                                                                                       
+     ☐ lvp-row-04                                                                                                       
+     ☐ lvp-row-05                                                                                                       
+     └ +55 more                                                                                                         
+ ⬢ deepseek-v4.1-flash · ◕ high · 4.5% ▌ ⑂ main *1 ?1 ▌ 📁 …rdr-dashboard\.sandbox\case-lvp ────── ⤴ 277.8/s ▌ v0.18.11 
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ 
+│ > Type your message... Alt+Q: Queue (busy) · Shift+Tab: Thinking · Ctrl+L: Model · Ctrl+R: History · Alt+Enter/Ctr… │ 
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ 

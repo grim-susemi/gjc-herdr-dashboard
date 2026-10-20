@@ -1,0 +1,76 @@
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/internal-urls/docs-index.generated.ts:139:	"tools/task.md": "# task\n\n> Launch subagents for parallel, optionally isolated work.\n\n## Source\n
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:43:export const TASK_SUBAGENT_EVENT_CHANNEL = "task:subagent:event";
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:46:export const TASK_SUBAGENT_PROGRESS_CHANNEL = "task:subagent:progress";
+C:/Users/USER/.bun/install/global/node_modules/@gajae-code/coding-agent/src/task/types.ts:49:export const TASK_SUBAGENT_LIFECYCLE_CHANNEL = "task:subagent:lifecycle";
+----
+270:export interface AgentProgress {
+271-	index: number;
+272-	id: string;
+273-	agent: string;
+274-	agentSource: AgentSource;
+275-	status: "pending" | "running" | "completed" | "failed" | "aborted" | "paused";
+276-	task: string;
+277-	assignment?: string;
+278-	description?: string;
+279-	lastIntent?: string;
+280-	currentTool?: string;
+281-	currentToolArgs?: string;
+282-	currentToolStartMs?: number;
+283-	recentTools: Array<{ tool: string; args: string; endMs: number }>;
+284-	recentOutput: string[];
+285-	toolCount: number;
+286-	/** Cumulative input + output + cacheWrite tokens across all turns. Excludes cacheRead (re-reads cached context every turn, making cumulative sum misleading). */
+287-	tokens: number;
+288-	/**
+289-	 * Current per-turn context size: latest assistant message's `usage.totalTokens`.
+290-	 * This is the number to compare against `contextWindow` — what compaction
+291-	 * decides on, what the user typically reads as "how full is the context".
+292-	 * Distinct from `tokens`, which is a lifetime billing-volume counter.
+293-	 */
+294-	contextTokens?: number;
+295-	/** Model's context window in tokens, when known. Lets the UI render `<curr>/<window>` gauges. */
+296-	contextWindow?: number;
+297-	/** Cumulative billing cost in USD, accumulated incrementally from message_end events. */
+298-	cost: number;
+299-	durationMs: number;
+300-	modelOverride?: string | string[];
+301-	modelSubstitutionWarning?: ModelSubstitutionWarning;
+302-	/** Whether the resolved subagent model runs under the effective fast service tier. */
+303-	fastMode?: boolean;
+304-	/** Data extracted by registered subprocess tool handlers (keyed by tool name) */
+305-	extractedToolData?: Record<string, unknown[]>;
+306-	/**
+307-	 * Auto-retry state when the subagent is sleeping between provider retries
+308-	 * (e.g. 429 rate-limit with retry-after). Cleared when the retry resolves
+309-	 * or fails. Surfacing this to the parent prevents the task tool from
+310-	 * looking indefinitely "in progress" when a child is actually blocked on
+311-	 * provider quota.
+312-	 */
+313-	retryState?: {
+314-		attempt: number;
+315-		maxAttempts: number;
+316-		unbounded?: boolean;
+317-		kind: "first_event_timeout" | "idle_stream_stall" | "provider_error";
+318-		provider?: string;
+319-		lastProviderProgressAtMs?: number;
+320-		delayMs: number;
+321-		errorMessage: string;
+322-		startedAtMs: number;
+323-	};
+324-	/**
+325-	 * Terminal retry failure surfaced once the subagent gave up retrying
+326-	 * (e.g. retry-after exceeded the cap, or all attempts exhausted). Carries
+327-	 * the final error so the parent UI can render "blocked: rate-limited"
+328-	 * instead of waiting for a status that never arrives.
+329-	 */
+330-	retryFailure?: {
+331-		attempt: number;
+332-		errorMessage: string;
+333-	};
+334-	/** Safe diagnostic retained in terminal progress when setup fails before the first LLM request. */
+335-	setupFailure?: SetupFailureSummary;
+336-	/**
+337-	 * Snapshot of the most recent `task` tool call's in-flight `TaskToolDetails`,
+338-	 * captured from `tool_execution_update`. Lets the parent UI surface live
+339-	 * nested-subagent progress while this agent is still inside its own `task`
+340-	 * call. Cleared when the call ends — finalized data lives in
