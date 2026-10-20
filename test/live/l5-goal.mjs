@@ -140,8 +140,8 @@ await runScript("l5-goal (LV-goal / AC5.2)", async () => {
     assert(row.includes("◎"), "the captured frame carries the goal marker", { row });
     // The host in this environment has no model credentials, so the goal's token/time counters can
     // legitimately stay at 0; the format is the assertion, not a positive number.
-    assert(/·\s*\d+(?:\.\d+)?[KMB]?\s*토큰\s*·\s*\d+(?:시간|분|초)/.test(row),
-      "the captured row carries a compact token count and elapsed time", { row });
+    assert(/·\s*active\s*·\s*\d+(?:\.\d+)?[KMB]?\s*tok\s*·\s*⧖\s*\d+(?:h|m|s)/.test(row),
+      "the captured row carries the active status, a compact token count and elapsed time", { row });
 
     Object.assign(result, {
       todoPaneId: todo.pane_id,

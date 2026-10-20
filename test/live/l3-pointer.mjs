@@ -28,8 +28,8 @@ const WRAPPER = join(REPO, 'test', 'live', 'herdr-wrapper.mjs');
 const sleep = (ms) => new Promise((done) => { setTimeout(done, ms); });
 const ESC = String.fromCharCode(27);
 const sgr = (button, x, y, release = false) => `${ESC}[<${button};${x};${y}${release ? 'm' : 'M'}`;
-const FOLLOW_ON = /자동 추적 ON/;
-const FOLLOW_OFF = /자동 추적 OFF/;
+const FOLLOW_ON = /Follow ON/;
+const FOLLOW_OFF = /Follow OFF/;
 
 await runScript('l3-pointer (LV-8)', async () => {
   const evidence = evidenceDirFor('L3', LV);
@@ -108,7 +108,7 @@ await runScript('l3-pointer (LV-8)', async () => {
       await sleep(3_000);
       const frame = stripAnsi(fixture.readPane(workers.pane_id));
       cards = (frame.match(/lvp[a-f]/g) ?? []).length;
-      if (/완료 6|Workers \[6\]/.test(frame)) break;
+      if (/Workers \[6\/6\]/.test(frame)) break;
     }
     await idle('after subagents');
     writeEvidence(evidence, 'workers-frame-before.txt', stripAnsi(fixture.readPane(workers.pane_id)));

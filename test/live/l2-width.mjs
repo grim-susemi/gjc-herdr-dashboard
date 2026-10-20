@@ -61,11 +61,13 @@ await runScript('l2-width (AC-F4)', async () => {
       const frame = whole.slice(whole.lastIndexOf('Workers ['));
       writeEvidence(evidence, `workers-${width}col.txt`, frame);
       const lines = frame.split(/\r?\n/);
-      const cardLines = lines.filter((l) => /^[ >][◐✗⊘✓]/.test(l));
+      // Column 0 is the selection marker and column 1 the status bar; the glyph comes next.
+      const cardLines = lines.filter((l) => /^[ >][▌ ][⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏○✓×⊘Ⅱ?]/.test(l));
       assert(cardLines.length === 3, `${width} cols: three card title lines are drawn`, { frame });
       assert(cardLines.every((l, i) => l.includes(['Parse', 'Write', 'Check'][i].slice(0, width >= 40 ? 5 : 3))), `${width} cols: each card title is recognisable`, { cardLines });
-      assert(/running/i.test(frame) && /failed/i.test(frame) && /aborted/i.test(frame),
-        `${width} cols: every status word is visible`, { frame });
+      // Q3=A: a running card carries the spinner glyph, not a word; the header says `run 1`.
+      assert(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(frame) && /failed/.test(frame) && /aborted/.test(frame),
+        `${width} cols: every status indicator is visible`, { frame });
       const widest = Math.max(...lines.filter((l) => l.trim() !== '').map((l) => [...l].length));
       assert(widest <= width, `${width} cols: every drawn line fits the width (${widest})`, { frame });
       results[width] = { titleLines: cardLines.length, widest, cardLines };

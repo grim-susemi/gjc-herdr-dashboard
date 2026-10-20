@@ -5,7 +5,7 @@
 //      pane) - or T16 if the pane stayed (the sequence is recorded either way). Exactly one role pane
 //      afterwards.
 //   B. kill the harness gjc WITHOUT `/exit` (no `stoppedAt`): the viewer's default owner probe must see
-//      ESRCH and show `연결 끊김` within 20 s of the kill (a dead owner with a 10 s old heartbeat), and the viewer pane must stay.
+//      ESRCH and show `OFFLINE` within 20 s of the kill (a dead owner with a 10 s old heartbeat), and the viewer pane must stay.
 //
 // Run: node test/live/kill-recovery.mjs
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -105,20 +105,20 @@ await runScript('kill-recovery (AC1.7/AC1.9)', async () => {
       const pane = viewerPanes(fixture)[0];
       if (!pane) break;
       frame = stripAnsi(fixture.readPane(pane.pane_id));
-      if (/연결 끊김/.test(frame)) { label = Date.now() - killedAt; break; }
+      if (/OFFLINE/.test(frame)) { label = Date.now() - killedAt; break; }
     }
     writeEvidence(evidence, 'viewer-after-owner-kill.txt', frame);
     writeEvidenceJson(evidence, 'list-after-owner-kill.json', fixture.listPanes());
-    assert(label !== null, 'the viewer shows 연결 끊김 after the owner was killed', { frame });
+    assert(label !== null, 'the viewer shows OFFLINE after the owner was killed', { frame });
     // AC1.9: kill -> label within 20 s (plan gate, measured from the kill). The heartbeat-anchored span is
     // recorded as well; the viewer flips a dead owner once its heartbeat is 10 s old.
     const freshOwner = readJson(join(dir, 'owner.json'));
     writeEvidenceJson(evidence, 'ac1-9-timing.json', { killedAt, killToLabelMs: label, ownerHeartbeatAt: freshOwner.heartbeatAt, lastHeartbeatToLabelMs: killedAt + label - freshOwner.heartbeatAt });
-    assert(label <= 20_000, `AC1.9: 연결 끊김 within 20 s of the kill (took ${label} ms)`, { frame, freshOwner });
+    assert(label <= 20_000, `AC1.9: OFFLINE within 20 s of the kill (took ${label} ms)`, { frame, freshOwner });
     assert(viewerPanes(fixture).length === 1, 'the viewer pane stays after the owner dies');
     const afterOwner = readJson(join(dir, 'owner.json'));
     assert(!Number.isFinite(afterOwner.stoppedAt), 'no stoppedAt: this was a kill, not an exit');
-    fixture.record('assertion', `ac1.9 owner-kill: 연결 끊김 after ${label} ms, pane stayed`);
+    fixture.record('assertion', `ac1.9 owner-kill: OFFLINE after ${label} ms, pane stayed`);
     return { recovery, disconnectMs: label };
   } finally {
     const cleanup = await fixture.cleanup();

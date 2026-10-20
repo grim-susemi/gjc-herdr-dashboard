@@ -105,14 +105,18 @@ await runScript('l2-workers (LV-7)', async () => {
       `each assignment: "run the bash command sleep 12, then reply with the word pong. ${SENTINEL}". Then reply done.`);
     const frames = [];
     let sawRunning = false; let sawBothDone = false; let runningFrame = '';
+    // Q3=A: running cards carry the spinner glyph, not a word (the header says `run N`).
+    const SPINNER = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/;
+    const runningCard = (frame, id) => frame.split(/\r?\n/).some((line) =>
+      line.includes(id) && SPINNER.test(line));
     const begin = Date.now();
     while (Date.now() - begin < 240_000) {
       await sleep(500);
       const frame = readWorkers();
       frames.push({ ms: Date.now() - begin, frame });
-      if (/lvwa.*실행 중|lvwb.*실행 중|lvwa.*running|lvwb.*running/s.test(frame)) {
+      if (runningCard(frame, 'lvwa') || runningCard(frame, 'lvwb')) {
         sawRunning = true;
-        if (/lvwa[^\n]*(실행 중|running)/.test(frame) && /lvwb[^\n]*(실행 중|running)/.test(frame)) runningFrame = frame;
+        if (runningCard(frame, 'lvwa') && runningCard(frame, 'lvwb')) runningFrame = frame;
       }
       let data = null;
       try {
@@ -128,7 +132,7 @@ await runScript('l2-workers (LV-7)', async () => {
     writeEvidenceJson(evidence, 'workers-frames.json', frames.filter((f, i) => i % 6 === 0 || /lvw[ab]/.test(f.frame)).slice(0, 40));
     writeEvidence(evidence, 'workers-frame-running.txt', runningFrame);
     assert(runningFrame !== '', 'AC2.2: both parallel cards were shown running at the same time', {});
-    assert(!/백그라운드|background/.test(runningFrame), 'AC2.2: parallel cards fed by the bus are not marked background', { runningFrame });
+    assert(!/background/.test(runningFrame), 'AC2.2: parallel cards fed by the bus are not marked background', { runningFrame });
     assert(sawRunning === true, 'a subagent card appeared while the run was in flight', {});
     assert(sawBothDone, 'both subagents reached a terminal state in workers.json', {});
     await sleep(3_000);
@@ -147,17 +151,18 @@ await runScript('l2-workers (LV-7)', async () => {
       try { return readFileSync(f, 'utf8').includes(SENTINEL); } catch { return false; } // outcome: unreadable file cannot leak
     });
     assert(leaked.length === 0, 'AC2.5: the assignment sentinel is in no state file', { leaked });
-    // AC-F4: title + status visible at the real pane width.
-    const widest = frameDone.split(/\r?\n/).reduce((m, l) => Math.max(m, [...l].length), 0);
-    writeEvidenceJson(evidence, 'af4.json', { paneColumns: rw.width, widestLine: widest });
-    assert(/lvwa|lvwb|executor/.test(frameDone), 'AC-F4: a card title is visible at the real width',
-      { width: rw.width, frameDone });
+    // AC-F4: title + status visible at the real pane width. Completed cards are folded by
+    // default, so the `c` frame (done cards shown) is the one that carries the titles.
     // c shows the completed cards (auto-folded cards are one line; the toggle must change the frame).
     fixture.sendKeys(workersPane, 'c');
     await sleep(1_500);
     const frameC = readWorkers();
     writeEvidence(evidence, 'workers-frame-c.txt', frameC);
     assert(frameC !== frameDone, 'c changes the Workers frame', {});
+    const widest = frameC.split(/\r?\n/).reduce((m, l) => Math.max(m, [...l].length), 0);
+    writeEvidenceJson(evidence, 'af4.json', { paneColumns: rw.width, widestLine: widest });
+    assert(/lvwa|lvwb|executor/.test(frameC), 'AC-F4: a card title is visible at the real width',
+      { width: rw.width, frameC });
     fixture.sendKeys(workersPane, 'c');
     result.ac22 = { statuses };
 
