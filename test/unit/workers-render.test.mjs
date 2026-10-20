@@ -361,6 +361,45 @@ test("AC2.6: `background` rides on card row 2", () => {
   assert.equal(plainLine(bare.bodyLines[1]).slice(2), "background");
 });
 
+// Owner #259: an existing long role/agent identity continues on indented rows under
+// the badge instead of being ellipsis-cut. Only card.agent and background are used;
+// there is no model field in the workers projection.
+test("owner #259: a long agent identity continues under the badge and keeps TAIL", () => {
+  const agent = "architect-role-" + "long-role-name-".repeat(6) + "TAIL";
+  const long = card("c1", { title: "alpha", status: "running", agent, background: true,
+    tokens: 48000, toolCount: 12, contextPercent: 41, durationMs: 300000 });
+  for (const columns of [24, 34, 54]) {
+    const frame = frameOf([long], { columns, rows: 14 });
+    const lines = frame.bodyLines.map(plainLine);
+    // The unchanged rows: title/spinner first, metrics last.
+    assert.equal(lines[0], ">▌⠋ alpha · ⧖ 5m 0s", `${columns}: title row`);
+    assert.match(lines.at(-1), /48K tok · 12 tools/, `${columns}: metrics row`);
+    // The identity starts with the badge opener, continues with the same bar column
+    // and a two-cell indent, and closes with `]`; the background mark stays visible.
+    assert.match(lines[1], /^ ▌\[architect-role-/, `${columns}: badge opener`);
+    assert.ok(lines.slice(2, -1).some((line) => line.startsWith(" ▌  ")),
+      `${columns}: continuation rows`);
+    assert.ok(lines.some((line) => line.includes("TAIL]")), `${columns}: TAIL and closing bracket`);
+    assert.ok(lines.some((line) => line.includes("background")), `${columns}: background`);
+    for (const line of lines) assert.ok(width(line) <= columns - 1, `${columns}: ${JSON.stringify(line)}`);
+    assert.equal(frame.ranges.c1.start, 0);
+    assert.equal(frame.ranges.c1.end, frame.bodyLines.length, `${columns}: range covers every card row`);
+    assert.ok(frame.bodyLines.map(stripVTControlCharacters).join("\n").includes("TAIL"));
+  }
+  // A short-agent card keeps exactly its previous single `[agent] background` row.
+  const short = frameOf([card("c2", { title: "alpha", status: "running", agent: "worker",
+    background: true })], { columns: 24, rows: 14 });
+  assert.equal(plainLine(short.bodyLines[1]), " ▌[worker] background");
+  // Beyond the documented cap the last identity row ends `…]`; the card stays bounded
+  // and the title/metrics rows remain reachable.
+  const huge = frameOf([card("c3", { title: "alpha", status: "running", agent: "x".repeat(1000) })],
+    { columns: 24, rows: 14 });
+  const hugeLines = huge.bodyLines.map(plainLine);
+  assert.match(hugeLines.at(-2), /…]$/);
+  assert.ok(hugeLines.length <= 9, `bounded card, got ${hugeLines.length}`);
+  for (const line of hugeLines) assert.ok(width(line) <= 23, line);
+});
+
 // K1: a reported 0 is exactly the "never measured" ambiguity, so the detail view
 // prints `?`, never a confident `$0.0000`. The list has no cost row at all.
 test("K1: an unknown cost is `?` in the detail view only", () => {

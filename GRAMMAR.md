@@ -51,7 +51,7 @@ When a goal exists, row 2 of the Todo pane (directly under the header divider) r
 A card has up to three rows plus one alert row. Column 0 is the selection column (G12).
 
 1. Row 1: bar, glyph, space, title, then ` · <word>` for failed, aborted, paused, pending and unknown, then ` · ⧖ <compact time>`. Example: `▌⠋ build docs · ⧖ 5m 0s`. A folded completed card inserts `▸ ` between the glyph and the title (`✓ ▸ done one`), mirroring OMO `:402`. The word and the time are reserved before the title is sized. If the title would keep fewer than 10 cells, the time moves to the front of row 3.
-2. Row 2: `[agent]` in `35`, plus ` background` dim when the worker runs in the background. Left out when there is neither.
+2. Row 2: `[agent]` in `35`, plus ` background` dim when the worker runs in the background. Left out when there is neither. A long agent identity continues on following rows instead of being ellipsis-cut: the first row starts `[`, continuation rows are indented under the badge (two cells) and keep the same bar column, and the closing `]` ends the last identity row. At most six continuation rows are drawn; beyond that the last one ends `…]` so the title and metrics stay reachable. The ` background` mark stays visible: it shares the last identity row when it fits and otherwise takes one dim indented row. Mirrors OMO `packages/dag/src/render.mjs:395,399,445-447` (the role keeps its own row instead of being cut short to share one).
 3. Row 3: `48K tok · 12 tools · ctx 41%` in `90`. Each part is left out when its value is missing.
 4. Alert row, only when a retry is pending: `↻ <attempt> · <delay>` in `33`.
 
@@ -87,7 +87,7 @@ These follow the OMO generation-32 empty panes at `3242ad4`. The Workers shape m
 
 ## G11. Truncation mark
 
-The Todo pane cuts with `~`, as OMO `packages/todo/src/render.mjs:70` does. The Workers pane cuts with `…`, as OMO `packages/dag/src/render.mjs:552` fits the DAG pane. The shared `fit` takes the mark as a parameter.
+The Todo pane cuts with `~`, as OMO `packages/todo/src/render.mjs:70` does. The Workers pane cuts with `…`, as OMO `packages/dag/src/render.mjs:552` fits the DAG pane. The shared `fit` takes the mark as a parameter. A Workers agent identity is wrapped on continuation rows first (G7) and only ellipsized after the six-row cap or at a degenerate pane width.
 
 ## G12. Selection column
 
@@ -110,14 +110,14 @@ Every place where GJC differs from OMO `3242ad4` on purpose, with the contract b
 | AC-F4 | Amended: at 24 columns the title keeps at least one cell and the status indicator survives: the glyph for running and done, glyph plus word for the other states. | Running and done show the glyph only. | Owner decision Q3=A (2026-10-20) amends AC-F4. |
 | selection | Column-0 `>` marker (G12): bold `36` in Workers, styled with the task row in Todo. | Bold title only (`packages/dag/src/render.mjs:442`). | GJC j/k/Tab selection. |
 | data-absent | No model, turns or tok/s on cards. | Shows them (`packages/dag/src/render.mjs:387-411`). | The data isn't in the GJC workers projection. |
-| truncation | Todo `~`, Workers `…` (G11). | Same split per pane. | Mirrors OMO per pane. |
+| truncation | Todo `~`, Workers `…` (G11). A Workers agent identity continues on up to six following rows before it is fitted with `…` (G7). | Same split per pane; OMO keeps the role on its own row (`packages/dag/src/render.mjs:395,399,445-447`). | Mirrors OMO per pane; owner #259 keeps existing identity text instead of cutting it. |
 | zh-cn | zh-cn keeps its translated pane strings and only gains the new keys. | ko block is English. | Existing zh-cn values stay byte-identical. |
 | L5b | Amended: the goal row sits under the header divider (row 2), not at row 0 (README.md:86, `test/unit/goal-render.test.mjs:1-3,35`, `test/live/l5-goal.mjs:1-2`). | No goal row. | Header-first grammar. |
 | d | Failed, aborted, paused and pending cards show full rows by default. | Only running cards expand (`packages/dag/src/render.mjs:572-573`). | Problem cards stay readable without a key press. |
 | g | The footer keeps the requested follow state, `Follow ON` or `Follow OFF`, in every connection state; the Workers footer gives EMPTY the live colour `36`. | Always shows a follow label, but forces `Follow OFF` when the source isn't live (`packages/todo/src/render.mjs:230,232-233`, labels at `packages/todo/src/i18n.mjs:11-12,27-28`). | AC-F1. |
 | h | The source error row sits above the body. | Error lines go into the body (`packages/dag/src/render.mjs:561-562`). | Keeps the last good body in place. |
 | i | No scroll range in the footer. | Footer may carry position text. | AC-F1 (footer never truncated, so it stays short). |
-| j | `background` mark on card row 2. | No background mark. | GJC contract AC2.6. |
+| j | `background` mark on card row 2, kept visible on a wrapped identity by sharing its last row or taking one dim indented row (G7). | No background mark. | GJC contract AC2.6; owner #259 continuation rows. |
 | todo-body | Todo body keeps GJC semantics (G5): done and dropped `90`, no strike or strike animation, open phases never folded, no ` ▸` fold suffix. | Done `2;32` struck, dropped `2;31`, strike reveal, open phases outside the in-progress set (or, with nothing in progress, every open phase after the first) folded with ` ▸` (`packages/todo/src/render.mjs:24-40,141-143,149-153`). | IS-7: Todo body and fold semantics are unchanged by this plan. |
 | k | The en catalogue takes the same English wording as ko. | ko block is English (`packages/dag/src/i18n.mjs`). | One English chrome in ko and en. |
 

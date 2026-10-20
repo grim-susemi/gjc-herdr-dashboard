@@ -76,6 +76,23 @@ const connections = new Set(["live", "waiting", "empty", "disconnected", "source
 
 const paint = (text, token, enabled, heading = false) => enabled && style[token]
   ? `\x1b[${heading ? "1;" : ""}${style[token]}m${text}\x1b[0m` : text;
+// Grapheme-aware prefix for the long-identity continuation lines. `fit` only returns
+// a fitted string; wrapping needs the untouched head of the remaining text.
+const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const takeCells = (value, cells) => {
+  if (cells < 1) return "";
+  let out = "", used = 0;
+  for (const { segment } of segmenter.segment(value)) {
+    const size = width(segment);
+    if (used + size > cells) break;
+    out += segment; used += size;
+  }
+  return out;
+};
+// Owner #259: at most six continuation rows after the first `[agent` row. A corrupt
+// projection therefore cannot grow one card past eight identity rows; beyond the cap
+// the last continuation ends `…]` instead of hiding the remaining text silently.
+const MAX_IDENTITY_CONTINUATION = 6;
 // A corrupt scroll (a string, an object, NaN) is 0 rather than NaN: the frame's own
 // `scroll` is a number a caller may persist straight back to disk.
 const clamp = (value, max) => {
@@ -205,7 +222,7 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
   const elapsed = `⧖ ${compactDuration(language, durationOf(card, now))}`;
   const timeSuffix = ` · ${elapsed}`;
   const timeToken = status === "running" ? "time" : "muted";
-  const agent = text(card?.agent);
+  const agent = text(card?.agent).replaceAll("\n", " ");
   const background = card?.background === true;
   const hasAgentRow = !oneRow && Boolean(agent || background);
   const metrics = metricsText(card, language);
@@ -245,22 +262,82 @@ function cardLines(card, { columns, color, language, now, spin, selected, expand
   ];
   if (hasAgentRow) {
     const rowRoom = columns - 2;
-    let content;
     if (agent) {
-      const badge = `[${agent}]`;
       const tail = background ? ` ${t(language, "workers.background")}` : "";
-      const badgeRoom = rowRoom - width(tail);
-      if (badgeRoom < 1) {
-        content = paint(fit(badge, rowRoom, false, "…"), "badge", color);
+      const full = `[${agent}]`;
+      // The ordinary short badge keeps exactly its previous one-row shape.
+      if (rowRoom >= 1 && width(full) + width(tail) <= rowRoom) {
+        lines.push(` ${bar}${paint(full, "badge", color)}` +
+          (tail ? paint(tail, "dim", color) : ""));
       } else {
-        const fittedBadge = fit(badge, badgeRoom, false, "…");
-        const fittedTail = tail ? fit(tail, rowRoom - width(fittedBadge), false, "…") : "";
-        content = `${paint(fittedBadge, "badge", color)}${paint(fittedTail, "dim", color)}`;
+        // OMO `:395,399,445-447`: the role keeps its own rows instead of being cut
+        // short to share one. Only card.agent is wrapped; there is no model source.
+        // `[agent` starts on the first row, continuation rows align under the badge
+        // (two-cell indent) and keep the card's bar column, and the closing `]` ends
+        // the last identity row. The background mark moves to that last row when it
+        // fits and otherwise takes one dim indented row of its own, so it stays visible.
+        const identities = [];
+        const pushIdentity = (styled, plainWidth) => identities.push({ styled, plainWidth });
+        const addTail = (tailText) => {
+          if (!tailText) return;
+          const last = identities.at(-1);
+          if (last && last.plainWidth + width(tailText) <= rowRoom) {
+            last.styled += paint(tailText, "dim", color);
+            last.plainWidth += width(tailText);
+          } else {
+            pushIdentity(`  ${paint(t(language, "workers.background"), "dim", color)}`,
+              2 + width(t(language, "workers.background")));
+          }
+        };
+        if (rowRoom < 3) {
+          // A degenerate pane: one fitted identity row, never a continuation loop.
+          pushIdentity(paint(fit(`${full}${tail}`, Math.max(1, rowRoom), false, "…"),
+            "badge", color), Math.max(1, rowRoom));
+        } else {
+          let remaining = agent;
+          const first = takeCells(remaining, rowRoom - 1);
+          remaining = remaining.slice(first.length);
+          pushIdentity(paint(`[${first}`, "badge", color), 1 + width(first));
+          let continuation = 0;
+          while (remaining !== "") {
+            const lastRoom = rowRoom - 2;
+            // At most six continuation rows in total. The sixth may be the closing
+            // row above; once it cannot close, it becomes the `…]` capped row.
+            if (continuation >= MAX_IDENTITY_CONTINUATION ||
+              (continuation === MAX_IDENTITY_CONTINUATION - 1 &&
+                width(remaining) + 1 > lastRoom)) {
+              const chunk = takeCells(remaining, Math.max(0, lastRoom - 2));
+              const capped = fit(`${chunk}…]`, Math.max(1, lastRoom), false, "…");
+              pushIdentity(`  ${paint(capped, "badge", color)}`, 2 + width(capped));
+              remaining = "";
+              break;
+            }
+            // The whole rest fits on a closing row: `  text]`.
+            if (width(remaining) + 1 <= lastRoom) {
+              pushIdentity(`  ${paint(`${remaining}]`, "badge", color)}`,
+                2 + width(remaining) + 1);
+              remaining = "";
+              break;
+            }
+            const chunk = takeCells(remaining, lastRoom);
+            if (chunk === "") {
+              pushIdentity(`  ${paint(fit(`${remaining}]`, lastRoom, false, "…"), "badge", color)}`,
+                lastRoom);
+              remaining = "";
+              break;
+            }
+            pushIdentity(`  ${paint(chunk, "badge", color)}`, 2 + width(chunk));
+            remaining = remaining.slice(chunk.length);
+            continuation += 1;
+          }
+          addTail(tail);
+        }
+        for (const identity of identities) lines.push(` ${bar}${identity.styled}`);
       }
     } else {
-      content = paint(fit(t(language, "workers.background"), rowRoom, false, "…"), "dim", color);
+      lines.push(` ${bar}${paint(fit(t(language, "workers.background"), rowRoom, false, "…"),
+        "dim", color)}`);
     }
-    lines.push(` ${bar}${content}`);
   }
   if (statsRow) {
     const plain = [timeInTitle ? "" : elapsed, metrics].filter(Boolean).join(" · ");
